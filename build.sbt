@@ -63,3 +63,11 @@ lazy val akkaBackend = (project in file("rdbc-pgsql-akka"))
       Library.typesafeConfig
     )
   ).dependsOn(core, codec, codecScodec)
+
+lazy val playground = (project in file("rdbc-pgsql-playground"))
+  .settings(commonSettings: _*)
+  .settings(
+    name := "playground",
+    publishArtifact := false,
+    bintrayReleaseOnPublish := false
+  ).dependsOn(core, codec, codecScodec, akkaBackend)

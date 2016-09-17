@@ -1,7 +1,7 @@
 import sbt._
 
 object Library {
-  val rdbcCore = "io.rdbc" %% "rdbc-core" % "0.0.2"
+  val rdbcCore = "io.rdbc" %% "rdbc-core" % "0.0.4"
   val reactiveStreams = "org.reactivestreams" % "reactive-streams" % "1.0.0"
   val scodecBits = "org.scodec" %% "scodec-bits" % "1.1.0"
   val scodecCore = "org.scodec" %% "scodec-core" % "1.10.2"
