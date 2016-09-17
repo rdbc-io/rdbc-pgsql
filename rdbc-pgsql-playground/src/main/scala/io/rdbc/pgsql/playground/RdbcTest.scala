@@ -36,6 +36,31 @@ object SelectTest extends App {
   }
 }
 
+object WarningTest extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = 10 seconds
+  val fact = PgConnectionFactory("localhost", 5432, "povder", "povder", "povder", "povder")
+
+  fact.connection().flatMap { conn =>
+
+    val rsFuture = for {
+      stmt <- conn.select("select pg_advisory_unlock(:one)")
+      boundStmt <- stmt.bindF("one" -> 1)
+      rs <- boundStmt.executeForSet()
+    } yield rs
+
+    rsFuture.map { rs =>
+      println("warnings = " + rs.warnings)
+    }
+
+    conn.release()
+
+  }.recover {
+    case fatalEx => fatalEx.printStackTrace()
+  }
+}
+
 object SelectMetadataTest extends App {
 
   implicit val ec = ExecutionContext.global
