@@ -18,17 +18,22 @@ package io.rdbc.pgsql
 
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
-import io.rdbc.core.api.{ColumnMetadata, ResultStream, Row, RowMetadata}
+import io.rdbc.core.ImmutSeq
+import io.rdbc.core.api._
 import io.rdbc.pgsql.core.{PgRow, PgTypeConvRegistry}
 import io.rdbc.pgsql.session.fsm.PgSession.Msg.Outbound.SourceRef
 import org.reactivestreams.Publisher
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class PgResultStream(sourceRef: SourceRef, val typeConvRegistry: PgTypeConvRegistry)(implicit materializer: ActorMaterializer)
+class PgResultStream(sourceRef: SourceRef, val typeConvRegistry: PgTypeConvRegistry)(implicit materializer: ActorMaterializer, ec: ExecutionContext)
   extends ResultStream {
 
-  val rowsAffected: Future[Long] = sourceRef.commandResult //TODO combine this with rows affected
+  val rowsAffected: Future[Long] = sourceRef.rowsAffected //TODO combine this with rows affected
+
+  val warnings: Future[ImmutSeq[Warning]] = sourceRef.warnings.map { warnMsgs =>
+    warnMsgs.map(warnMsg => Warning(warnMsg.statusData.shortInfo, warnMsg.statusData.sqlState))
+  }
 
   val rows: Publisher[Row] = {
     val nameMappings = Map(sourceRef.rowDesc.fieldDescriptions.zipWithIndex.map {

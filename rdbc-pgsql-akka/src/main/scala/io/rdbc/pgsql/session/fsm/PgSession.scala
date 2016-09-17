@@ -21,6 +21,8 @@ import java.net.InetSocketAddress
 import akka.NotUsed
 import akka.actor.{ActorLogging, ActorRef, FSM, Props}
 import akka.stream.scaladsl.Source
+import io.rdbc.core.ImmutSeq
+import io.rdbc.core.api.Warning
 import io.rdbc.core.api.exceptions.StmtExecutionException
 import io.rdbc.pgsql.codec.{Decoder, Encoder}
 import io.rdbc.pgsql.core.auth.Authenticator
@@ -49,7 +51,7 @@ object PgSession {
 
     sealed trait Outbound
     object Outbound {
-      case class SourceRef(source: Source[DataRow, ActorRef], rowDesc: RowDescription, commandResult: Future[Long]) extends Outbound
+      case class SourceRef(source: Source[DataRow, ActorRef], rowDesc: RowDescription, rowsAffected: Future[Long], warnings: Future[ImmutSeq[StatusMessage]]) extends Outbound
       case class Rows(rows: Vector[DescribedDataRow]) extends Outbound
       case class Ready(readyForQuery: ReadyForQuery) extends Outbound
 
