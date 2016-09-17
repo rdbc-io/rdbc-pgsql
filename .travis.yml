@@ -20,3 +20,6 @@ cache:
 before_cache:
 - find $HOME/.ivy2 -name "ivydata-*.properties" -delete
 - find $HOME/.sbt -name "*.lock" -delete
+env:
+  global:
+    secure: E9NN2+J3+W5phJPEwey5O73feRnD1WoTni7ICj1Hj/BMWFASP1rSKvsIGhfj7LBVgXCZraEArQJoDZ3wFjiXlpnzL2720c0rKaz6ZZ0PSL1VXFujdVHKcj9kpYVssqZ2/OsROtT19p5LnVzCAElN+hh/LlrKBXP/kdqJwiXVcpKezivZqaLk64cV/POhpGnK0Sm6abJgXFzhKFWnVC+A2F2Vb+vQuOthfm2hN4vueBPiYPGr93jx73h5/XROu+f00Uxc1+0H+6ND0OA0S9d2q62tS/Mi1k9Sn8/vf0aqn8TM4qP9vzXep5f+l6K+D0FRI1vmCaNwZbncZIyyCT0DFR42+Qo2RvyNLaAItCxTZ1FZ5t2FDtnTPePHlMOWcKqGopNS9ldDQ9ygAGiM9YMeWMUbiUofq4QGJZkIq/j7uJeF76r1BDn69oWtD3/KyeicUxG3AZJ8nCIzIiHYApS0lGDcP8hPV1p8F5cJMT+o0jd4rVAZ7yL4U0hyttGoQPo4IJo38rLnRm6YBqGlo4ffvWx394bX/ZMyMSyVJw1MSf3U/JdoYXQ1mT1MC4nY0Hx8fLAnDr5Etpn4qeF8mUGgGIONesCiMBl55t/csad2wEgxACx6CJKqk5sLH/NBCQHLNuS56AMl6UUomrOkjq6FbJwDPGkV6RlJ9woPLQjBVfA=
