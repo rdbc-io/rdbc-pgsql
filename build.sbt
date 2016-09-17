@@ -36,7 +36,7 @@ lazy val core = (project in file("rdbc-pgsql-core"))
 lazy val codec = (project in file("rdbc-pgsql-codec"))
   .settings(commonSettings: _*)
   .settings(
-    name := "codec",
+    name := "pgsql-codec",
     libraryDependencies ++= Vector(
       Library.scodecBits
     )
@@ -45,7 +45,7 @@ lazy val codec = (project in file("rdbc-pgsql-codec"))
 lazy val codecScodec = (project in file("rdbc-pgsql-codec-scodec"))
   .settings(commonSettings: _*)
   .settings(
-    name := "codec-scodec",
+    name := "pgsql-codec-scodec",
     libraryDependencies ++= Vector(
       Library.scodecBits,
       Library.scodecCore
@@ -55,7 +55,7 @@ lazy val codecScodec = (project in file("rdbc-pgsql-codec-scodec"))
 lazy val akkaBackend = (project in file("rdbc-pgsql-akka"))
   .settings(commonSettings: _*)
   .settings(
-    name := "akka-backend",
+    name := "pgsql-akka-backend",
     libraryDependencies ++= Vector(
       Library.akkaActor,
       Library.scodecBits,
@@ -67,7 +67,7 @@ lazy val akkaBackend = (project in file("rdbc-pgsql-akka"))
 lazy val playground = (project in file("rdbc-pgsql-playground"))
   .settings(commonSettings: _*)
   .settings(
-    name := "playground",
+    name := "pgsql-playground",
     publishArtifact := false,
     bintrayReleaseOnPublish := false
   ).dependsOn(core, codec, codecScodec, akkaBackend)
