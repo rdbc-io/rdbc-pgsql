@@ -18,6 +18,8 @@ package io.rdbc.pgsql.session.fsm
 
 import akka.actor.{ActorRef, Status}
 import akka.stream.scaladsl.Source
+import io.rdbc.core.ImmutSeq
+import io.rdbc.core.api.Warning
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.core.messages.frontend.{PgFrontendMessage, Query}
 import io.rdbc.pgsql.exception.PgStmtExecutionEx
@@ -60,7 +62,9 @@ object QueryingExtendedBehavior {
                        txManagement: Boolean,
                        stage: QueryingExtendedBehavior.Stage,
                        rowsAffected: Option[Long] = None,
-                       commandCompletePromise: Promise[Long] = Promise[Long]) extends PgStateData
+                       rowsAffectedPromise: Promise[Long] = Promise[Long],
+                       warnings: Vector[StatusMessage] = Vector.empty,
+                       warningsPromise: Promise[ImmutSeq[StatusMessage]] = Promise[ImmutSeq[StatusMessage]]) extends PgStateData
 
 }
 
@@ -92,12 +96,12 @@ class QueryingExtendedBehavior(val session: PgSession) extends PgSessionBehavior
       stay
 
     case Event(Received(desc: RowDescription), data: StateData) =>
-      data.requester ! SourceRef(data.source, desc, data.commandCompletePromise.future)
+      data.requester ! SourceRef(data.source, desc, data.rowsAffectedPromise.future, data.warningsPromise.future)
       stay using data.copy(stage = PullingRows)
 
     case Event(Received(io.rdbc.pgsql.core.messages.backend.NoData), data: StateData) => //TODO code dupl
       //TODO if you delete this case clause infinite loop will kick in, investigate this
-      data.requester ! SourceRef(data.source, RowDescription(Vector.empty), data.commandCompletePromise.future)
+      data.requester ! SourceRef(data.source, RowDescription(Vector.empty), data.rowsAffectedPromise.future, data.warningsPromise.future)
       //TODO not pulling rows, stream is empty, complete it (what happens if you complete the stream before subscription?)
       stay using data.copy(stage = PullingRows)
 
@@ -123,45 +127,63 @@ class QueryingExtendedBehavior(val session: PgSession) extends PgSessionBehavior
           stay using data.copy(stage = RollingBackTx(error)) //TODO rollingBackTx has to carry data about stage at which error occurred. after the rollback if stage was "binding" requester has to be informed
 
         case PullingComplete =>
-          data.publisher.foreach(_ ! Status.Success("")) //TODO ""
-          data.commandCompletePromise.success(data.rowsAffected.getOrElse(0L))
+          onSuccess(data)
           goto(SessionIdle) using SessionIdleBehavior.StateData(txStatus)
 
         case ComittingTx if txStatus == ActiveTxStatus =>
           stay //TODO do I have to do the same for the rollback?
 
         case ComittingTx if txStatus == IdleTxStatus =>
-          data.publisher.foreach(_ ! Status.Success("")) //TODO ""
-          data.commandCompletePromise.success(data.rowsAffected.getOrElse(0L))
+          onSuccess(data)
           goto(SessionIdle) using SessionIdleBehavior.StateData(txStatus)
 
         case RollingBackTx(error) =>
-          val ex = PgStmtExecutionEx(error.statusData)
-          data.publisher.foreach(_ ! Status.Failure(ex))
-          data.commandCompletePromise.failure(ex)
+          onPullingFailure(error, data)
           goto(SessionIdle) using SessionIdleBehavior.StateData(txStatus)
 
         case Errored(RollingBackTx(error), _) =>
           //TODO error during rollback is swallowed, and cause of the rollback is sent to the client, decide what to do
-          val ex = PgStmtExecutionEx(error.statusData)
-          data.publisher.foreach(_ ! Status.Failure(ex))
-          data.commandCompletePromise.failure(ex)
+          onPullingFailure(error, data)
           goto(SessionIdle) using SessionIdleBehavior.StateData(txStatus)
 
         case Errored(Binding, error) =>
-          data.publisher.foreach(_ ! Status.Failure(new Exception(""))) //TODO ex cause
-          data.requester ! PgSessionError.PgReported(error)
+          onBindingFailure(error, data)
           goto(SessionIdle) using SessionIdleBehavior.StateData(txStatus)
 
         case Errored(stage, error) =>
           val ex = PgStmtExecutionEx(error.statusData)
           data.publisher.foreach(_ ! Status.Failure(ex))
-          data.commandCompletePromise.failure(ex)
+          data.rowsAffectedPromise.failure(ex)
           goto(SessionIdle) using SessionIdleBehavior.StateData(txStatus)
       }
 
+    case Event(Received(warn: StatusMessage), data: StateData) if isWarning(warn) =>
+      stay using data.copy(warnings = data.warnings :+ warn)
+
     case Event(Received(err: ErrorMessage), data: StateData) =>
       stay using data.copy(stage = Errored(data.stage, err))
+  }
 
+  private def onSuccess(data: StateData): Unit = {
+    data.publisher.foreach(_ ! Status.Success("")) //TODO ""
+    data.rowsAffectedPromise.success(data.rowsAffected.getOrElse(0L))
+    data.warningsPromise.success(data.warnings)
+  }
+
+  private def onPullingFailure(error: ErrorMessage, data: StateData): Unit = {
+    val ex = PgStmtExecutionEx(error.statusData)
+    data.publisher.foreach(_ ! Status.Failure(ex))
+    data.rowsAffectedPromise.failure(ex)
+    data.warningsPromise.failure(ex)
+  }
+
+  private def onBindingFailure(error: ErrorMessage, data: StateData): Unit = {
+    data.publisher.foreach(_ ! Status.Failure(new Exception(""))) //TODO ex cause
+    data.requester ! PgSessionError.PgReported(error)
+  }
+
+  private def isWarning(statusMsg: StatusMessage): Boolean = {
+    val sqlState = statusMsg.statusData.sqlState
+    sqlState.startsWith("01") || sqlState.startsWith("02")
   }
 }
