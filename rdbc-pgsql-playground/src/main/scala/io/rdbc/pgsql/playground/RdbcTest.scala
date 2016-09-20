@@ -3,8 +3,8 @@ package io.rdbc.pgsql.playground
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source}
-import io.rdbc.core.api.ResultSet
 import io.rdbc.pgsql.PgConnectionFactory
+import io.rdbc.sapi.ResultSet
 import org.reactivestreams.Publisher
 
 import scala.concurrent.duration._
@@ -12,25 +12,25 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 object SelectTest extends App {
-
   implicit val ec = ExecutionContext.global
   implicit val timeout = 10 seconds
   val fact = PgConnectionFactory("localhost", 5432, "povder", "povder", "povder", "povder")
-
+  //TODO commit never happens during this test and a ClosePortal message is sent, which is unhandled
   fact.connection().flatMap { conn =>
 
     val idsFuture = for {
       stmt <- conn.select("select * from genkeytest where 1 = :one")
       boundStmt <- stmt.bindF("one" -> 1)
-      id <- boundStmt.executeForSingle[Int](_.int("id"))
+      id <- boundStmt.executeForValue[Int](_.int("id"))
     } yield id
 
-    idsFuture.map { maybeId =>
+    val fut = idsFuture.map { maybeId =>
       println("maybe id = " + maybeId)
     }
 
     conn.release()
 
+    fut
   }.recover {
     case fatalEx => fatalEx.printStackTrace()
   }
@@ -154,7 +154,7 @@ object ParseTest extends App {
   implicit val ec = ExecutionContext.global
   val fact = PgConnectionFactory("localhost", 5432, "povder", "povder", "povder", "povder")
   implicit val timeout = 10 seconds
-
+  //TODO this test doesn't work anymore, closePportal is sent and that's it
   val futResult: Future[Unit] = fact.connection().flatMap { conn =>
 
     val rsFut = for {

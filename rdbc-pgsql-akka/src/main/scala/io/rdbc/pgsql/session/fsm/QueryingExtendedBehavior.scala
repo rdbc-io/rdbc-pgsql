@@ -18,8 +18,7 @@ package io.rdbc.pgsql.session.fsm
 
 import akka.actor.{ActorRef, Status}
 import akka.stream.scaladsl.Source
-import io.rdbc.core.ImmutSeq
-import io.rdbc.core.api.Warning
+import io.rdbc.ImmutSeq
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.core.messages.frontend.{PgFrontendMessage, Query}
 import io.rdbc.pgsql.exception.PgStmtExecutionEx

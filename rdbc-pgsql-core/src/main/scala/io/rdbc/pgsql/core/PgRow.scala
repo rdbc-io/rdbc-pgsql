@@ -16,65 +16,53 @@
 
 package io.rdbc.pgsql.core
 
-import io.rdbc.core.api.exceptions.ResultProcessingException
-import io.rdbc.core.api.exceptions.ResultProcessingException.{MissingColumnException, NoSuitableConverterFoundException}
-import io.rdbc.core.api.{Row, TypeConverterRegistry}
-import io.rdbc.core.typeconv.{IntConverter, LongConverter, StringConverter}
+import io.rdbc.api.exceptions.ResultProcessingException.MissingColumnException
+import io.rdbc.implbase.RowPartialImpl
 import io.rdbc.pgsql.core.messages.backend.RowDescription
 import io.rdbc.pgsql.core.messages.data.DbValFormat.{BinaryDbValFormat, TextualDbValFormat}
 import io.rdbc.pgsql.core.messages.data.{DataType, FieldValue, NotNullFieldValue, NullFieldValue}
+import io.rdbc.sapi.{Row, TypeConverterRegistry}
 import scodec.bits.ByteVector
 
-import scala.concurrent.Future
+class PgRow(rowDesc: RowDescription,
+            cols: IndexedSeq[FieldValue],
+            nameMapping: Map[String, Int],
+            rdbcTypeConvRegistry: TypeConverterRegistry,
+            pgTypeConvRegistry: PgTypeConvRegistry)
+  extends Row with RowPartialImpl {
 
-/**
-  * Created by krzysztofpado on 21/08/16.
-  */
-class PgRow(rowDesc: RowDescription, cols: IndexedSeq[FieldValue], nameMapping: Map[String, Int], tconvRegistry: PgTypeConvRegistry) extends Row {
+  val typeConverterRegistry = rdbcTypeConvRegistry
 
-  val typeConverterRegistry = TypeConverterRegistry(StringConverter, IntConverter, LongConverter)
-  //TODO
-
-  override def obj[T](name: String, cls: Class[T]): T = {
+  protected def notConverted(name: String): Any = {
     nameMapping.get(name) match {
-      case Some(idx) => obj[T](idx, cls)
+      case Some(idx) => notConverted(idx)
       case None => throw MissingColumnException(name)
     }
   }
 
-  private def textualToObj(pgType: DataType, textualVal: String): Any = {
-    tconvRegistry.byTypeOid(pgType.oid).map(_.toObj(textualVal))
-      .getOrElse(throw new Exception("unsupported type")) //TODO
-  }
-
-  private def binaryToObj(pgType: DataType, binaryVal: ByteVector): Any = {
-    tconvRegistry.byTypeOid(pgType.oid).map(_.toObj(binaryVal))
-      .getOrElse(throw new Exception("unsupported type")) //TODO
-  }
-
-  override def obj[A](idx: Int, cls: Class[A]): A = {
+  protected def notConverted(idx: Int): Any = {
     //TODO preconditions fucking everywhere
     //TODO for returning inserts this is 0 based, for selects not, fix this
     val fieldDesc = rowDesc.fieldDescriptions(idx) //TODO this must be indexed seq, not List
     val fieldVal = cols(idx)
 
-    val anyFieldVal = fieldVal match {
-      case NullFieldValue => null.asInstanceOf[A]
+    fieldVal match {
+      case NullFieldValue => null
       case NotNullFieldValue(rawFieldVal) =>
         fieldDesc.fieldFormat match {
           case TextualDbValFormat => textualToObj(fieldDesc.dataType, new String(rawFieldVal.toArray)) //TODO charset
           case BinaryDbValFormat => binaryToObj(fieldDesc.dataType, rawFieldVal)
         }
     }
-    if (anyFieldVal == null) null.asInstanceOf[A]
-    else {
-      if (cls.isInstance(anyFieldVal)) {
-        anyFieldVal.asInstanceOf[A]
-      } else {
-        typeConverterRegistry.converters.get(cls)
-          .map(converter => converter.fromAny(anyFieldVal).asInstanceOf[A])
-          .getOrElse(throw NoSuitableConverterFoundException(anyFieldVal))
-      }
-    }
+  }
+
+  private def textualToObj(pgType: DataType, textualVal: String): Any = {
+    pgTypeConvRegistry.byTypeOid(pgType.oid).map(_.toObj(textualVal))
+      .getOrElse(throw new Exception("unsupported type")) //TODO
+  }
+
+  private def binaryToObj(pgType: DataType, binaryVal: ByteVector): Any = {
+    pgTypeConvRegistry.byTypeOid(pgType.oid).map(_.toObj(binaryVal))
+      .getOrElse(throw new Exception("unsupported type")) //TODO
   }
 }

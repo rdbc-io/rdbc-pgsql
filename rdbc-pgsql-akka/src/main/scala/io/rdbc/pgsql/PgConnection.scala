@@ -22,29 +22,31 @@ import akka.actor.ActorSystem
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import io.rdbc.core.api._
-import io.rdbc.core.api.exceptions.{BeginTxException, _}
+import io.rdbc.sapi._
+import io.rdbc.api.exceptions.{BeginTxException, _}
+import io.rdbc.implbase.{ConnectionPartialImpl, ReturningInsertImpl}
 import io.rdbc.pgsql.core.PgTypeConvRegistry
 import io.rdbc.pgsql.core.messages.backend.{ErrorMessage, ParseComplete}
 import io.rdbc.pgsql.core.messages.frontend.{Parse, Query}
 import io.rdbc.pgsql.exception.{PgParseEx, PgStmtExecutionEx}
 import io.rdbc.pgsql.session.fsm.PgSession.Msg.Inbound.Cancel
 import io.rdbc.pgsql.session.fsm.PgSession.Msg.Outbound.Rows
+import io.rdbc.sapi.Connection
 import org.reactivestreams.Publisher
 
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
-class PgConnection /*protected[pgsql]*/ (val pgTypeConvRegistry: PgTypeConvRegistry)(implicit sessionRef: SessionRef, system: ActorSystem, materializer: ActorMaterializer)
-  extends Connection {
+class PgConnection /*protected[pgsql]*/ (val rdbcTypeConvRegistry: TypeConverterRegistry, val pgTypeConvRegistry: PgTypeConvRegistry)(implicit sessionRef: SessionRef, system: ActorSystem, materializer: ActorMaterializer)
+  extends Connection with ConnectionPartialImpl {
 
   private val stmtCache: mutable.Map[String, CachedPgStatement] = mutable.Map.empty
   //TODO replace with LRU map, remove unused statements from the db
   private val stmtParseCounter: mutable.Map[String, Int] = mutable.Map.empty.withDefaultValue(0)
   private var cachedStmtCounter: Int = 0
 
-  override implicit val ec: ExecutionContext = system.dispatcher
+  implicit val ec: ExecutionContext = system.dispatcher
 
   override def beginTx()(implicit timeout: FiniteDuration): Future[Unit] = {
     executeSimpleStatement("BEGIN")
@@ -88,15 +90,15 @@ class PgConnection /*protected[pgsql]*/ (val pgTypeConvRegistry: PgTypeConvRegis
 
           parseResultFut.map {
             case ParseComplete =>
-              val parsedStmt = new CachedPgStatement(stmtName, nativeStmt, pgTypeConvRegistry)
+              val parsedStmt = new CachedPgStatement(stmtName, nativeStmt, rdbcTypeConvRegistry, pgTypeConvRegistry)
               stmtCache.put(sql, parsedStmt)
-              new CachedPgStatement(stmtName, nativeStmt, pgTypeConvRegistry)
+              new CachedPgStatement(stmtName, nativeStmt, rdbcTypeConvRegistry, pgTypeConvRegistry)
 
             case err: ErrorMessage => throw PgParseEx(err.statusData)
           }
 
         } else {
-          Future.successful(new NotCachedPgStatement(nativeStmt, None, pgTypeConvRegistry))
+          Future.successful(new NotCachedPgStatement(nativeStmt, None, rdbcTypeConvRegistry, pgTypeConvRegistry))
         }
     }
   }
@@ -106,7 +108,7 @@ class PgConnection /*protected[pgsql]*/ (val pgTypeConvRegistry: PgTypeConvRegis
   override def returningInsert(sql: String, keyColumns: String*): Future[ReturningInsert] = {
     val returningSql = sql + " returning " + keyColumns.mkString(",")
     statement(returningSql).map { stmt =>
-      new ReturningInsert(stmt)
+      new ReturningInsertImpl(stmt)
     }
   }
 
