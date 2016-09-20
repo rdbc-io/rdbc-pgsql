@@ -26,7 +26,9 @@ lazy val core = (project in file("rdbc-pgsql-core"))
   .settings(
     name := "pgsql-core",
     libraryDependencies ++= Vector(
-      Library.rdbcCore,
+      Library.rdbcScalaApi,
+      Library.rdbcTypeconv,
+      Library.rdbcImplbase,
       Library.scodecBits,
       Library.scodecCore,
       Library.typesafeConfig
@@ -58,6 +60,7 @@ lazy val akkaBackend = (project in file("rdbc-pgsql-akka"))
     name := "pgsql-akka-backend",
     libraryDependencies ++= Vector(
       Library.akkaActor,
+      Library.akkaStream,
       Library.scodecBits,
       Library.scodecAkka,
       Library.typesafeConfig

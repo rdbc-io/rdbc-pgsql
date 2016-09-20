@@ -18,15 +18,17 @@ package io.rdbc.pgsql
 
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
-import io.rdbc.core.ImmutSeq
-import io.rdbc.core.api._
+import io.rdbc.ImmutSeq
 import io.rdbc.pgsql.core.{PgRow, PgTypeConvRegistry}
 import io.rdbc.pgsql.session.fsm.PgSession.Msg.Outbound.SourceRef
+import io.rdbc.sapi._
 import org.reactivestreams.Publisher
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class PgResultStream(sourceRef: SourceRef, val typeConvRegistry: PgTypeConvRegistry)(implicit materializer: ActorMaterializer, ec: ExecutionContext)
+class PgResultStream(sourceRef: SourceRef,
+                     val rdbcTypeConvRegistry: TypeConverterRegistry,
+                     val pgTypeConvRegistry: PgTypeConvRegistry)(implicit materializer: ActorMaterializer, ec: ExecutionContext)
   extends ResultStream {
 
   val rowsAffected: Future[Long] = sourceRef.rowsAffected //TODO combine this with rows affected
@@ -42,13 +44,13 @@ class PgResultStream(sourceRef: SourceRef, val typeConvRegistry: PgTypeConvRegis
     )
 
     sourceRef.source.map { dr =>
-      new PgRow(sourceRef.rowDesc, dr.fieldValues, nameMappings, typeConvRegistry)
+      new PgRow(sourceRef.rowDesc, dr.fieldValues, nameMappings, rdbcTypeConvRegistry, pgTypeConvRegistry)
     }.runWith(Sink.asPublisher(fanout = false))
   }
 
   lazy val metadata: RowMetadata = {
     val columnsMetadata = sourceRef.rowDesc.fieldDescriptions.map { fdesc =>
-      ColumnMetadata(fdesc.name, fdesc.dataType.oid.code.toString, typeConvRegistry.oid2conv.get(fdesc.dataType.oid).map(_.primaryClass))
+      ColumnMetadata(fdesc.name, fdesc.dataType.oid.code.toString, pgTypeConvRegistry.oid2conv.get(fdesc.dataType.oid).map(_.primaryClass))
     }
     RowMetadata(columnsMetadata)
   }

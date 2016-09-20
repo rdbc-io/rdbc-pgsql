@@ -23,9 +23,7 @@ import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import com.typesafe.config.ConfigValueFactory._
 import com.typesafe.config.{Config, ConfigFactory}
-import io.rdbc.core.api.exceptions.ConnectException
-import io.rdbc.core.api.exceptions.ConnectException.{AuthFailureException, UncategorizedConnectException}
-import io.rdbc.core.api.{Connection, ConnectionFactory}
+import io.rdbc.api.exceptions.ConnectException.{AuthFailureException, UncategorizedConnectException}
 import io.rdbc.pgsql.codec.{DecoderFactory, EncoderFactory}
 import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.auth.{Authenticator, UsernamePasswordAuthenticator}
@@ -34,6 +32,8 @@ import io.rdbc.pgsql.exception.PgConnectEx
 import io.rdbc.pgsql.session.fsm.PgSession
 import io.rdbc.pgsql.session.fsm.PgSession.Msg.Inbound.StartSession
 import io.rdbc.pgsql.session.fsm.PgSession.Msg.Outbound.{PgSessionError, Ready}
+import io.rdbc.sapi.{Connection, ConnectionFactory, TypeConverterRegistry}
+import io.rdbc.typeconv.BuiltInConverters
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -82,7 +82,7 @@ object PgConnectionFactory {
     val authenticatorConf = config.getConfig("authenticator")
     val authenticator = authenticatorConf.getClassInstance[Authenticator]("class", authenticatorConf)
 
-    val typeConvRegistry = PgTypeConvRegistry.apply(config.getClassInstances[PgTypeConv]("type-converters"): _*)
+    val pgTypeConvRegistry = PgTypeConvRegistry.apply(config.getClassInstances[PgTypeConv]("type-converters"): _*)
 
     val maybeOptions = config.getOptionalConfig("options")
 
@@ -98,7 +98,8 @@ object PgConnectionFactory {
       dbuser = dbuser,
       database = database,
       authenticator = authenticator,
-      typeConvRegistry = typeConvRegistry
+      rdbcTypeConvRegistry = BuiltInConverters, //TODO
+      pgTypeConvRegistry = pgTypeConvRegistry
     )
 
   }
@@ -115,12 +116,15 @@ class PgConnectionFactory(
                            val dbuser: String,
                            val database: String,
                            val authenticator: Authenticator,
-                           val typeConvRegistry: PgTypeConvRegistry
+                           rdbcTypeConvRegistry: TypeConverterRegistry,
+                           val pgTypeConvRegistry: PgTypeConvRegistry
                          ) extends ConnectionFactory {
 
   implicit val implActorSystem = actorSystem
   implicit val materializer = ActorMaterializer()
   implicit val dispatcher = actorSystem.dispatcher
+
+  val typeConverterRegistry = rdbcTypeConvRegistry
 
   override def connection(): Future[Connection] = {
     val encoder = encoderFactory.encoder()
@@ -139,7 +143,7 @@ class PgConnectionFactory(
     }.flatMap {
       case Ready(_) =>
         implicit val sref = SessionRef(sessionActor)
-        Future.successful(new PgConnection(typeConvRegistry))
+        Future.successful(new PgConnection(rdbcTypeConvRegistry, pgTypeConvRegistry))
 
       case PgSessionError.Auth(msg) => Future.failed(AuthFailureException(msg))
 
