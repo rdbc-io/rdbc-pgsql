@@ -16,10 +16,10 @@
 
 package io.rdbc.pgsql.exception
 
-import io.rdbc.core.api.exceptions.ConnectException.{AuthFailureException, UncategorizedConnectException}
-import io.rdbc.core.api.exceptions.ParseException.{SyntaxErrorException, UncategorizedParseException}
-import io.rdbc.core.api.exceptions.{ConnectException, ParseException, StmtExecutionException}
-import io.rdbc.core.api.exceptions.StmtExecutionException._
+import io.rdbc.api.exceptions.ConnectException.{AuthFailureException, UncategorizedConnectException}
+import io.rdbc.api.exceptions.ParseException.{SyntaxErrorException, UncategorizedParseException}
+import io.rdbc.api.exceptions._
+import io.rdbc.api.exceptions.StmtExecutionException._
 import io.rdbc.pgsql.core.messages.backend.StatusData
 
 trait PgEx {
@@ -27,7 +27,7 @@ trait PgEx {
 }
 
 object PgStmtExecutionEx {
-  def apply(statusData: StatusData): StmtExecutionException = {
+  def apply(statusData: StatusData): RdbcException = {
     if (statusData.sqlState == "42501") new PgUnauthorizedException(statusData)
     else if (statusData.sqlState == "57014") new PgTimeoutException(statusData)
     else if (statusData.sqlState.startsWith("42")) new PgInvalidQueryException(statusData)
@@ -48,7 +48,7 @@ class PgConstraintViolationException(val pgStatusData: StatusData)
     msg = pgStatusData.shortInfo
   ) with PgEx
 
-class PgTimeoutException(val pgStatusData: StatusData) extends ExecuteTimeoutException(pgStatusData.shortInfo) with PgEx
+class PgTimeoutException(val pgStatusData: StatusData) extends TimeoutException(pgStatusData.shortInfo) with PgEx
 
 class PgUncategorizedExecutionException(val pgStatusData: StatusData) extends UncategorizedExecutionException(pgStatusData.shortInfo, pgStatusData.detail) with PgEx
 

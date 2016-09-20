@@ -21,9 +21,7 @@ import java.net.InetSocketAddress
 import akka.NotUsed
 import akka.actor.{ActorLogging, ActorRef, FSM, Props}
 import akka.stream.scaladsl.Source
-import io.rdbc.core.ImmutSeq
-import io.rdbc.core.api.Warning
-import io.rdbc.core.api.exceptions.StmtExecutionException
+import io.rdbc.ImmutSeq
 import io.rdbc.pgsql.codec.{Decoder, Encoder}
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.messages.backend._

@@ -47,7 +47,7 @@ class BindSubscriber extends ActorSubscriber {
       queue :+= bind
       akka.pattern.after(3 seconds, using = context.system.scheduler) {
         self ! "ok"
-        Future.successful()
+        Future.successful(())
       }
 
     case "ok" =>

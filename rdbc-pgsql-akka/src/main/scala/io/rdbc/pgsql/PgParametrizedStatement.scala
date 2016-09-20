@@ -20,18 +20,19 @@ import java.util.concurrent.TimeUnit
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import io.rdbc.core.api.exceptions.StmtExecutionException.UncategorizedExecutionException
-import io.rdbc.core.api.{ParametrizedStatement, ResultStream}
+import io.rdbc.api.exceptions.StmtExecutionException.UncategorizedExecutionException
+import io.rdbc.implbase.ParametrizedStatementPartialImpl
 import io.rdbc.pgsql.core.PgTypeConvRegistry
 import io.rdbc.pgsql.core.messages.frontend._
 import io.rdbc.pgsql.exception.PgStmtExecutionEx
 import io.rdbc.pgsql.session.fsm.PgSession.Msg.Inbound.{Cancel, ExecuteCachedStmt, ParseAndExecuteStmt}
 import io.rdbc.pgsql.session.fsm.PgSession.Msg.Outbound.{PgSessionError, SourceRef}
+import io.rdbc.sapi.{ParametrizedStatement, ResultStream, TypeConverterRegistry}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
-trait PgParametrizedStatement extends ParametrizedStatement {
+trait PgParametrizedStatement extends ParametrizedStatement with ParametrizedStatementPartialImpl {
 
   override implicit val ec: ExecutionContext = system.dispatcher
 
@@ -43,7 +44,8 @@ trait PgParametrizedStatement extends ParametrizedStatement {
 
   implicit def materializer: ActorMaterializer
 
-  def typeConvRegistry: PgTypeConvRegistry
+  def pgTypeConvRegistry: PgTypeConvRegistry
+  def rdbcTypeConvRegistry: TypeConverterRegistry
 
   override def executeForStream()(implicit timeout: FiniteDuration): Future[ResultStream] = {
 
@@ -51,7 +53,7 @@ trait PgParametrizedStatement extends ParametrizedStatement {
     val askResult = akka.pattern.ask(sessionRef.actor, requestMsg)(akka.util.Timeout(100, TimeUnit.DAYS)).flatMap {
       case PgSessionError.PgReported(err) => Future.failed(PgStmtExecutionEx(err.statusData))
       case PgSessionError.Uncategorized(errMsg) => Future.failed(UncategorizedExecutionException(errMsg))
-      case sref: SourceRef => Future.successful(new PgResultStream(sref, typeConvRegistry))
+      case sref: SourceRef => Future.successful(new PgResultStream(sref, rdbcTypeConvRegistry, pgTypeConvRegistry))
     }
 
     //TODO this is a soft timeout that asks PG to cancel the query
@@ -59,7 +61,7 @@ trait PgParametrizedStatement extends ParametrizedStatement {
       if (!askResult.isCompleted) {
         sessionRef.actor ! Cancel
       }
-      Future.successful()
+      Future.successful(())
     }
 
     askResult
@@ -67,10 +69,18 @@ trait PgParametrizedStatement extends ParametrizedStatement {
   }
 }
 
-class NotCachedPgParametrizedStatement(val sql: String, val stmtName: Option[String], val params: IndexedSeq[DbValue], val typeConvRegistry: PgTypeConvRegistry)(implicit val sessionRef: SessionRef, val system: ActorSystem, val materializer: ActorMaterializer) extends PgParametrizedStatement {
+class NotCachedPgParametrizedStatement(
+                                        val sql: String,
+                                        val stmtName: Option[String],
+                                        val params: IndexedSeq[DbValue],
+                                        val rdbcTypeConvRegistry: TypeConverterRegistry,
+                                        val pgTypeConvRegistry: PgTypeConvRegistry)(implicit val sessionRef: SessionRef, val system: ActorSystem, val materializer: ActorMaterializer) extends PgParametrizedStatement {
   val requestMsg: Any = ParseAndExecuteStmt(Parse(stmtName, sql, List.empty), Bind(stmtName.map(_ + "_portal"), stmtName, params.toList, AllTextual)) //TODO toList, //TODO AllTextual
 }
 
-class CachedPgParametrizedStatement(val stmtName: String, val params: IndexedSeq[DbValue], val typeConvRegistry: PgTypeConvRegistry)(implicit val sessionRef: SessionRef, val system: ActorSystem, val materializer: ActorMaterializer) extends PgParametrizedStatement {
+class CachedPgParametrizedStatement(val stmtName: String,
+                                    val params: IndexedSeq[DbValue],
+                                    val rdbcTypeConvRegistry: TypeConverterRegistry,
+                                    val pgTypeConvRegistry: PgTypeConvRegistry)(implicit val sessionRef: SessionRef, val system: ActorSystem, val materializer: ActorMaterializer) extends PgParametrizedStatement {
   val requestMsg: Any = ExecuteCachedStmt(Bind(Some(s"${stmtName}_portal"), Some(stmtName), params.toList, AllTextual)) //TODO toList, //TODO AllTextual
 }
