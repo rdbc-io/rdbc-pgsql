@@ -1,3 +1,5 @@
+import de.heikoseeberger.sbtheader.license.Apache2_0
+
 lazy val commonSettings = Seq(
   organization := "io.rdbc.pgsql",
   version := "0.0.1",
@@ -10,7 +12,10 @@ lazy val commonSettings = Seq(
     "-encoding", "UTF-8"
   ),
   licenses += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0.html")),
-  bintrayOrganization := Some("rdbc")
+  bintrayOrganization := Some("rdbc"),
+  headers := Map(
+    "scala" -> Apache2_0("2016", "Krzysztof Pado")
+  )
 )
 
 lazy val rdbcPgsql = (project in file("."))
@@ -19,7 +24,7 @@ lazy val rdbcPgsql = (project in file("."))
     publishArtifact := false,
     bintrayReleaseOnPublish := false
   )
-  .aggregate(core, codec, codecScodec, akkaBackend)
+  .aggregate(core, scodec, nettyBackend)
 
 lazy val core = (project in file("rdbc-pgsql-core"))
   .settings(commonSettings: _*)
@@ -31,20 +36,12 @@ lazy val core = (project in file("rdbc-pgsql-core"))
       Library.rdbcImplbase,
       Library.scodecBits,
       Library.scodecCore,
-      Library.typesafeConfig
+      Library.typesafeConfig,
+      Library.stm
     )
   )
 
-lazy val codec = (project in file("rdbc-pgsql-codec"))
-  .settings(commonSettings: _*)
-  .settings(
-    name := "pgsql-codec",
-    libraryDependencies ++= Vector(
-      Library.scodecBits
-    )
-  ).dependsOn(core)
-
-lazy val codecScodec = (project in file("rdbc-pgsql-codec-scodec"))
+lazy val scodec = (project in file("rdbc-pgsql-scodec"))
   .settings(commonSettings: _*)
   .settings(
     name := "pgsql-codec-scodec",
@@ -52,20 +49,21 @@ lazy val codecScodec = (project in file("rdbc-pgsql-codec-scodec"))
       Library.scodecBits,
       Library.scodecCore
     )
-  ).dependsOn(codec)
+  ).dependsOn(core)
 
-lazy val akkaBackend = (project in file("rdbc-pgsql-akka"))
+lazy val nettyBackend = (project in file("rdbc-pgsql-netty"))
   .settings(commonSettings: _*)
   .settings(
-    name := "pgsql-akka-backend",
+    name := "pgsql-netty-backend",
     libraryDependencies ++= Vector(
-      Library.akkaActor,
-      Library.akkaStream,
-      Library.scodecBits,
-      Library.scodecAkka,
-      Library.typesafeConfig
+      Library.nettyHandler,
+      Library.nettyEpoll,
+      Library.rdbcTypeconv,
+      Library.stm,
+      Library.scalaLogging,
+      Library.logback
     )
-  ).dependsOn(core, codec, codecScodec)
+  ).dependsOn(core, scodec)
 
 lazy val playground = (project in file("rdbc-pgsql-playground"))
   .settings(commonSettings: _*)
@@ -73,4 +71,4 @@ lazy val playground = (project in file("rdbc-pgsql-playground"))
     name := "pgsql-playground",
     publishArtifact := false,
     bintrayReleaseOnPublish := false
-  ).dependsOn(core, codec, codecScodec, akkaBackend)
+  ).dependsOn(core, scodec, nettyBackend)

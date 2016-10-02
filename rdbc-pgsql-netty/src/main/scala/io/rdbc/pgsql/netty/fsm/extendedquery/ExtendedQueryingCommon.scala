@@ -14,26 +14,21 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.auth
+package io.rdbc.pgsql.netty.fsm.extendedquery
 
-import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.messages.backend.auth.AuthBackendMessage
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
+import io.rdbc.pgsql.core.messages.backend.{NoticeMessage, PgBackendMessage, StatusMessage}
+import io.rdbc.pgsql.netty.fsm.State.Outcome
+import io.rdbc.pgsql.netty.StatusMsgUtil.isWarning
 
-sealed trait AuthState {
-  def answers: Seq[PgFrontendMessage]
-}
+abstract protected class ExtendedQueryingCommon extends ExtendedQuerying {
 
-object AuthState {
+  private var _warnings = Vector.empty[NoticeMessage]
 
-  case class AuthContinue(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
+  protected def warnings = _warnings
 
-  case class AuthComplete(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-}
-
-trait Authenticator {
-  def authenticate(authReqMessage: AuthBackendMessage): AuthState
-
-  def supports(authReqMessage: AuthBackendMessage): Boolean
+  protected def handleCommon: PartialFunction[PgBackendMessage, Outcome] = {
+    case warning: NoticeMessage if isWarning(warning) =>
+      _warnings = _warnings :+ warning
+      stay
+  }
 }

@@ -14,26 +14,18 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.auth
+package io.rdbc.pgsql.core.types
 
-import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.messages.backend.auth.AuthBackendMessage
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
+import io.rdbc.pgsql.core.SessionParams
+import io.rdbc.pgsql.core.messages.data.Oid
 
-sealed trait AuthState {
-  def answers: Seq[PgFrontendMessage]
-}
+trait Int4 extends PgType[Int] {
+  val typeOid = Oid(23)
+  val cls = classOf[Int]
+  override val otherClasses = Vector(classOf[Integer])
 
-object AuthState {
+  override def toObj(textualVal: String)(implicit sessionParams: SessionParams): Int = textualVal.toInt
 
-  case class AuthContinue(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
+  override def toPgTextual(obj: Int)(implicit sessionParams: SessionParams): String = obj.toString
 
-  case class AuthComplete(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-}
-
-trait Authenticator {
-  def authenticate(authReqMessage: AuthBackendMessage): AuthState
-
-  def supports(authReqMessage: AuthBackendMessage): Boolean
 }
