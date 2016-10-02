@@ -14,26 +14,27 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.auth
+package io.rdbc.pgsql.netty.fsm
 
-import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.messages.backend.auth.AuthBackendMessage
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
+import io.rdbc.pgsql.core.messages.backend.PgBackendMessage
+import io.rdbc.pgsql.netty.fsm.State.{Goto, Outcome, Stay}
 
-sealed trait AuthState {
-  def answers: Seq[PgFrontendMessage]
+object State {
+  sealed trait Outcome
+
+  case class Goto(next: State, afterTransition: Option[() => Unit]) extends Outcome {
+    def andThen(block: => Unit): Goto = {
+      Goto(next, Some(() => block))
+    }
+  }
+
+  case object Stay extends Outcome
+  case object Unhandled extends Outcome
 }
 
-object AuthState {
-
-  case class AuthContinue(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-  case class AuthComplete(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-}
-
-trait Authenticator {
-  def authenticate(authReqMessage: AuthBackendMessage): AuthState
-
-  def supports(authReqMessage: AuthBackendMessage): Boolean
+trait State {
+  def handleMsg: PartialFunction[PgBackendMessage, Outcome]
+  def shortDesc: String
+  def stay = Stay
+  def goto(next: State) = Goto(next, None)
 }

@@ -14,26 +14,17 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.auth
+package io.rdbc.pgsql.netty.fsm
 
-import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.messages.backend.auth.AuthBackendMessage
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
+import io.rdbc.pgsql.core.messages.backend.NoticeMessage
+import io.rdbc.pgsql.netty.PgRowPublisher
 
-sealed trait AuthState {
-  def answers: Seq[PgFrontendMessage]
-}
+import scala.concurrent.Promise
 
-object AuthState {
+package object extendedquery {
+  trait ExtendedQuerying extends State
 
-  case class AuthContinue(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-  case class AuthComplete(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-}
-
-trait Authenticator {
-  def authenticate(authReqMessage: AuthBackendMessage): AuthState
-
-  def supports(authReqMessage: AuthBackendMessage): Boolean
+  case class AfterDescData(publisher: PgRowPublisher,
+                           warningsPromise: Promise[Vector[NoticeMessage]],
+                           rowsAffectedPromise: Promise[Long])
 }
