@@ -14,26 +14,22 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.auth
+package io.rdbc.pgsql.netty.fsm.extendedquery
 
-import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.messages.backend.auth.AuthBackendMessage
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
+import io.rdbc.pgsql.core.messages.backend.{CommandComplete, ReadyForQuery}
+import io.rdbc.pgsql.netty.fsm.Idle
 
-sealed trait AuthState {
-  def answers: Seq[PgFrontendMessage]
-}
+class FailedWaitingForReadyAfterRollback(onIdle: => Unit) extends ExtendedQueryingCommon {
+  private var complete = false
 
-object AuthState {
+  def handleMsg = {
+    case CommandComplete("ROLLBACK", _) if !complete =>
+      complete = true
+      stay
 
-  case class AuthContinue(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
+    case ReadyForQuery(txStatus) if complete =>
+      goto(Idle(txStatus)) andThen onIdle
+  }
 
-  case class AuthComplete(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-}
-
-trait Authenticator {
-  def authenticate(authReqMessage: AuthBackendMessage): AuthState
-
-  def supports(authReqMessage: AuthBackendMessage): Boolean
+  val shortDesc = "extended_querying.waiting_for_ready_after_rollback"
 }

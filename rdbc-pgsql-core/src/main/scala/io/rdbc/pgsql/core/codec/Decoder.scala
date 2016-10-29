@@ -14,26 +14,13 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.auth
+package io.rdbc.pgsql.core.codec
 
-import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.messages.backend.auth.AuthBackendMessage
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
+import io.rdbc.pgsql.core.messages.backend.{Header, PgBackendMessage, ServerCharset}
+import scodec.bits.ByteVector
 
-sealed trait AuthState {
-  def answers: Seq[PgFrontendMessage]
-}
+trait Decoder {
+  def decodeMsg(bytes: ByteVector)(implicit serverCharset: ServerCharset): Either[DecodingError, Decoded[PgBackendMessage]]
 
-object AuthState {
-
-  case class AuthContinue(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-  case class AuthComplete(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-}
-
-trait Authenticator {
-  def authenticate(authReqMessage: AuthBackendMessage): AuthState
-
-  def supports(authReqMessage: AuthBackendMessage): Boolean
+  def decodeHeader(bytes: ByteVector): Either[DecodingError, Decoded[Header]]
 }

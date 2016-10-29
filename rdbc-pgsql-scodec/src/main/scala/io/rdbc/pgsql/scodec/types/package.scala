@@ -13,27 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.rdbc.pgsql.scodec
 
-package io.rdbc.pgsql.core.auth
+import io.rdbc.pgsql.core.types.PgTypeRegistry
 
-import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.messages.backend.auth.AuthBackendMessage
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
-
-sealed trait AuthState {
-  def answers: Seq[PgFrontendMessage]
-}
-
-object AuthState {
-
-  case class AuthContinue(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-  case class AuthComplete(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-}
-
-trait Authenticator {
-  def authenticate(authReqMessage: AuthBackendMessage): AuthState
-
-  def supports(authReqMessage: AuthBackendMessage): Boolean
+package object types {
+  val ScodecBuiltInTypes = PgTypeRegistry(ScodecInt4, ScodecTimestamp, ScodecVarchar)
 }

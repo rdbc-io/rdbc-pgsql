@@ -13,27 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.rdbc.pgsql.core
 
-package io.rdbc.pgsql.core.auth
+import java.nio.charset.Charset
 
-import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.messages.backend.auth.AuthBackendMessage
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
-
-sealed trait AuthState {
-  def answers: Seq[PgFrontendMessage]
+object SessionParams {
+  val default = SessionParams(
+    clientCharset = Charset.forName("US-ASCII"),
+    serverCharset = Charset.forName("US-ASCII")
+  )
 }
 
-object AuthState {
-
-  case class AuthContinue(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-  case class AuthComplete(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-}
-
-trait Authenticator {
-  def authenticate(authReqMessage: AuthBackendMessage): AuthState
-
-  def supports(authReqMessage: AuthBackendMessage): Boolean
-}
+case class SessionParams(clientCharset: Charset, serverCharset: Charset)

@@ -13,27 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.rdbc.pgsql.netty
 
-package io.rdbc.pgsql.core.auth
-
-import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.messages.backend.auth.AuthBackendMessage
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
-
-sealed trait AuthState {
-  def answers: Seq[PgFrontendMessage]
+object PreparedStmtCache {
+  val empty = new PreparedStmtCache(Map.empty)
 }
 
-object AuthState {
+class PreparedStmtCache(cache: Map[String, String]) {
+  //TODO replace with LRU or sth
+  //TOOD when element is evicted from the cache ClosePortal needs to be sent to the backend
 
-  case class AuthContinue(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
+  def get(sql: String): Option[String] = cache.get(sql)
 
-  case class AuthComplete(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
+  def put(sql: String, stmtName: String): PreparedStmtCache = {
+    new PreparedStmtCache(cache + (sql -> stmtName))
+  }
 
-}
-
-trait Authenticator {
-  def authenticate(authReqMessage: AuthBackendMessage): AuthState
-
-  def supports(authReqMessage: AuthBackendMessage): Boolean
 }

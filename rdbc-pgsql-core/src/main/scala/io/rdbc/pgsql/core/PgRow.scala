@@ -21,6 +21,7 @@ import io.rdbc.implbase.RowPartialImpl
 import io.rdbc.pgsql.core.messages.backend.RowDescription
 import io.rdbc.pgsql.core.messages.data.DbValFormat.{BinaryDbValFormat, TextualDbValFormat}
 import io.rdbc.pgsql.core.messages.data.{DataType, FieldValue, NotNullFieldValue, NullFieldValue}
+import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.sapi.{Row, TypeConverterRegistry}
 import scodec.bits.ByteVector
 
@@ -28,7 +29,8 @@ class PgRow(rowDesc: RowDescription,
             cols: IndexedSeq[FieldValue],
             nameMapping: Map[String, Int],
             rdbcTypeConvRegistry: TypeConverterRegistry,
-            pgTypeConvRegistry: PgTypeConvRegistry)
+            pgTypeConvRegistry: PgTypeRegistry,
+            implicit val sessionParams: SessionParams)
   extends Row with RowPartialImpl {
 
   val typeConverterRegistry = rdbcTypeConvRegistry
@@ -43,7 +45,8 @@ class PgRow(rowDesc: RowDescription,
   protected def notConverted(idx: Int): Any = {
     //TODO preconditions fucking everywhere
     //TODO for returning inserts this is 0 based, for selects not, fix this
-    val fieldDesc = rowDesc.fieldDescriptions(idx) //TODO this must be indexed seq, not List
+    val fieldDesc = rowDesc.fieldDescriptions(idx)
+    //TODO this must be indexed seq, not List
     val fieldVal = cols(idx)
 
     fieldVal match {
@@ -58,11 +61,11 @@ class PgRow(rowDesc: RowDescription,
 
   private def textualToObj(pgType: DataType, textualVal: String): Any = {
     pgTypeConvRegistry.byTypeOid(pgType.oid).map(_.toObj(textualVal))
-      .getOrElse(throw new Exception("unsupported type")) //TODO
+      .getOrElse(throw new Exception(s"unsupported type $pgType")) //TODO
   }
 
   private def binaryToObj(pgType: DataType, binaryVal: ByteVector): Any = {
     pgTypeConvRegistry.byTypeOid(pgType.oid).map(_.toObj(binaryVal))
-      .getOrElse(throw new Exception("unsupported type")) //TODO
+      .getOrElse(throw new Exception(s"unsupported type $pgType")) //TODO
   }
 }
