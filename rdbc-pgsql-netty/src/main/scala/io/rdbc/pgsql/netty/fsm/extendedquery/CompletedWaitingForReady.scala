@@ -14,26 +14,21 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.auth
+package io.rdbc.pgsql.netty.fsm.extendedquery
 
-import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.messages.backend.auth.AuthBackendMessage
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
+import io.rdbc.pgsql.core.messages.backend.ReadyForQuery
+import io.rdbc.pgsql.netty.fsm.Idle
+import io.rdbc.pgsql.netty.{PgNettyConnection, PgRowPublisher}
 
-sealed trait AuthState {
-  def answers: Seq[PgFrontendMessage]
-}
+import scala.concurrent.{ExecutionContext, Future}
 
-object AuthState {
+class CompletedWaitingForReady(publisher: PgRowPublisher)(implicit ec: ExecutionContext) extends ExtendedQueryingCommon {
+  def handleMsg = {
+    case ReadyForQuery(txStatus) =>
+      goto(Idle(txStatus)) andThen {
+        publisher.complete()
+      }
+  }
 
-  case class AuthContinue(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-  case class AuthComplete(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-}
-
-trait Authenticator {
-  def authenticate(authReqMessage: AuthBackendMessage): AuthState
-
-  def supports(authReqMessage: AuthBackendMessage): Boolean
+  val shortDesc = "extended_querying.waiting_for_ready"
 }

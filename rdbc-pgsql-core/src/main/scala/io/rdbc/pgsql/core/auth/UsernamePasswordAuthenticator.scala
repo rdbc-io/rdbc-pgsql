@@ -21,6 +21,9 @@ import io.rdbc.pgsql.core.auth.AuthState.AuthComplete
 import io.rdbc.pgsql.core.messages.backend.auth.{AuthBackendMessage, AuthRequestMd5}
 import io.rdbc.pgsql.core.messages.frontend.PasswordMessage
 
+import scala.collection.immutable
+
+
 class UsernamePasswordAuthenticator(val username: String, val password: String) extends Authenticator {
 
   def this(config: Config) = {
@@ -29,7 +32,7 @@ class UsernamePasswordAuthenticator(val username: String, val password: String) 
 
   override def authenticate(authReqMessage: AuthBackendMessage): AuthState = authReqMessage match {
     case req: AuthRequestMd5 =>
-      AuthComplete(Seq(PasswordMessage.md5(username, password, req.salt)))
+      AuthComplete(immutable.Seq(PasswordMessage.md5(username, password, req.salt)))
     //TODO more username password mechanisms
   }
 

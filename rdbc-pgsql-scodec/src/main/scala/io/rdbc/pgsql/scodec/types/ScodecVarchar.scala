@@ -13,27 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.rdbc.pgsql.scodec.types
 
-package io.rdbc.pgsql.core.auth
+import _root_.scodec.Codec
+import io.rdbc.pgsql.core.SessionParams
+import io.rdbc.pgsql.core.types.Varchar
+import io.rdbc.pgsql.scodec._
 
-import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.messages.backend.auth.AuthBackendMessage
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
-
-sealed trait AuthState {
-  def answers: Seq[PgFrontendMessage]
-}
-
-object AuthState {
-
-  case class AuthContinue(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-  case class AuthComplete(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-}
-
-trait Authenticator {
-  def authenticate(authReqMessage: AuthBackendMessage): AuthState
-
-  def supports(authReqMessage: AuthBackendMessage): Boolean
+object ScodecVarchar extends Varchar with ScodecPgType[String] {
+  def decodeCodec(implicit sessionParams: SessionParams): Codec[String] = pgStringNonTerminated(sessionParams.serverCharset)
+  def encodeCodec(implicit sessionParams: SessionParams): Codec[String] = pgStringNonTerminated(sessionParams.clientCharset)
 }
