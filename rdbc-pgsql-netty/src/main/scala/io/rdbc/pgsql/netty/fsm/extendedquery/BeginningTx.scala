@@ -20,17 +20,17 @@ import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.messages.backend.{CommandComplete, ReadyForQuery}
 import io.rdbc.pgsql.core.messages.frontend._
 import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.netty.{ChannelWriter, PgConnection, PgResultStream, TimeoutScheduler}
+import io.rdbc.pgsql.netty.{ChannelWriter, PgResultStream, TimeoutScheduler}
 import io.rdbc.sapi.TypeConverterRegistry
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Promise}
 
 object BeginningTx {
-  def apply(parse: Option[Parse], bind: Bind, streamPromise: Promise[PgResultStream], parsePromise: Promise[Unit], sessionParams: SessionParams,
-            timeoutScheduler: TimeoutScheduler)
-               (implicit out: ChannelWriter, rdbcTypeConvRegistry: TypeConverterRegistry,
-                pgTypeConvRegistry: PgTypeRegistry, ec: ExecutionContext): BeginningTx = {
-    new BeginningTx(parse, bind, streamPromise, parsePromise, sessionParams, timeoutScheduler)
+  def apply(parse: Option[Parse], bind: Bind, streamPromise: Promise[PgResultStream], parsePromise: Promise[Unit],
+            sessionParams: SessionParams, timeoutScheduler: TimeoutScheduler,
+            rdbcTypeConvRegistry: TypeConverterRegistry, pgTypeConvRegistry: PgTypeRegistry)
+           (implicit out: ChannelWriter, ec: ExecutionContext): BeginningTx = {
+    new BeginningTx(parse, bind, streamPromise, parsePromise, sessionParams, timeoutScheduler, rdbcTypeConvRegistry, pgTypeConvRegistry)
   }
 }
 
@@ -39,10 +39,11 @@ class BeginningTx protected(maybeParse: Option[Parse],
                             streamPromise: Promise[PgResultStream],
                             parsePromise: Promise[Unit],
                             sessionParams: SessionParams,
-                            timeoutScheduler: TimeoutScheduler)
-                           (implicit out: ChannelWriter,
+                            timeoutScheduler: TimeoutScheduler,
                             rdbcTypeConvRegistry: TypeConverterRegistry,
-                            pgTypeConvRegistry: PgTypeRegistry, ec: ExecutionContext)
+                            pgTypeConvRegistry: PgTypeRegistry)
+                           (implicit out: ChannelWriter,
+                            ec: ExecutionContext)
   extends ExtendedQueryingCommon {
 
   private var beginComplete = false
@@ -54,7 +55,7 @@ class BeginningTx protected(maybeParse: Option[Parse],
 
     case ReadyForQuery(_) if beginComplete =>
       maybeParse.foreach(out.write(_))
-      goto(WaitingForDescribe.withTxMgmt(bind.portal, streamPromise, parsePromise, sessionParams: SessionParams, timeoutScheduler)) andThen {
+      goto(WaitingForDescribe.withTxMgmt(bind.portal, streamPromise, parsePromise, sessionParams: SessionParams, timeoutScheduler, rdbcTypeConvRegistry, pgTypeConvRegistry)) andThen {
         out.writeAndFlush(bind, Describe(PortalType, bind.portal), Sync)
       }
   }

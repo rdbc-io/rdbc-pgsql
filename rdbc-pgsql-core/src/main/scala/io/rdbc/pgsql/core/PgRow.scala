@@ -52,7 +52,7 @@ class PgRow(rowDesc: RowDescription,
       case NullFieldValue => null
       case NotNullFieldValue(rawFieldVal) =>
         fieldDesc.fieldFormat match {
-          case TextualDbValFormat => textualToObj(fieldDesc.dataType, new String(rawFieldVal.toArray)) //TODO charset
+          case TextualDbValFormat => textualToObj(fieldDesc.dataType, new String(rawFieldVal)) //TODO charset
           case BinaryDbValFormat => binaryToObj(fieldDesc.dataType, rawFieldVal)
         }
     }

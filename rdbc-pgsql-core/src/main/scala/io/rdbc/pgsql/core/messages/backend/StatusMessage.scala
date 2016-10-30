@@ -109,8 +109,23 @@ case class StatusData(
 
 sealed trait StatusMessage extends PgBackendMessage {
   def statusData: StatusData
+  def isWarning: Boolean = statusData.sqlState.startsWith("01") || statusData.sqlState.startsWith("02")
 }
 
-case class ErrorMessage(statusData: StatusData) extends StatusMessage
+case class ErrorMessage(statusData: StatusData) extends StatusMessage {
+  def isFatal: Boolean = {
+    if (statusData.sqlState == "57014") {
+      false //query canceled
+    } else {
+      val errCat = statusData.sqlState.take(2)
+      errCat match {
+        case "57" => true //operator intervention
+        case "58" => true //system error
+        case "XX" => true //PG internal error
+        case _ => false
+      }
+    }
+  }
+}
 
 case class NoticeMessage(statusData: StatusData) extends StatusMessage

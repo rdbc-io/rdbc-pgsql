@@ -21,7 +21,6 @@ import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.exception.PgStmtExecutionException
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.netty.StatusMsgUtil.isFatal
 import io.rdbc.pgsql.netty.exception.ProtocolViolationException
 import io.rdbc.pgsql.netty.fsm.ConnectionClosed
 import io.rdbc.pgsql.netty.fsm.State.Outcome
@@ -35,10 +34,10 @@ object WaitingForDescribe {
                  streamPromise: Promise[PgResultStream],
                  parsePromise: Promise[Unit],
                  sessionParams: SessionParams,
-                 timeoutScheduler: TimeoutScheduler)
-                (implicit out: ChannelWriter,
-                 pgTypeConvRegistry: PgTypeRegistry,
+                 timeoutScheduler: TimeoutScheduler,
                  rdbcTypeConvRegistry: TypeConverterRegistry,
+                 pgTypeConvRegistry: PgTypeRegistry)
+                (implicit out: ChannelWriter,
                  ec: ExecutionContext): WaitingForDescribe = {
     new WaitingForDescribe(txMgmt = true, portalName, streamPromise, parsePromise, pgTypeConvRegistry, rdbcTypeConvRegistry, sessionParams, timeoutScheduler)
   }
@@ -47,10 +46,10 @@ object WaitingForDescribe {
                     streamPromise: Promise[PgResultStream],
                     parsePromise: Promise[Unit],
                     sessionParams: SessionParams,
-                    timeoutScheduler: TimeoutScheduler)
-                   (implicit out: ChannelWriter,
-                    pgTypeConvRegistry: PgTypeRegistry,
+                    timeoutScheduler: TimeoutScheduler,
                     rdbcTypeConvRegistry: TypeConverterRegistry,
+                    pgTypeConvRegistry: PgTypeRegistry)
+                   (implicit out: ChannelWriter,
                     ec: ExecutionContext): WaitingForDescribe = {
     new WaitingForDescribe(txMgmt = false, portalName, streamPromise, parsePromise, pgTypeConvRegistry, rdbcTypeConvRegistry, sessionParams, timeoutScheduler)
   }
@@ -109,7 +108,7 @@ class WaitingForDescribe protected(txMgmt: Boolean,
         }
     }
 
-    case err: ErrorMessage if isFatal(err) =>
+    case err: ErrorMessage if err.isFatal =>
       val ex = PgStmtExecutionException(err.statusData)
       maybeAfterDescData match {
         case Some(AfterDescData(publisher, warningsPromise, rowsAffectedPromise)) =>

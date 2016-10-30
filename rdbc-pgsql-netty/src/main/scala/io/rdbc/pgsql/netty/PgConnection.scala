@@ -29,7 +29,6 @@ import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.core.messages.frontend.{Query, StartupMessage, Terminate}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.{PgCharset, PgConnectionPartialImpl, PgNativeStatement, SessionParams}
-import io.rdbc.pgsql.netty.StatusMsgUtil.isWarning
 import io.rdbc.pgsql.netty.codec.{PgMsgDecoderHandler, PgMsgEncoderHandler}
 import io.rdbc.pgsql.netty.fsm.State._
 import io.rdbc.pgsql.netty.fsm.{Authenticating, _}
@@ -70,7 +69,7 @@ class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
   def watchForIdle: Future[this.type] = idlePromise.single().future
 
   def statement(sql: String): Future[Statement] = {
-    Future.successful(new PgStatement(this, PgNativeStatement.fromRdbc(sql)))
+    Future.successful(new PgStatement(this, PgNativeStatement.parse(sql)))
   }
 
   def streamIntoTable(sql: String, paramsPublisher: Publisher[Map[String, Any]]): Future[Unit] = ???
@@ -86,7 +85,7 @@ class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
   private[netty] def init(dbUser: String, dbName: String, authenticator: Authenticator): Future[Unit] = {
     logger.debug(s"Initializing connection")
     val initPromise = Promise[BackendKeyData]
-    triggerTransition(new Authenticating(out, initPromise, authenticator))
+    triggerTransition(new Authenticating(initPromise, authenticator)(out, ec))
     out.writeAndFlush(StartupMessage(dbUser, dbName))
     initPromise.future.map { returnedBkd =>
       bkd = Some(returnedBkd)
@@ -166,7 +165,7 @@ class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
       doRelease(ex)
 
     case statusMsg: StatusMessage =>
-      if (isWarning(statusMsg)) {
+      if (statusMsg.isWarning) {
         logger.warn(s"Warning received: ${statusMsg.statusData.shortInfo}")
       } else {
         logger.debug(s"Notice received: ${statusMsg.statusData.shortInfo}")

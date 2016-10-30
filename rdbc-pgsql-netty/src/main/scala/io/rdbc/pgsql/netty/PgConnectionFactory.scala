@@ -27,6 +27,7 @@ import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder
 import io.netty.handler.timeout.WriteTimeoutHandler
+import io.rdbc.ImmutSeq
 import io.rdbc.api.exceptions.ConnectException
 import io.rdbc.api.exceptions.ConnectException.UncategorizedConnectException
 import io.rdbc.pgsql.core.auth.{Authenticator, UsernamePasswordAuthenticator}
@@ -39,7 +40,7 @@ import io.rdbc.pgsql.netty.scheduler.EventLoopGroupScheduler
 import io.rdbc.pgsql.scodec.types.ScodecBuiltInTypes
 import io.rdbc.pgsql.scodec.{ScodecDecoderFactory, ScodecEncoderFactory}
 import io.rdbc.sapi.{ConnectionFactory, TypeConverterRegistry}
-import io.rdbc.{ImmutSeq, typeconv}
+import io.rdbc.typeconv.BuiltInConverters
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -47,35 +48,22 @@ import scala.util.control.NonFatal
 
 case class ChannelOptionValue[T](option: ChannelOption[T], value: T)
 
-class EventLoopGroupExecutionContext(eventLoopGroup: EventLoopGroup) extends ExecutionContext {
-
-  private val fallbackEc = ExecutionContext.global
-
-  override def execute(runnable: Runnable): Unit = {
-    if (!eventLoopGroup.isShutdown) {
-      eventLoopGroup.execute(runnable)
-    } else {
-      fallbackEc.execute(runnable)
-    }
-  }
-  override def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
-}
-
-object PgNettyConnectionFactory {
-  def apply(host: String, port: Int, username: String, password: String, database: String): PgNettyConnectionFactory = {
-    new PgNettyConnectionFactory(
+object PgConnectionFactory {
+  def apply(host: String, port: Int, username: String, password: String, database: String): PgConnectionFactory = {
+    new PgConnectionFactory(
       remoteAddr = InetSocketAddress.createUnresolved(host, port),
       dbUser = username,
       dbName = database,
       authenticator = new UsernamePasswordAuthenticator(username, password),
-      rdbcTypeConvRegistry = typeconv.BuiltInConverters,
+      rdbcTypeConvRegistry = BuiltInConverters,
       pgTypeConvRegistry = ScodecBuiltInTypes,
       msgDecoderFactory = new ScodecDecoderFactory,
       msgEncoderFactory = new ScodecEncoderFactory,
       writeTimeout = 10.seconds,
       channelFactory = defaultChannelFactory,
       eventLoopGroup = defaultEventLoopGroup,
-      channelOptions = Vector(ChannelOptionValue[java.lang.Boolean](SO_KEEPALIVE, true))) //TODO
+      channelOptions = Vector(ChannelOptionValue[java.lang.Boolean](SO_KEEPALIVE, true)),
+      fallbackExecutionContext = ExecutionContext.global) //TODO
   }
 
   private val defaultChannelFactory: ChannelFactory[SocketChannel] = {
@@ -89,25 +77,26 @@ object PgNettyConnectionFactory {
   }
 }
 
-class PgNettyConnectionFactory protected(remoteAddr: SocketAddress,
-                                         dbUser: String,
-                                         dbName: String,
-                                         authenticator: Authenticator,
-                                         rdbcTypeConvRegistry: TypeConverterRegistry,
-                                         pgTypeConvRegistry: PgTypeRegistry,
-                                         msgDecoderFactory: DecoderFactory,
-                                         msgEncoderFactory: EncoderFactory,
-                                         writeTimeout: FiniteDuration,
-                                         channelFactory: ChannelFactory[_ <: Channel],
-                                         eventLoopGroup: EventLoopGroup,
-                                         channelOptions: ImmutSeq[ChannelOptionValue[_]])
+class PgConnectionFactory protected(remoteAddr: SocketAddress,
+                                    dbUser: String,
+                                    dbName: String,
+                                    authenticator: Authenticator,
+                                    rdbcTypeConvRegistry: TypeConverterRegistry,
+                                    pgTypeConvRegistry: PgTypeRegistry,
+                                    msgDecoderFactory: DecoderFactory,
+                                    msgEncoderFactory: EncoderFactory,
+                                    writeTimeout: FiniteDuration,
+                                    channelFactory: ChannelFactory[_ <: Channel],
+                                    eventLoopGroup: EventLoopGroup,
+                                    channelOptions: ImmutSeq[ChannelOptionValue[_]],
+                                    fallbackExecutionContext: ExecutionContext)
   extends ConnectionFactory {
 
   thisFactory =>
 
   val typeConverterRegistry = rdbcTypeConvRegistry
   private val scheduler = new EventLoopGroupScheduler(eventLoopGroup)
-  private implicit val ec = new EventLoopGroupExecutionContext(eventLoopGroup) //TODO are you sure?
+  private implicit val ec = new EventLoopGroupExecutionContext(eventLoopGroup, fallbackExecutionContext) //TODO are you sure?
 
   def connection(): Future[PgConnection] = {
 
@@ -147,7 +136,7 @@ class PgNettyConnectionFactory protected(remoteAddr: SocketAddress,
     connectionFut
   }
 
-  def abortRequest(bkd: BackendKeyData): Future[Unit] = {
+  private def abortRequest(bkd: BackendKeyData): Future[Unit] = {
     //TODO code dupl
     val bootstrap = new Bootstrap()
       .group(eventLoopGroup)
