@@ -14,6 +14,12 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.codec
+package io.rdbc.pgsql.netty.scheduler
 
-case class DecodingError(msg: String)
+import io.netty.util.concurrent.ScheduledFuture
+
+class FutureScheduledTask(scheduledFuture: ScheduledFuture[_]) extends ScheduledTask {
+  def cancel(): Unit = {
+    scheduledFuture.cancel(false)
+  }
+}

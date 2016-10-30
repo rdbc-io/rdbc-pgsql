@@ -63,7 +63,7 @@ package object frontend {
 
   val password: Codec[PasswordMessage] = pgHeadedMsg('p') {
     {
-      "credentials" | bytes
+      "credentials" | bytesArr
     }.as[PasswordMessage]
   }.withToString("PasswordMessage")
 

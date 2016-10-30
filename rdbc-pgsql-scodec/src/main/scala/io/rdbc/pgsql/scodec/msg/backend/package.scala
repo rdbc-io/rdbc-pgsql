@@ -27,8 +27,7 @@ import io.rdbc.pgsql.scodec._
 package object backend {
 
 
-  def pgBackendMessage(implicit serverCharset: ServerCharset): Codec[PgBackendMessage] = {
-    implicit val charset = serverCharset.charset
+  def pgBackendMessage(implicit charset: Charset): Codec[PgBackendMessage] = {
     discriminatorFallback(
       left = unknown,
       right = discriminated[PgBackendMessage].by(byte)
@@ -95,7 +94,7 @@ package object backend {
   val unknown: Codec[UnknownPgMessage] = {
     {
       ("head" | byte) ::
-        ("body" | variableSizeBytes(pgInt32, bytes, 4))
+        ("body" | variableSizeBytes(pgInt32, bytesArr, 4))
     }.as[UnknownPgMessage]
   }
 
@@ -108,7 +107,7 @@ package object backend {
   }
 
   val authRequestMd5: Codec[AuthRequestMd5] = {
-    bytes(4).withContext("md5 salt").as[AuthRequestMd5].withToString("AuthRequestMd5")
+    bytesArr(4).withContext("md5 salt").as[AuthRequestMd5].withToString("AuthRequestMd5")
   }
 
   val auth: Codec[AuthBackendMessage] = pgHeadlessMsg {

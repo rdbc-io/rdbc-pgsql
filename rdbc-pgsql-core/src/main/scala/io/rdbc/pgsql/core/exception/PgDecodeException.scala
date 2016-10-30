@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.messages.backend
+package io.rdbc.pgsql.core.exception
 
-import java.nio.charset.Charset
+import io.rdbc.api.exceptions.RdbcException
 
-final case class ServerCharset(charset: Charset)
+case class PgDecodeException(msg: String) extends RdbcException(msg)

@@ -18,13 +18,10 @@ package io.rdbc.pgsql.core.messages.frontend
 
 import java.security.MessageDigest
 
-import scodec.Encoder
-import scodec.bits.ByteVector
-
 object PasswordMessage {
 
 
-  def md5(username: String, password: String, salt: ByteVector): PasswordMessage = {
+  def md5(username: String, password: String, salt: Array[Byte]): PasswordMessage = {
     //TODO optimize this happy data copying
     val md5 = MessageDigest.getInstance("MD5")
     md5.update(password.getBytes("US-ASCII"))
@@ -33,7 +30,7 @@ object PasswordMessage {
     val digest: Array[Byte] = md5.digest()
     val hexBytes = bytesToHex(digest).getBytes("US-ASCII")
     md5.update(hexBytes)
-    md5.update(salt.toArray)
+    md5.update(salt)
 
     val digest2 = md5.digest()
 
@@ -42,7 +39,7 @@ object PasswordMessage {
     val md5String = "md5" + hex2
     val credentials = md5String.getBytes("US-ASCII")
 
-    PasswordMessage(ByteVector.view(credentials))
+    PasswordMessage(credentials)
   }
 
   private def bytesToHex(bytes: Array[Byte]): String = {
@@ -50,4 +47,4 @@ object PasswordMessage {
   }
 }
 
-case class PasswordMessage(credentials: ByteVector) extends PgFrontendMessage
+case class PasswordMessage(credentials: Array[Byte]) extends PgFrontendMessage

@@ -18,7 +18,7 @@ package io.rdbc.pgsql.scodec
 
 import java.nio.charset.Charset
 
-import _root_.scodec.bits.BitVector
+import _root_.scodec.bits.{BitVector, ByteVector}
 import _root_.scodec.codecs._
 import _root_.scodec.{Attempt, Codec, DecodeResult, SizeBound}
 import io.rdbc.pgsql.core.messages.frontend.{BinaryDbValue, DbValue, NullDbValue, TextualDbValue}
@@ -36,7 +36,7 @@ class ParamValuesCodec(implicit charset: Charset) extends Codec[List[DbValue]] {
     val paramValueAttempts: List[Attempt[BitVector]] = params.map {
       case NullDbValue => pgInt32.encode(-1)
       case TextualDbValue(value) => variableSizeBytes(pgInt32, pgStringNonTerminated).encode(value) //TODO check whether not cstring
-      case BinaryDbValue(value) => variableSizeBytes(pgInt32, bytes).encode(value)
+      case BinaryDbValue(value) => variableSizeBytes(pgInt32, bytes).encode(ByteVector.view(value))
     }
 
     val paramValueBits = concatAttempts(paramValueAttempts)

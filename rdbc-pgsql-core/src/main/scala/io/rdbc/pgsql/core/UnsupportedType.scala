@@ -18,7 +18,4 @@ package io.rdbc.pgsql.core
 
 import io.rdbc.pgsql.core.messages.data.DataType
 
-/**
-  * Created by krzysztofpado on 21/08/16.
-  */
 case class UnsupportedType(pgType: DataType)

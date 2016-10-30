@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.netty.fsm.extendedquery
 
 import io.rdbc.api.exceptions.ConnectionClosedException
-import io.rdbc.pgsql.core.exception.PgStmtExecutionEx
+import io.rdbc.pgsql.core.exception.PgStmtExecutionException
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.netty.ChannelWriter
 
@@ -54,7 +54,7 @@ class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: C
       else goto(new CompletedWaitingForReady(publisher))
 
     case err: ErrorMessage if isFatal(err) =>
-      val ex = PgStmtExecutionEx(err.statusData)
+      val ex = PgStmtExecutionException(err.statusData)
       goto(ConnectionClosed(ConnectionClosedException("TODO cause"))) andThen {
         publisher.failure(ex)
         warningsPromise.failure(ex)
@@ -65,7 +65,7 @@ class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: C
     //TODO massive code dupl
 
     case err: ErrorMessage =>
-      val ex = PgStmtExecutionEx(err.statusData)
+      val ex = PgStmtExecutionException(err.statusData)
       goto(Failed(txMgmt) {
         publisher.failure(ex)
         warningsPromise.failure(ex)

@@ -20,13 +20,13 @@ import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.messages.backend.{CommandComplete, ReadyForQuery}
 import io.rdbc.pgsql.core.messages.frontend._
 import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.netty.{ChannelWriter, PgNettyConnection, PgNettyResultStream, TimeoutScheduler}
+import io.rdbc.pgsql.netty.{ChannelWriter, PgConnection, PgResultStream, TimeoutScheduler}
 import io.rdbc.sapi.TypeConverterRegistry
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 object BeginningTx {
-  def apply(parse: Option[Parse], bind: Bind, streamPromise: Promise[PgNettyResultStream], parsePromise: Promise[Unit], sessionParams: SessionParams,
+  def apply(parse: Option[Parse], bind: Bind, streamPromise: Promise[PgResultStream], parsePromise: Promise[Unit], sessionParams: SessionParams,
             timeoutScheduler: TimeoutScheduler)
                (implicit out: ChannelWriter, rdbcTypeConvRegistry: TypeConverterRegistry,
                 pgTypeConvRegistry: PgTypeRegistry, ec: ExecutionContext): BeginningTx = {
@@ -36,7 +36,7 @@ object BeginningTx {
 
 class BeginningTx protected(maybeParse: Option[Parse],
                             bind: Bind,
-                            streamPromise: Promise[PgNettyResultStream],
+                            streamPromise: Promise[PgResultStream],
                             parsePromise: Promise[Unit],
                             sessionParams: SessionParams,
                             timeoutScheduler: TimeoutScheduler)

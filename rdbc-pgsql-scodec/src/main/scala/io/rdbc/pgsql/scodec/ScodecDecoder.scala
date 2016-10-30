@@ -16,25 +16,28 @@
 
 package io.rdbc.pgsql.scodec
 
+import java.nio.charset.Charset
+
 import _root_.scodec.Attempt.{Failure, Successful}
 import _root_.scodec.DecodeResult
-import _root_.scodec.bits.ByteVector
-import io.rdbc.pgsql.core.codec.{Decoded, Decoder, DecodingError}
-import io.rdbc.pgsql.core.messages.backend.{Header, PgBackendMessage, ServerCharset}
+import _root_.scodec.bits.BitVector
+import io.rdbc.pgsql.core.codec.{Decoded, Decoder}
+import io.rdbc.pgsql.core.exception.PgDecodeException
+import io.rdbc.pgsql.core.messages.backend.{Header, PgBackendMessage}
 import io.rdbc.pgsql.scodec.msg.backend._
 
 class ScodecDecoder extends Decoder {
-  override def decodeMsg(bytes: ByteVector)(implicit serverCharset: ServerCharset): Either[DecodingError, Decoded[PgBackendMessage]] = {
-    pgBackendMessage.decode(bytes.bits) match {
-      case Successful(DecodeResult(msg, remainder)) => Right(Decoded(msg, remainder.bytes))
-      case Failure(err) => Left(DecodingError(err.messageWithContext))
+  override def decodeMsg(bytes: Array[Byte])(implicit charset: Charset): Decoded[PgBackendMessage] = {
+    pgBackendMessage.decode(BitVector.view(bytes)) match {
+      case Successful(DecodeResult(msg, remainder)) => Decoded(msg, remainder.toByteArray)
+      case Failure(err) => throw PgDecodeException(err.messageWithContext)
     }
   }
 
-  override def decodeHeader(bytes: ByteVector): Either[DecodingError, Decoded[Header]] = {
-    header.decode(bytes.bits) match {
-      case Successful(DecodeResult(msg, remainder)) => Right(Decoded(msg, remainder.bytes))
-      case Failure(err) => Left(DecodingError(err.messageWithContext))
+  override def decodeHeader(bytes: Array[Byte]): Decoded[Header] = {
+    header.decode(BitVector.view(bytes)) match {
+      case Successful(DecodeResult(msg, remainder)) => Decoded(msg, remainder.toByteArray)
+      case Failure(err) => throw PgDecodeException(err.messageWithContext)
     }
     //TODO code dupl
   }

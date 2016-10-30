@@ -16,8 +16,6 @@
 
 package io.rdbc.pgsql.core.messages.backend
 
-import scodec.bits.ByteVector
-
-case class UnknownPgMessage(head: Byte, body: ByteVector) extends PgBackendMessage {
+case class UnknownPgMessage(head: Byte, body: Array[Byte]) extends PgBackendMessage {
   override def toString = s"UnknownPgMessage(head = ${head.toChar}, body = $body)"
 }

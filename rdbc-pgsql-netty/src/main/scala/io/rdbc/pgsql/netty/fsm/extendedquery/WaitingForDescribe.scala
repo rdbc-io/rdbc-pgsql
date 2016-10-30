@@ -18,21 +18,21 @@ package io.rdbc.pgsql.netty.fsm.extendedquery
 
 import io.rdbc.api.exceptions.{ConnectionClosedException, RdbcException}
 import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.exception.PgStmtExecutionEx
+import io.rdbc.pgsql.core.exception.PgStmtExecutionException
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.netty.StatusMsgUtil.isFatal
 import io.rdbc.pgsql.netty.exception.ProtocolViolationException
 import io.rdbc.pgsql.netty.fsm.ConnectionClosed
 import io.rdbc.pgsql.netty.fsm.State.Outcome
-import io.rdbc.pgsql.netty.{ChannelWriter, PgNettyResultStream, PgRowPublisher, TimeoutScheduler}
+import io.rdbc.pgsql.netty.{ChannelWriter, PgResultStream, PgRowPublisher, TimeoutScheduler}
 import io.rdbc.sapi.TypeConverterRegistry
 
 import scala.concurrent.{ExecutionContext, Promise}
 
 object WaitingForDescribe {
   def withTxMgmt(portalName: Option[String],
-                 streamPromise: Promise[PgNettyResultStream],
+                 streamPromise: Promise[PgResultStream],
                  parsePromise: Promise[Unit],
                  sessionParams: SessionParams,
                  timeoutScheduler: TimeoutScheduler)
@@ -44,7 +44,7 @@ object WaitingForDescribe {
   }
 
   def withoutTxMgmt(portalName: Option[String],
-                    streamPromise: Promise[PgNettyResultStream],
+                    streamPromise: Promise[PgResultStream],
                     parsePromise: Promise[Unit],
                     sessionParams: SessionParams,
                     timeoutScheduler: TimeoutScheduler)
@@ -58,7 +58,7 @@ object WaitingForDescribe {
 
 class WaitingForDescribe protected(txMgmt: Boolean,
                                    portalName: Option[String],
-                                   streamPromise: Promise[PgNettyResultStream],
+                                   streamPromise: Promise[PgResultStream],
                                    parsePromise: Promise[Unit],
                                    pgTypeConvRegistry: PgTypeRegistry,
                                    rdbcTypeConvRegistry: TypeConverterRegistry,
@@ -89,7 +89,7 @@ class WaitingForDescribe protected(txMgmt: Boolean,
           rowsAffectedPromise = rowsAffectedPromise
         ))
 
-        val stream = new PgNettyResultStream(
+        val stream = new PgResultStream(
           publisher,
           rowDesc = rowDesc,
           rowsAffected = rowsAffectedPromise.future,
@@ -110,7 +110,7 @@ class WaitingForDescribe protected(txMgmt: Boolean,
     }
 
     case err: ErrorMessage if isFatal(err) =>
-      val ex = PgStmtExecutionEx(err.statusData)
+      val ex = PgStmtExecutionException(err.statusData)
       maybeAfterDescData match {
         case Some(AfterDescData(publisher, warningsPromise, rowsAffectedPromise)) =>
           goto(ConnectionClosed(ConnectionClosedException("TODO cause"))) andThen {
@@ -126,7 +126,7 @@ class WaitingForDescribe protected(txMgmt: Boolean,
           }
       }
 
-    case err: ErrorMessage => onError(PgStmtExecutionEx(err.statusData))
+    case err: ErrorMessage => onError(PgStmtExecutionException(err.statusData))
 
     //TODO massive code duplication
   }

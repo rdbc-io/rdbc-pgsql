@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.rdbc.pgsql
 
 import java.nio.charset.Charset
 
 import _root_.scodec._
-import _root_.scodec.bits.BitVector
+import _root_.scodec.bits.{BitVector, ByteVector}
 import _root_.scodec.codecs._
 import io.rdbc.pgsql.core.messages.backend.{FieldDescription, Header}
 import io.rdbc.pgsql.core.messages.data.DbValFormat.{BinaryDbValFormat, TextualDbValFormat}
@@ -112,5 +113,9 @@ package object scodec {
         ("modifier" | pgInt32)
     }.as[DataType]
   }
+
+  def bytesArr(n: Int): Codec[Array[Byte]] = bytes(n).xmap(_.toArray, ByteVector.view)
+
+  val bytesArr: Codec[Array[Byte]] = bytes.xmap(_.toArray, ByteVector.view)
 
 }

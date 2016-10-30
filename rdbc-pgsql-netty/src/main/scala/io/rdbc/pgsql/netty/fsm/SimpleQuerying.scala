@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.netty.fsm
 
 import io.rdbc.api.exceptions.RdbcException
-import io.rdbc.pgsql.core.exception.PgStmtExecutionEx
+import io.rdbc.pgsql.core.exception.PgStmtExecutionException
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.netty.ChannelWriter
 
@@ -32,7 +32,7 @@ object SimpleQuerying {
       case _: RowDescription => stay
       case _: DataRow => stay
       case CommandComplete(_, _) | EmptyQueryResponse => goto(new SuccessWaitingForReady(promise))
-      case ErrorMessage(statusData) => goto(new FailedWaitingForReady(PgStmtExecutionEx(statusData), promise))
+      case ErrorMessage(statusData) => goto(new FailedWaitingForReady(PgStmtExecutionException(statusData), promise))
     }
 
     val shortDesc = "simple_querying.pulling_rows"

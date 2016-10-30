@@ -23,7 +23,7 @@ import io.rdbc.sapi.{Connection, ReturningInsert}
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-trait PgConnectionBase extends Connection with ConnectionPartialImpl {
+trait PgConnectionPartialImpl extends Connection with ConnectionPartialImpl {
 
   protected def simpleQueryIgnoreResult(sql: String)(implicit timeout: FiniteDuration): Future[Unit]
 

@@ -14,8 +14,17 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.messages.frontend
+package io.rdbc.pgsql.netty.scheduler
 
-import java.nio.charset.Charset
+import io.netty.channel.EventLoopGroup
 
-final case class ClientCharset(charset: Charset)
+import scala.concurrent.duration.FiniteDuration
+
+class EventLoopGroupScheduler(eventLoopGroup: EventLoopGroup) extends TaskScheduler {
+  def schedule(delay: FiniteDuration)(action: => Unit): ScheduledTask = {
+    val fut = eventLoopGroup.schedule(new Runnable() {
+      def run() = action
+    }, delay.length, delay.unit)
+    new FutureScheduledTask(fut)
+  }
+}

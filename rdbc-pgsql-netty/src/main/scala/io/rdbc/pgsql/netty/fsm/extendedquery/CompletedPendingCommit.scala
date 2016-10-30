@@ -18,7 +18,7 @@ package io.rdbc.pgsql.netty.fsm.extendedquery
 
 import io.rdbc.pgsql.core.messages.backend.{ActiveTxStatus, ReadyForQuery}
 import io.rdbc.pgsql.core.messages.frontend.Query
-import io.rdbc.pgsql.netty.{ChannelWriter, PgNettyConnection, PgRowPublisher}
+import io.rdbc.pgsql.netty.{ChannelWriter, PgConnection, PgRowPublisher}
 
 import scala.concurrent.{ExecutionContext, Future}
 

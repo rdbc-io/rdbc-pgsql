@@ -18,7 +18,7 @@ package io.rdbc.pgsql.netty.fsm
 
 import io.rdbc.pgsql.core.auth.AuthState.{AuthComplete, AuthContinue}
 import io.rdbc.pgsql.core.auth.Authenticator
-import io.rdbc.pgsql.core.exception.PgConnectEx
+import io.rdbc.pgsql.core.exception.PgConnectException
 import io.rdbc.pgsql.core.messages.backend.auth.{AuthBackendMessage, AuthOk}
 import io.rdbc.pgsql.core.messages.backend.{BackendKeyData, ErrorMessage}
 import io.rdbc.pgsql.netty.ChannelWriter
@@ -46,7 +46,7 @@ class Authenticating(out: ChannelWriter, initPromise: Promise[BackendKeyData],
     case AuthOk if waitingForOk => goto(new Initializing(out, initPromise))
 
     case ErrorMessage(statusData) =>
-      initPromise.failure(PgConnectEx(statusData))
+      initPromise.failure(PgConnectException(statusData))
       stay //TODO fatal error
   }
 

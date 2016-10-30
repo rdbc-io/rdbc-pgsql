@@ -17,26 +17,31 @@
 package io.rdbc.pgsql.netty.codec
 
 import java.nio.charset.Charset
+import java.util
 
+import com.typesafe.scalalogging.StrictLogging
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
-import io.netty.handler.codec.MessageToByteEncoder
-import io.rdbc.pgsql.core.codec.Encoder
-import io.rdbc.pgsql.core.messages.frontend.{ClientCharset, PgFrontendMessage}
+import io.netty.handler.codec.ByteToMessageDecoder
+import io.rdbc.pgsql.core.SessionParams
+import io.rdbc.pgsql.core.codec.Decoder
 
-protected[netty] class NettyPgMsgEncoder(encoder: Encoder) extends MessageToByteEncoder[PgFrontendMessage] {
+protected[netty] class PgMsgDecoderHandler(decoder: Decoder)
+  extends ByteToMessageDecoder
+    with StrictLogging {
 
-  @volatile
-  implicit private var _charset = ClientCharset(Charset.forName("US-ASCII"))
+  @volatile private var _charset = SessionParams.default.serverCharset
 
-  def charset = _charset.charset
+  def charset = _charset
 
   def charset_=(charset: Charset): Unit = {
-    println(s"client charset changed to $charset")
-    _charset = ClientCharset(charset)
+    logger.debug(s"Server charset changed to '$charset'")
+    _charset = charset
   }
 
-  override def encode(ctx: ChannelHandlerContext, msg: PgFrontendMessage, out: ByteBuf): Unit = {
-    out.writeBytes(encoder.encode(msg).toArray)
+  override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]): Unit = {
+    val bytes = new Array[Byte](in.readableBytes())
+    in.readBytes(bytes)
+    out.add(decoder.decodeMsg(bytes)(charset).msg)
   }
 }

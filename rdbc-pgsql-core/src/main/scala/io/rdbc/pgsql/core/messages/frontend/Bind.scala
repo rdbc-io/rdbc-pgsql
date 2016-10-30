@@ -17,7 +17,6 @@
 package io.rdbc.pgsql.core.messages.frontend
 
 import io.rdbc.pgsql.core.messages.data.DbValFormat
-import scodec.bits.ByteVector
 
 sealed trait ReturnFieldFormats
 
@@ -36,7 +35,7 @@ case object NullDbValue extends DbValue
 
 case class TextualDbValue(value: String) extends DbValue
 
-case class BinaryDbValue(value: ByteVector) extends DbValue
+case class BinaryDbValue(value: Array[Byte]) extends DbValue
 
 
 case class Bind(portal: Option[String], preparedStmt: Option[String], params: List[DbValue], returnFieldFormats: ReturnFieldFormats) extends PgFrontendMessage

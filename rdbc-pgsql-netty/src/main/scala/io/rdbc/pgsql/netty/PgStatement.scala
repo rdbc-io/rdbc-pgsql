@@ -19,18 +19,18 @@ package io.rdbc.pgsql.netty
 import io.rdbc.ImmutIndexedSeq
 import io.rdbc.implbase.BindablePartialImpl
 import io.rdbc.pgsql.core.messages.frontend.DbValue
-import io.rdbc.pgsql.core.{PgNativeStatement, PgStatement}
+import io.rdbc.pgsql.core.{PgNativeStatement, PgStatementPartialImpl}
 import io.rdbc.sapi.{ParametrizedStatement, Statement}
 
-class PgNettyStatement(conn: PgNettyConnection, val nativeStmt: PgNativeStatement)
+class PgStatement(conn: PgConnection, val nativeStmt: PgNativeStatement)
   extends Statement
     with BindablePartialImpl[ParametrizedStatement]
-    with PgStatement {
+    with PgStatementPartialImpl {
 
   val pgTypeRegistry = conn.pgTypeConvRegistry
   def sessionParams = conn.sessionParams
 
   protected def parametrizedStmt(dbValues: ImmutIndexedSeq[DbValue]): ParametrizedStatement = {
-    new PgNettyParametrizedStatement(conn, nativeStmt.statement, dbValues)
+    new PgParametrizedStatement(conn, nativeStmt.statement, dbValues)
   }
 }

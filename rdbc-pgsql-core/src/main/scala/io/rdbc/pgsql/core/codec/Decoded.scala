@@ -16,6 +16,4 @@
 
 package io.rdbc.pgsql.core.codec
 
-import scodec.bits.ByteVector
-
-case class Decoded[A](msg: A, remainder: ByteVector)
+case class Decoded[A](msg: A, remainder: Array[Byte])

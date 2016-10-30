@@ -1,13 +1,5 @@
 package io.rdbc.pgsql.playground
 
-import java.nio.charset.Charset
-
-import io.rdbc.pgsql.core.messages.backend.{DataRow, PgBackendMessage, ServerCharset}
-import io.rdbc.pgsql.core.messages.data.DbValFormat._
-import io.rdbc.pgsql.core.messages.data.{DbValFormat, NotNullFieldValue}
-import io.rdbc.pgsql.core.messages.frontend._
-import scodec.Encoder
-
 
 object ScodecTest extends App {
 /*

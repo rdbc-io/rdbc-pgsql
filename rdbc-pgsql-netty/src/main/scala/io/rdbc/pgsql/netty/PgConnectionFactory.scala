@@ -17,7 +17,6 @@
 package io.rdbc.pgsql.netty
 
 import java.net.{InetSocketAddress, SocketAddress}
-import java.util.concurrent.ScheduledFuture
 
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.ChannelOption.SO_KEEPALIVE
@@ -35,7 +34,8 @@ import io.rdbc.pgsql.core.codec.{DecoderFactory, EncoderFactory}
 import io.rdbc.pgsql.core.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.messages.frontend.CancelRequest
 import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.netty.codec.{NettyPgMsgDecoder, NettyPgMsgEncoder}
+import io.rdbc.pgsql.netty.codec.{PgMsgDecoderHandler, PgMsgEncoderHandler}
+import io.rdbc.pgsql.netty.scheduler.EventLoopGroupScheduler
 import io.rdbc.pgsql.scodec.types.ScodecBuiltInTypes
 import io.rdbc.pgsql.scodec.{ScodecDecoderFactory, ScodecEncoderFactory}
 import io.rdbc.sapi.{ConnectionFactory, TypeConverterRegistry}
@@ -59,25 +59,6 @@ class EventLoopGroupExecutionContext(eventLoopGroup: EventLoopGroup) extends Exe
     }
   }
   override def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
-}
-
-class ScheduledTask(scheduledFuture: ScheduledFuture[_]) {
-  def cancel(): Unit = {
-    scheduledFuture.cancel(false)
-  }
-}
-
-trait TaskScheduler {
-  def schedule(delay: FiniteDuration)(action: => Unit): ScheduledTask
-}
-
-class EventLoopGroupScheduler(eventLoopGroup: EventLoopGroup) extends TaskScheduler {
-  def schedule(delay: FiniteDuration)(action: => Unit): ScheduledTask = {
-    val fut = eventLoopGroup.schedule(new Runnable() {
-      def run() = action
-    }, delay.length, delay.unit)
-    new ScheduledTask(fut)
-  }
 }
 
 object PgNettyConnectionFactory {
@@ -128,9 +109,9 @@ class PgNettyConnectionFactory protected(remoteAddr: SocketAddress,
   private val scheduler = new EventLoopGroupScheduler(eventLoopGroup)
   private implicit val ec = new EventLoopGroupExecutionContext(eventLoopGroup) //TODO are you sure?
 
-  def connection(): Future[PgNettyConnection] = {
+  def connection(): Future[PgConnection] = {
 
-    var conn: PgNettyConnection = null
+    var conn: PgConnection = null
     //TODO bossGroup, workerGroup - familarize yourself
     val bootstrap = new Bootstrap()
       .group(eventLoopGroup)
@@ -138,9 +119,9 @@ class PgNettyConnectionFactory protected(remoteAddr: SocketAddress,
       .remoteAddress(remoteAddr)
       .handler(new ChannelInitializer[Channel] {
         def initChannel(ch: Channel): Unit = {
-          val decoderHandler = new NettyPgMsgDecoder(msgDecoderFactory.decoder())
-          val encoderHandler = new NettyPgMsgEncoder(msgEncoderFactory.encoder())
-          conn = new PgNettyConnection(pgTypeConvRegistry, rdbcTypeConvRegistry, new ChannelWriter(ch), decoderHandler, encoderHandler, ec, scheduler, thisFactory.abortRequest)
+          val decoderHandler = new PgMsgDecoderHandler(msgDecoderFactory.decoder())
+          val encoderHandler = new PgMsgEncoderHandler(msgEncoderFactory.encoder())
+          conn = new PgConnection(pgTypeConvRegistry, rdbcTypeConvRegistry, new ChannelWriter(ch), decoderHandler, encoderHandler, ec, scheduler, thisFactory.abortRequest)
 
           ch.pipeline().addLast(framingHandler)
           ch.pipeline().addLast(decoderHandler)
@@ -174,7 +155,7 @@ class PgNettyConnectionFactory protected(remoteAddr: SocketAddress,
       .remoteAddress(remoteAddr)
       .handler(new ChannelInitializer[Channel] {
         def initChannel(ch: Channel): Unit = {
-          ch.pipeline().addLast(new NettyPgMsgEncoder(msgEncoderFactory.encoder()))
+          ch.pipeline().addLast(new PgMsgEncoderHandler(msgEncoderFactory.encoder()))
         }
       })
 

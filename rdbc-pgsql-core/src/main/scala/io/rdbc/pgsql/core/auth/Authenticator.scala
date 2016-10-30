@@ -20,20 +20,16 @@ import io.rdbc.ImmutSeq
 import io.rdbc.pgsql.core.messages.backend.auth.AuthBackendMessage
 import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
 
+trait Authenticator {
+  def authenticate(authReqMessage: AuthBackendMessage): AuthState
+  def supports(authReqMessage: AuthBackendMessage): Boolean
+}
+
 sealed trait AuthState {
-  def answers: Seq[PgFrontendMessage]
+  def answers: ImmutSeq[PgFrontendMessage]
 }
 
 object AuthState {
-
   case class AuthContinue(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
   case class AuthComplete(answers: ImmutSeq[PgFrontendMessage]) extends AuthState
-
-}
-
-trait Authenticator {
-  def authenticate(authReqMessage: AuthBackendMessage): AuthState
-
-  def supports(authReqMessage: AuthBackendMessage): Boolean
 }
