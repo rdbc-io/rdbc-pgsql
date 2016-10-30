@@ -16,15 +16,6 @@
 
 package io.rdbc.pgsql.core.messages.backend
 
-import io.rdbc.pgsql.core.messages.data.{Field, FieldValue}
+import io.rdbc.pgsql.core.messages.data.FieldValue
 
-case class DataRow(fieldValues: Vector[FieldValue]) extends PgBackendMessage {
-  def describe(rowDesc: RowDescription): DescribedDataRow = {
-    val fields = rowDesc.fieldDescriptions.zip(fieldValues).map {
-      case (fieldDesc, value) => Field(fieldDesc, value)
-    }
-    DescribedDataRow(fields)
-  }
-}
-
-case class DescribedDataRow(fields: Vector[Field])
+case class DataRow(fieldValues: Vector[FieldValue]) extends PgBackendMessage
