@@ -73,12 +73,12 @@ class PgParametrizedStatement(conn: PgConnection, nativeSql: String, params: Imm
     txStatus match {
       case ActiveTxStatus =>
         conn.triggerTransition(WaitingForDescribe.withoutTxMgmt(bind.portal, streamPromise, parsePromise, conn.sessionParams,
-          timeoutScheduler)(conn.out, conn.pgTypeConvRegistry, conn.rdbcTypeConvRegistry, ec))
+          timeoutScheduler, conn.rdbcTypeConvRegistry, conn.pgTypeConvRegistry)(conn.out, ec))
         parse.foreach(conn.out.write(_))
         conn.out.writeAndFlush(bind, Describe(PortalType, bind.portal), Sync)
 
       case IdleTxStatus =>
-        conn.triggerTransition(BeginningTx(parse, bind, streamPromise, parsePromise, conn.sessionParams, timeoutScheduler)(conn.out, conn.rdbcTypeConvRegistry, conn.pgTypeConvRegistry, ec))
+        conn.triggerTransition(BeginningTx(parse, bind, streamPromise, parsePromise, conn.sessionParams, timeoutScheduler, conn.rdbcTypeConvRegistry, conn.pgTypeConvRegistry)(conn.out, ec))
         conn.out.writeAndFlush(Query("BEGIN"))
 
       case FailedTxStatus => ??? //TODO

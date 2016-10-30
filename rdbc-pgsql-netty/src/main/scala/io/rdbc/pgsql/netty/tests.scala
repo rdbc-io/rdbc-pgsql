@@ -30,7 +30,7 @@ object Tst extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = PgNettyConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = PgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
 
   fact.connection().flatMap { conn =>
     println("hai\n\n\n")
@@ -62,7 +62,7 @@ object IdleTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  PgNettyConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().map { conn =>
+  PgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().map { conn =>
     println("hai\n\n\n")
 
 
@@ -78,7 +78,7 @@ object TstFloat extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  PgNettyConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
+  PgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
     println("hai\n\n\n")
 
     val rsFut = for {
@@ -132,7 +132,7 @@ object StreamTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  PgNettyConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
+  PgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
     println("hai\n\n\n")
 
     val streamFut = conn.statement("select * from test").flatMap { stmt =>
@@ -156,7 +156,7 @@ object TxTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  PgNettyConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
+  PgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
     println("hai\n\n\n")
 
     val rsFut = for {
@@ -182,7 +182,7 @@ object ErrTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  PgNettyConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
+  PgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
     println("hai\n\n\n")
 
     val rsFut = for {
@@ -207,7 +207,7 @@ object PerfTst extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val connFact = PgNettyConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val connFact = PgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
 
   connFact.connection().flatMap { conn =>
     println("hai\n\n\n")
@@ -271,7 +271,7 @@ object TimeoutTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(3, "seconds")
 
-  PgNettyConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
+  PgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
     println("hai\n\n\n")
 
     val rsFut = for {
@@ -296,7 +296,7 @@ object ConnClosedTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  PgNettyConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
+  PgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
     println("hai\n\n\n")
 
     val rsFut = for {
@@ -339,7 +339,7 @@ object IfIdleTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  PgNettyConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().map { conn =>
+  PgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().map { conn =>
     println("hai\n\n\n")
 
     val rsFut = for {
@@ -371,7 +371,7 @@ object ParallelTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val connFact = PgNettyConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val connFact = PgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
 
   connFact.connection().flatMap { conn =>
     println("hai\n\n\n")
@@ -411,20 +411,6 @@ object ParallelTest extends App {
       println("ok")
 
     case Failure(ex) => ex.printStackTrace()
-  }
-
-}
-
-object AbortTest extends App {
-
-  implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
-  //BackendKeyData(15472,1665048510)
-  val pid = 15472
-  val key = 1665048510
-
-  PgNettyConnectionFactory("localhost", 5432, "povder", "povder", "povder").abortRequest(BackendKeyData(pid, key)).recover {
-    case ex => ex.printStackTrace()
   }
 
 }

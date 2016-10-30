@@ -16,9 +16,8 @@
 
 package io.rdbc.pgsql.netty.fsm.extendedquery
 
-import io.rdbc.pgsql.core.messages.backend.{NoticeMessage, PgBackendMessage, StatusMessage}
+import io.rdbc.pgsql.core.messages.backend.{NoticeMessage, PgBackendMessage}
 import io.rdbc.pgsql.netty.fsm.State.Outcome
-import io.rdbc.pgsql.netty.StatusMsgUtil.isWarning
 
 abstract protected class ExtendedQueryingCommon extends ExtendedQuerying {
 
@@ -27,8 +26,8 @@ abstract protected class ExtendedQueryingCommon extends ExtendedQuerying {
   protected def warnings = _warnings
 
   protected def handleCommon: PartialFunction[PgBackendMessage, Outcome] = {
-    case warning: NoticeMessage if isWarning(warning) =>
-      _warnings = _warnings :+ warning
+    case notice: NoticeMessage if notice.isWarning =>
+      _warnings = _warnings :+ notice
       stay
   }
 }

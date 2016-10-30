@@ -19,10 +19,9 @@ package io.rdbc.pgsql.core
 import io.rdbc._
 
 object PgNativeStatement {
-  def fromRdbc(statement: String): PgNativeStatement = {
+  def parse(statement: String): PgNativeStatement = {
     /* matches ":param1", ":param2" etc. and groups a match without an initial colon */
-    val paramPattern =
-      """:([^\W]*)""".r
+    val paramPattern = """:([^\W]*)""".r
     val params = paramPattern.findAllMatchIn(statement).map(_.group(1)).toVector
     val nativeStatement = params.zipWithIndex.foldLeft(statement) { (acc, elem) =>
       val (param, idx) = elem

@@ -18,7 +18,6 @@ package io.rdbc.pgsql.core
 
 import java.nio.charset.Charset
 
-
 object PgCharset {
 
   def toJavaCharset(pgCharset: String): Option[Charset] = mapping.get(pgCharset).map { javaCharsetName =>
@@ -30,7 +29,7 @@ object PgCharset {
     */
   val mapping = Map(
     "BIG5" -> "Big5",
-    "EUC_CN" -> "", //TODO
+    "EUC_CN" -> "EUC_CN",
     "EUC_JP" -> "EUC-JP",
     "EUC_JIS_2004" -> "x-SJIS_0213", //TODO is this the same as SHIFT_JIS_2004?
     "EUC_KR" -> "EUC-KR",
@@ -54,11 +53,10 @@ object PgCharset {
     "LATIN8" -> "ISO-8859-8",
     "LATIN9" -> "ISO-8859-9",
     "LATIN10" -> "ISO-8859-10",
-    "MULE_INTERNAL" -> "", //TODO
     "SJIS" -> "Shift_JIS",
     "SHIFT_JIS_2004" -> "", //TODO
-    "SQL_ASCII" -> "US-ASCII", //TODO this ignores anything above 128, so it's not really US-ASCII
-    "UHC" -> "", //TODO
+    "SQL_ASCII" -> "US-ASCII",
+    "UHC" -> "MS949",
     "UTF8" -> "UTF-8",
     "WIN866" -> "IBM866", //TODO verify
     "WIN874" -> "x-windows-874",

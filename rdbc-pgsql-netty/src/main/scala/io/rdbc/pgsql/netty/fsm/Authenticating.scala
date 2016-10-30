@@ -25,8 +25,8 @@ import io.rdbc.pgsql.netty.ChannelWriter
 
 import scala.concurrent.{ExecutionContext, Promise}
 
-class Authenticating(out: ChannelWriter, initPromise: Promise[BackendKeyData],
-                     authenticator: Authenticator)(implicit ec: ExecutionContext) extends State {
+class Authenticating(initPromise: Promise[BackendKeyData], authenticator: Authenticator)
+                    (implicit out: ChannelWriter, ec: ExecutionContext) extends State {
 
   private var waitingForOk = false
 
@@ -43,7 +43,7 @@ class Authenticating(out: ChannelWriter, initPromise: Promise[BackendKeyData],
           stay
       }
 
-    case AuthOk if waitingForOk => goto(new Initializing(out, initPromise))
+    case AuthOk if waitingForOk => goto(new Initializing(initPromise))
 
     case ErrorMessage(statusData) =>
       initPromise.failure(PgConnectException(statusData))

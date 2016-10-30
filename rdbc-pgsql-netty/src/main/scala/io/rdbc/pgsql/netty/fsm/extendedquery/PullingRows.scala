@@ -20,10 +20,9 @@ import io.rdbc.api.exceptions.ConnectionClosedException
 import io.rdbc.pgsql.core.exception.PgStmtExecutionException
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.netty.ChannelWriter
+import io.rdbc.pgsql.netty.fsm.ConnectionClosed
 
 import scala.concurrent.ExecutionContext
-import io.rdbc.pgsql.netty.StatusMsgUtil.isFatal
-import io.rdbc.pgsql.netty.fsm.ConnectionClosed
 
 class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: ChannelWriter, ec: ExecutionContext) extends ExtendedQueryingCommon {
 
@@ -53,7 +52,7 @@ class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: C
       if (txMgmt) goto(new CompletedPendingCommit(publisher))
       else goto(new CompletedWaitingForReady(publisher))
 
-    case err: ErrorMessage if isFatal(err) =>
+    case err: ErrorMessage if err.isFatal =>
       val ex = PgStmtExecutionException(err.statusData)
       goto(ConnectionClosed(ConnectionClosedException("TODO cause"))) andThen {
         publisher.failure(ex)

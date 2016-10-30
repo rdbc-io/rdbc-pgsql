@@ -19,11 +19,10 @@ package io.rdbc.pgsql.netty.fsm
 import io.rdbc.pgsql.core.messages.backend.{BackendKeyData, ReadyForQuery}
 import io.rdbc.pgsql.netty.ChannelWriter
 import io.rdbc.pgsql.netty.exception.ProtocolViolationException
-import io.rdbc.sapi.Connection
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Promise}
 
-class Initializing(out: ChannelWriter, initPromise: Promise[BackendKeyData])(implicit ec: ExecutionContext) extends State {
+class Initializing(initPromise: Promise[BackendKeyData])(implicit out: ChannelWriter, ec: ExecutionContext) extends State {
 
   private var backendKeyData: Option[BackendKeyData] = None
 
