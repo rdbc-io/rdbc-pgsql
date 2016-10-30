@@ -24,12 +24,12 @@ import org.reactivestreams.Publisher
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class PgNettyResultStream(val rows: Publisher[Row],
-                          rowDesc: RowDescription,
-                          val rowsAffected: Future[Long],
-                          warningMsgsFut: Future[ImmutSeq[StatusMessage]],
-                          pgTypeConvRegistry: PgTypeRegistry,
-                          rdbcTypeConvRegistry: TypeConverterRegistry) extends ResultStream {
+class PgResultStream(val rows: Publisher[Row],
+                     rowDesc: RowDescription,
+                     val rowsAffected: Future[Long],
+                     warningMsgsFut: Future[ImmutSeq[StatusMessage]],
+                     pgTypeConvRegistry: PgTypeRegistry,
+                     rdbcTypeConvRegistry: TypeConverterRegistry) extends ResultStream {
 
   implicit val ec = ExecutionContext.global //TODO
 

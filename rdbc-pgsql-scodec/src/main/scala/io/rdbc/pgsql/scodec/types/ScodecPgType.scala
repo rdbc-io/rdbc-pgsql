@@ -13,26 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.rdbc.pgsql.scodec.types
 
 import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.types.PgType
 import scodec.Attempt.{Failure, Successful}
 import scodec.Codec
-import scodec.bits.ByteVector
+import scodec.bits.BitVector
 
 trait ScodecPgType[T] extends PgType[T] {
 
   def decodeCodec(implicit sessionParams: SessionParams): Codec[T]
   def encodeCodec(implicit sessionParams: SessionParams): Codec[T]
 
-  override def toObj(binaryVal: ByteVector)(implicit sessionParams: SessionParams): T = decodeCodec.decodeValue(binaryVal.bits) match {
+  override def toObj(binaryVal: Array[Byte])(implicit sessionParams: SessionParams): T = decodeCodec.decodeValue(BitVector.view(binaryVal)) match {
     case Successful(value) => value
     case Failure(err) => throw new RuntimeException(err.messageWithContext) //TODO DecodeException
   }
 
-  override def toPgBinary(obj: T)(implicit sessionParams: SessionParams): ByteVector = encodeCodec.encode(obj) match {
-    case Successful(value) => value.bytes
+  override def toPgBinary(obj: T)(implicit sessionParams: SessionParams): Array[Byte] = encodeCodec.encode(obj) match {
+    case Successful(value) => value.toByteArray
     case Failure(err) => throw new RuntimeException(err.messageWithContext) //TODO EncodeException
   }
 }

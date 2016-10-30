@@ -16,19 +16,13 @@
 
 package io.rdbc.pgsql.core.auth
 
-import com.typesafe.config.Config
 import io.rdbc.pgsql.core.auth.AuthState.AuthComplete
 import io.rdbc.pgsql.core.messages.backend.auth.{AuthBackendMessage, AuthRequestMd5}
 import io.rdbc.pgsql.core.messages.frontend.PasswordMessage
 
 import scala.collection.immutable
 
-
 class UsernamePasswordAuthenticator(val username: String, val password: String) extends Authenticator {
-
-  def this(config: Config) = {
-    this(config.getString("username"), config.getString("password"))
-  }
 
   override def authenticate(authReqMessage: AuthBackendMessage): AuthState = authReqMessage match {
     case req: AuthRequestMd5 =>

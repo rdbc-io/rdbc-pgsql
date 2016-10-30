@@ -18,7 +18,6 @@ package io.rdbc.pgsql.core.types
 
 import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.messages.data.Oid
-import scodec.bits.ByteVector
 
 trait PgType[T] {
   def typeOid: Oid
@@ -27,9 +26,9 @@ trait PgType[T] {
 
   def toObj(textualVal: String)(implicit sessionParams: SessionParams): T
 
-  def toObj(binaryVal: ByteVector)(implicit sessionParams: SessionParams): T
+  def toObj(binaryVal: Array[Byte])(implicit sessionParams: SessionParams): T
 
   def toPgTextual(obj: T)(implicit sessionParams: SessionParams): String
 
-  def toPgBinary(obj: T)(implicit sessionParams: SessionParams): ByteVector
+  def toPgBinary(obj: T)(implicit sessionParams: SessionParams): Array[Byte]
 }

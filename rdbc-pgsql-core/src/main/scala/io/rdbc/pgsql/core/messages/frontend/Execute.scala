@@ -16,7 +16,4 @@
 
 package io.rdbc.pgsql.core.messages.frontend
 
-import scodec.{Codec, Encoder}
-import scodec.bits.ByteVector
-
 case class Execute(optionalPortalName: Option[String], optionalFetchSize: Option[Int]) extends PgFrontendMessage

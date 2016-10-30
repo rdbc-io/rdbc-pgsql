@@ -17,10 +17,9 @@
 package io.rdbc.pgsql.core.messages.data
 
 import io.rdbc.pgsql.core.messages.backend.FieldDescription
-import scodec.bits.ByteVector
 
 sealed trait FieldValue
-case class NotNullFieldValue(data: ByteVector) extends FieldValue
+case class NotNullFieldValue(data: Array[Byte]) extends FieldValue
 case object NullFieldValue extends FieldValue
 
 case class Field(desc: FieldDescription, value: FieldValue)

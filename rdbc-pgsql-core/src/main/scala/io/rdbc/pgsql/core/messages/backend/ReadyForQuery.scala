@@ -16,8 +16,6 @@
 
 package io.rdbc.pgsql.core.messages.backend
 
-import scodec.Codec
-
 case class ReadyForQuery(txStatus: TxStatus) extends PgBackendMessage
 sealed trait TxStatus
 case object IdleTxStatus extends TxStatus

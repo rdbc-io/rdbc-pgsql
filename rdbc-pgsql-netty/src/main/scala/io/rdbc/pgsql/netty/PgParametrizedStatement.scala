@@ -27,7 +27,7 @@ import io.rdbc.sapi.{ParametrizedStatement, ResultStream}
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Promise}
 
-class PgNettyParametrizedStatement(conn: PgNettyConnection, nativeSql: String, params: ImmutSeq[DbValue])
+class PgParametrizedStatement(conn: PgConnection, nativeSql: String, params: ImmutSeq[DbValue])
   extends ParametrizedStatement
     with ParametrizedStatementPartialImpl
     with StrictLogging {
@@ -60,7 +60,7 @@ class PgNettyParametrizedStatement(conn: PgNettyConnection, nativeSql: String, p
     logger.debug(s"Executing statement '$nativeSql'")
     val (parse, bind) = parseAndBind
 
-    val streamPromise = Promise[PgNettyResultStream]
+    val streamPromise = Promise[PgResultStream]
     val parsePromise = Promise[Unit]
 
     val timeoutScheduler = TimeoutScheduler {
@@ -93,5 +93,5 @@ class PgNettyParametrizedStatement(conn: PgNettyConnection, nativeSql: String, p
     streamPromise.future
   }
 
-  override def connWatchForIdle: Future[PgNettyConnection] = conn.watchForIdle
+  override def connWatchForIdle: Future[PgConnection] = conn.watchForIdle
 }

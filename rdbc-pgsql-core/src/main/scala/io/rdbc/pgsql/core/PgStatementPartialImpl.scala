@@ -20,14 +20,14 @@ import io.rdbc._
 import io.rdbc.api.exceptions.BindException.MissingParamValException
 import io.rdbc.api.exceptions.NoSuitableConverterFoundException
 import io.rdbc.implbase.BindablePartialImpl
-import io.rdbc.pgsql.core.messages.frontend.{BinaryDbValue, DbValue, TextualDbValue}
+import io.rdbc.pgsql.core.messages.frontend.{BinaryDbValue, DbValue}
 import io.rdbc.pgsql.core.types.{PgType, PgTypeRegistry}
 import io.rdbc.sapi.{ParametrizedStatement, Statement}
 import org.reactivestreams.Publisher
 
 import scala.concurrent.Future
 
-trait PgStatement extends Statement with BindablePartialImpl[ParametrizedStatement] {
+trait PgStatementPartialImpl extends Statement with BindablePartialImpl[ParametrizedStatement] {
 
   def pgTypeRegistry: PgTypeRegistry
   def nativeStmt: PgNativeStatement

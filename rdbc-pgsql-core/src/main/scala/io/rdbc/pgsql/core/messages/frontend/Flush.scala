@@ -16,7 +16,4 @@
 
 package io.rdbc.pgsql.core.messages.frontend
 
-import scodec.{Codec, Encoder}
-import scodec.bits.ByteVector
-
 case object Flush extends PgFrontendMessage

@@ -16,14 +16,14 @@
 
 package io.rdbc.pgsql.scodec
 
-import _root_.scodec.bits.ByteVector
+import java.nio.charset.Charset
+
 import io.rdbc.pgsql.core.codec.Encoder
 import io.rdbc.pgsql.core.messages.frontend._
 import io.rdbc.pgsql.scodec.msg.frontend._
 
 class ScodecEncoder extends Encoder {
-  override def encode(msg: PgFrontendMessage)(implicit clientCharset: ClientCharset): ByteVector = {
-    implicit val charset = clientCharset.charset
+  override def encode(msg: PgFrontendMessage)(implicit charset: Charset): Array[Byte] = {
     val codec = msg match {
       case m: StartupMessage => startup.upcast[PgFrontendMessage]
       case m: Bind => bind.upcast[PgFrontendMessage]
@@ -40,6 +40,6 @@ class ScodecEncoder extends Encoder {
       case Sync => sync.upcast[PgFrontendMessage]
     }
 
-    codec.encode(msg).require.bytes
+    codec.encode(msg).require.toByteArray
   }
 }

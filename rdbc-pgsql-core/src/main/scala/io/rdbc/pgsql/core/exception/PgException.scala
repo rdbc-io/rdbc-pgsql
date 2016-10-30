@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.codec
+package io.rdbc.pgsql.core.exception
 
-import java.nio.charset.Charset
+import io.rdbc.api.exceptions._
+import io.rdbc.pgsql.core.messages.backend.StatusData
 
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
-
-trait Encoder {
-  def encode(msg: PgFrontendMessage)(implicit charset: Charset): Array[Byte]
+trait PgException {
+  def pgStatusData: StatusData
 }
+
+class PgUncategorizedException(val pgStatusData: StatusData) extends RdbcException(pgStatusData.shortInfo) with PgException

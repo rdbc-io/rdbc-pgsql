@@ -14,8 +14,14 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.messages
+package io.rdbc.pgsql.netty.scheduler
 
-import io.rdbc.pgsql.core.messages.backend.RowDescription
+import scala.concurrent.duration.FiniteDuration
 
-case class MsgDecodingContext(currentRowDesc: Option[RowDescription] = None)
+trait TaskScheduler {
+  def schedule(delay: FiniteDuration)(action: => Unit): ScheduledTask
+}
+
+trait ScheduledTask {
+  def cancel(): Unit
+}

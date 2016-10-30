@@ -23,7 +23,6 @@ import io.rdbc.pgsql.core.messages.data.DbValFormat.{BinaryDbValFormat, TextualD
 import io.rdbc.pgsql.core.messages.data.{DataType, FieldValue, NotNullFieldValue, NullFieldValue}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.sapi.{Row, TypeConverterRegistry}
-import scodec.bits.ByteVector
 
 class PgRow(rowDesc: RowDescription,
             cols: IndexedSeq[FieldValue],
@@ -64,7 +63,7 @@ class PgRow(rowDesc: RowDescription,
       .getOrElse(throw new Exception(s"unsupported type $pgType")) //TODO
   }
 
-  private def binaryToObj(pgType: DataType, binaryVal: ByteVector): Any = {
+  private def binaryToObj(pgType: DataType, binaryVal: Array[Byte]): Any = {
     pgTypeConvRegistry.byTypeOid(pgType.oid).map(_.toObj(binaryVal))
       .getOrElse(throw new Exception(s"unsupported type $pgType")) //TODO
   }

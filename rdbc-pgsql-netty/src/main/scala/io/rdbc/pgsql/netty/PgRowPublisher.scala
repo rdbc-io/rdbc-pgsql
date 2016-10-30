@@ -23,6 +23,7 @@ import io.rdbc.pgsql.core.messages.backend.{DataRow, RowDescription}
 import io.rdbc.pgsql.core.messages.frontend.{ClosePortal, Execute, Sync}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.{PgRow, SessionParams}
+import io.rdbc.pgsql.netty.scheduler.ScheduledTask
 import io.rdbc.sapi.{Row, TypeConverterRegistry}
 import org.reactivestreams.{Publisher, Subscriber, Subscription}
 

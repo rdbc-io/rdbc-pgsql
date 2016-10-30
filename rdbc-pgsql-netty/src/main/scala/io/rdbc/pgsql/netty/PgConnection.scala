@@ -28,11 +28,12 @@ import io.rdbc.pgsql.core.exception.PgUncategorizedException
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.core.messages.frontend.{Query, StartupMessage, Terminate}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.core.{PgCharset, PgConnectionBase, PgNativeStatement, SessionParams}
+import io.rdbc.pgsql.core.{PgCharset, PgConnectionPartialImpl, PgNativeStatement, SessionParams}
 import io.rdbc.pgsql.netty.StatusMsgUtil.isWarning
-import io.rdbc.pgsql.netty.codec.{NettyPgMsgDecoder, NettyPgMsgEncoder}
+import io.rdbc.pgsql.netty.codec.{PgMsgDecoderHandler, PgMsgEncoderHandler}
 import io.rdbc.pgsql.netty.fsm.State._
 import io.rdbc.pgsql.netty.fsm.{Authenticating, _}
+import io.rdbc.pgsql.netty.scheduler.TaskScheduler
 import io.rdbc.sapi._
 import org.reactivestreams.Publisher
 
@@ -41,18 +42,18 @@ import scala.concurrent.stm._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 //TODO make a note in Connection scaladoc that implementations must be thread safe
-class PgNettyConnection(val pgTypeConvRegistry: PgTypeRegistry,
-                        val rdbcTypeConvRegistry: TypeConverterRegistry,
-                        protected[netty] val out: ChannelWriter,
-                        decoder: NettyPgMsgDecoder,
-                        encoder: NettyPgMsgEncoder,
-                        implicit val ec: ExecutionContext,
-                        val scheduler: TaskScheduler,
-                        private val requestCanceler: (BackendKeyData) => Future[Unit])
+class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
+                   val rdbcTypeConvRegistry: TypeConverterRegistry,
+                   private[netty] val out: ChannelWriter,
+                   decoder: PgMsgDecoderHandler,
+                   encoder: PgMsgEncoderHandler,
+                   implicit val ec: ExecutionContext,
+                   private[netty] val scheduler: TaskScheduler,
+                   requestCanceler: (BackendKeyData) => Future[Unit])
   extends SimpleChannelInboundHandler[PgBackendMessage]
     with Connection
     with ConnectionPartialImpl
-    with PgConnectionBase
+    with PgConnectionPartialImpl
     with StrictLogging {
 
   private val idle: Ref[Boolean] = Ref(false)
@@ -62,15 +63,14 @@ class PgNettyConnection(val pgTypeConvRegistry: PgTypeRegistry,
 
   @volatile private[netty] var sessionParams = SessionParams.default
   @volatile private[netty] var stmtCache = PreparedStmtCache.empty
-  private val stmtCounter = new AtomicInteger(0)
   @volatile private var bkd = Option.empty[BackendKeyData]
-
+  private val stmtCounter = new AtomicInteger(0)
   private val lastRequestId: Ref[Long] = Ref(Long.MinValue)
 
   def watchForIdle: Future[this.type] = idlePromise.single().future
 
   def statement(sql: String): Future[Statement] = {
-    Future.successful(new PgNettyStatement(this, PgNativeStatement.fromRdbc(sql)))
+    Future.successful(new PgStatement(this, PgNativeStatement.fromRdbc(sql)))
   }
 
   def streamIntoTable(sql: String, paramsPublisher: Publisher[Map[String, Any]]): Future[Unit] = ???
@@ -140,7 +140,10 @@ class PgNettyConnection(val pgTypeConvRegistry: PgTypeRegistry,
   private def handleCharsetChange(pgCharsetName: String)(consumer: (Charset) => Unit) = {
     PgCharset.toJavaCharset(pgCharsetName) match {
       case Some(charset) => consumer(charset)
-      case None => doRelease(s"Unsupported charset '$pgCharsetName'")
+      case None =>
+        val msg = s"Unsupported charset '$pgCharsetName'"
+        logger.error(msg)
+        doRelease(msg)
     }
   }
 
@@ -158,7 +161,7 @@ class PgNettyConnection(val pgTypeConvRegistry: PgTypeRegistry,
     case ParameterStatus(name, value) => logger.debug(s"Received parameter '$name' = '$value'")
 
     case err: ErrorMessage =>
-      logger.error(s"Unhandled error received: ${err.statusData}")
+      logger.error(s"Unhandled error message received: ${err.statusData.shortInfo}")
       val ex = new PgUncategorizedException(err.statusData)
       doRelease(ex)
 
@@ -170,12 +173,14 @@ class PgNettyConnection(val pgTypeConvRegistry: PgTypeRegistry,
       }
 
     case unknownMsg: UnknownPgMessage =>
-      logger.error(s"Unknown message received: '$unknownMsg'")
-      doRelease(s"Unknown message received: '$unknownMsg'")
+      val msg = s"Unknown message received: '$unknownMsg'"
+      logger.error(msg)
+      doRelease(msg)
 
     case unhandledMsg =>
-      logger.error(s"Unhandled message '$unhandledMsg' in state '$localState'")
-      doRelease(s"Unhandled message '$unhandledMsg' in state '$localState'")
+      val msg = s"Unhandled message '$unhandledMsg' in state '$localState'"
+      logger.error(msg)
+      doRelease(msg)
   }
 
   private[netty] def onTimeout[A](reqId: Long): Unit = {
@@ -238,6 +243,7 @@ class PgNettyConnection(val pgTypeConvRegistry: PgTypeRegistry,
   }
 
   def forceRelease(): Future[Unit] = {
+    logger.info("Forcing a connection release")
     doRelease("Connection released by client (forced)")
   }
 }
