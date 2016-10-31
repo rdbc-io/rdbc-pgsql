@@ -24,7 +24,7 @@ lazy val rdbcPgsql = (project in file("."))
     publishArtifact := false,
     bintrayReleaseOnPublish := false
   )
-  .aggregate(core, scodec, nettyBackend)
+  .aggregate(core, scodec, nettyTransport)
 
 lazy val core = (project in file("rdbc-pgsql-core"))
   .settings(commonSettings: _*)
@@ -35,7 +35,8 @@ lazy val core = (project in file("rdbc-pgsql-core"))
       Library.rdbcTypeconv,
       Library.rdbcImplbase,
       Library.typesafeConfig,
-      Library.stm
+      Library.stm,
+      Library.scalaLogging
     )
   )
 
@@ -49,10 +50,10 @@ lazy val scodec = (project in file("rdbc-pgsql-scodec"))
     )
   ).dependsOn(core)
 
-lazy val nettyBackend = (project in file("rdbc-pgsql-netty"))
+lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
   .settings(commonSettings: _*)
   .settings(
-    name := "pgsql-netty-backend",
+    name := "rdbc-pgsql-transport-netty",
     libraryDependencies ++= Vector(
       Library.nettyHandler,
       Library.nettyEpoll,
@@ -69,4 +70,4 @@ lazy val playground = (project in file("rdbc-pgsql-playground"))
     name := "pgsql-playground",
     publishArtifact := false,
     bintrayReleaseOnPublish := false
-  ).dependsOn(core, scodec, nettyBackend)
+  ).dependsOn(core, scodec, nettyTransport)
