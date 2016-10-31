@@ -21,7 +21,6 @@ import java.nio.charset.Charset
 import com.typesafe.scalalogging.StrictLogging
 import io.netty.channel.{ChannelHandlerContext, SimpleChannelInboundHandler}
 import io.rdbc.pgsql.core._
-import io.rdbc.pgsql.core.fsm.State._
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.core.scheduler.TaskScheduler
 import io.rdbc.pgsql.core.types.PgTypeRegistry
@@ -29,7 +28,7 @@ import io.rdbc.sapi._
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class NettyPgConnection(pgTypeConvRegistry: PgTypeRegistry,
+class NettyPgConnection(pgTypeRegistry: PgTypeRegistry,
                         rdbcTypeConvRegistry: TypeConverterRegistry,
                         out: ChannelWriter,
                         decoder: PgMsgDecoderHandler,
@@ -37,22 +36,12 @@ class NettyPgConnection(pgTypeConvRegistry: PgTypeRegistry,
                         ec: ExecutionContext,
                         scheduler: TaskScheduler,
                         requestCanceler: (BackendKeyData) => Future[Unit])
-  extends PgConnection(pgTypeConvRegistry, rdbcTypeConvRegistry,
-    out,
-    ec,
-    scheduler,
-    requestCanceler)
+  extends PgConnection(pgTypeRegistry, rdbcTypeConvRegistry, out, ec, scheduler, requestCanceler)
     with StrictLogging {
 
   val handler = new SimpleChannelInboundHandler[PgBackendMessage] {
     override def channelRead0(ctx: ChannelHandlerContext, msg: PgBackendMessage): Unit = {
-      logger.trace(s"Received backend message '$msg'")
-      val localState = state.single()
-      localState.handleMsg.applyOrElse(msg, (_: PgBackendMessage) => Unhandled) match {
-        case Unhandled => onUnhandled(msg, localState)
-        case Stay => ()
-        case Goto(newState, afterTransitionAction) => triggerTransition(newState, afterTransitionAction)
-      }
+      onMessage(msg)
     }
 
     override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = {
@@ -61,11 +50,11 @@ class NettyPgConnection(pgTypeConvRegistry: PgTypeRegistry,
     }
   }
 
-  def clientCharsetChanged(charset: Charset): Unit = {
+  protected def clientCharsetChanged(charset: Charset): Unit = {
     encoder.charset = charset
-
   }
-  def serverCharsetChanged(charset: Charset): Unit = {
+
+  protected def serverCharsetChanged(charset: Charset): Unit = {
     decoder.charset = charset
   }
 }

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.messages.backend
+package io.rdbc.pgsql.core.fsm
 
-case class Header(msgLength: Int)
+trait EmptyState extends State {
+  def handleMsg = PartialFunction.empty
+}

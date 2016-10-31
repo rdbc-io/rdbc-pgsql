@@ -20,7 +20,7 @@ import com.typesafe.scalalogging.StrictLogging
 import io.rdbc.ImmutSeq
 import io.rdbc.implbase.ParametrizedStatementPartialImpl
 import io.rdbc.pgsql.core.fsm.extendedquery.{BeginningTx, WaitingForDescribe}
-import io.rdbc.pgsql.core.messages.backend.{ActiveTxStatus, FailedTxStatus, IdleTxStatus}
+import io.rdbc.pgsql.core.messages.backend.TxStatus
 import io.rdbc.pgsql.core.messages.frontend._
 import io.rdbc.pgsql.core.scheduler.TimeoutScheduler
 import io.rdbc.sapi.{ParametrizedStatement, ResultStream}
@@ -74,17 +74,17 @@ class PgParametrizedStatement(conn: PgConnection,
     }
 
     txStatus match {
-      case ActiveTxStatus =>
+      case TxStatus.Active =>
         conn.triggerTransition(WaitingForDescribe.withoutTxMgmt(bind.portal, streamPromise, parsePromise, conn.sessionParams,
           timeoutScheduler, conn.rdbcTypeConvRegistry, conn.pgTypeConvRegistry)(conn.out, ec))
         parse.foreach(conn.out.write(_))
         conn.out.writeAndFlush(bind, Describe(PortalType, bind.portal), Sync)
 
-      case IdleTxStatus =>
+      case TxStatus.Idle =>
         conn.triggerTransition(BeginningTx(parse, bind, streamPromise, parsePromise, conn.sessionParams, timeoutScheduler, conn.rdbcTypeConvRegistry, conn.pgTypeConvRegistry)(conn.out, ec))
         conn.out.writeAndFlush(Query("BEGIN"))
 
-      case FailedTxStatus => ??? //TODO
+      case TxStatus.Failed => ??? //TODO
     }
 
     parse.flatMap(_.optionalName).foreach { stmtName =>

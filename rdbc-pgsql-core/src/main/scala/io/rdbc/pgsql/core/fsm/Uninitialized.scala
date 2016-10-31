@@ -16,7 +16,6 @@
 
 package io.rdbc.pgsql.core.fsm
 
-object Uninitialized extends State {
-  def handleMsg = PartialFunction.empty
-  val shortDesc = "uninitialized"
+object Uninitialized extends EmptyState {
+  val name = "uninitialized"
 }

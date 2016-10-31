@@ -78,7 +78,7 @@ class WaitingForDescribe protected(txMgmt: Boolean,
       case Some(_) => onError(new ProtocolViolationException("already received row description"))
       case None =>
         val publisher = new PgRowPublisher(out, rowDesc, portalName, pgTypeConvRegistry, rdbcTypeConvRegistry, sessionParams, timeoutScheduler)
-        val warningsPromise = Promise[Vector[NoticeMessage]]
+        val warningsPromise = Promise[Vector[StatusMessage.Notice]]
         val rowsAffectedPromise = Promise[Long]
 
         maybeAfterDescData = Some(AfterDescData(
@@ -107,7 +107,7 @@ class WaitingForDescribe protected(txMgmt: Boolean,
         }
     }
 
-    case err: ErrorMessage if err.isFatal =>
+    case err: StatusMessage.Error if err.isFatal =>
       val ex = PgStmtExecutionException(err.statusData)
       maybeAfterDescData match {
         case Some(AfterDescData(publisher, warningsPromise, rowsAffectedPromise)) =>
@@ -124,7 +124,7 @@ class WaitingForDescribe protected(txMgmt: Boolean,
           }
       }
 
-    case err: ErrorMessage => onError(PgStmtExecutionException(err.statusData))
+    case err: StatusMessage.Error => onError(PgStmtExecutionException(err.statusData))
 
     //TODO massive code duplication
   }
@@ -144,5 +144,5 @@ class WaitingForDescribe protected(txMgmt: Boolean,
       })
   }
 
-  val shortDesc = "extended_querying.waiting_for_describe"
+  val name = "extended_querying.waiting_for_describe"
 }

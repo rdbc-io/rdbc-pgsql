@@ -29,9 +29,8 @@ class PgResultStream(val rows: Publisher[Row],
                      val rowsAffected: Future[Long],
                      warningMsgsFut: Future[ImmutSeq[StatusMessage]],
                      pgTypeConvRegistry: PgTypeRegistry,
-                     rdbcTypeConvRegistry: TypeConverterRegistry) extends ResultStream {
-
-  implicit val ec = ExecutionContext.global //TODO
+                     rdbcTypeConvRegistry: TypeConverterRegistry)
+                    (implicit ec: ExecutionContext) extends ResultStream {
 
   val warnings: Future[ImmutSeq[Warning]] = warningMsgsFut.map { warnMsgs =>
     warnMsgs.map(warnMsg => Warning(warnMsg.statusData.shortInfo, warnMsg.statusData.sqlState))

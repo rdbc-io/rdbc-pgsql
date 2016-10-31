@@ -21,8 +21,10 @@ import _root_.scodec.codecs._
 import _root_.scodec.{Attempt, Codec, DecodeResult, SizeBound}
 import io.rdbc.pgsql.core.messages.data.{FieldValue, NotNullFieldValue, NullFieldValue}
 
-class FieldValueCodec extends Codec[FieldValue] {
-  override def decode(bits: BitVector): Attempt[DecodeResult[FieldValue]] = {
+object FieldValueCodec extends Codec[FieldValue] {
+  def sizeBound: SizeBound = SizeBound.unknown
+
+  def decode(bits: BitVector): Attempt[DecodeResult[FieldValue]] = {
     pgInt32.decode(bits).flatMap(dResult => {
       val len = dResult.value
       if (len == -1) {
@@ -33,10 +35,8 @@ class FieldValueCodec extends Codec[FieldValue] {
     })
   }
 
-  override def encode(value: FieldValue): Attempt[BitVector] = value match {
+  def encode(value: FieldValue): Attempt[BitVector] = value match {
     case NullFieldValue => byte.unit(-1).encode(Unit)
     case NotNullFieldValue(data) => variableSizeBytes(pgInt32, bytes).encode(ByteVector.view(data))
   }
-
-  override def sizeBound: SizeBound = SizeBound.unknown
 }

@@ -31,5 +31,5 @@ class FailedWaitingForReadyAfterRollback(onIdle: => Unit) extends ExtendedQueryi
       goto(Idle(txStatus)) andThen onIdle
   }
 
-  val shortDesc = "extended_querying.waiting_for_ready_after_rollback"
+  val name = "extended_querying.waiting_for_ready_after_rollback"
 }

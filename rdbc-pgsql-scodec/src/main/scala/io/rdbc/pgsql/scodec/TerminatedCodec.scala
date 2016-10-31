@@ -21,16 +21,14 @@ import _root_.scodec.{Attempt, Codec, DecodeResult, Err, SizeBound}
 
 class TerminatedCodec[A](terminator: BitVector, codec: Codec[A]) extends Codec[A] {
 
-  override def sizeBound: SizeBound = SizeBound.unknown
+  def sizeBound: SizeBound = SizeBound.unknown
 
-  override def decode(bits: BitVector): Attempt[DecodeResult[A]] = {
+  def decode(bits: BitVector): Attempt[DecodeResult[A]] = {
     bits.bytes.indexOfSlice(terminator.bytes) match {
       case -1 => Attempt.failure(Err(s"Does not contain a '0x${terminator.toHex}' terminator."))
-      case i =>
-        codec.decode(bits.take(i * 8L)).map(dr => dr.mapRemainder(_ => bits.drop(i * 8L + 8L)))
+      case i => codec.decode(bits.take(i * 8L)).map(dr => dr.mapRemainder(_ => bits.drop(i * 8L + 8L)))
     }
   }
 
-  override def encode(value: A): Attempt[BitVector] = codec.encode(value).map(_ ++ terminator)
-
+  def encode(value: A): Attempt[BitVector] = codec.encode(value).map(_ ++ terminator)
 }

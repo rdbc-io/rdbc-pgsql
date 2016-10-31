@@ -16,4 +16,10 @@
 
 package io.rdbc.pgsql.core.messages.backend
 
-case class Header(msgLength: Int)
+import io.rdbc.pgsql.core.messages.data.{DataType, DbValFormat, Oid}
+
+case class FieldDescription(name: String,
+                            tableOid: Option[Oid],
+                            columnAttr: Option[Int],
+                            dataType: DataType,
+                            fieldFormat: DbValFormat)

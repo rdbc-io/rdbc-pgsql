@@ -48,7 +48,7 @@ package object backend {
         .typecase('n', noData)
         .typecase('t', parameterDescription)
     ).xmapc(_.fold(identity, identity)) {
-      case u: UnknownPgMessage => Left(u)
+      case u: UnknownBackendMessage => Left(u)
       case r => Right(r)
     }
   }
@@ -91,18 +91,18 @@ package object backend {
     vectorOfN(pgInt16.withContext("columns"), fieldValue).as[DataRow]
   }
 
-  val unknown: Codec[UnknownPgMessage] = {
+  val unknown: Codec[UnknownBackendMessage] = {
     {
       ("head" | byte) ::
         ("body" | variableSizeBytes(pgInt32, bytesArr, 4))
-    }.as[UnknownPgMessage]
+    }.as[UnknownBackendMessage]
   }
 
   val readyForQuery: Codec[ReadyForQuery] = pgHeadlessMsg {
     discriminated.by(byte)
-      .typecase('I', provide(ReadyForQuery(IdleTxStatus)))
-      .typecase('E', provide(ReadyForQuery(FailedTxStatus)))
-      .typecase('T', provide(ReadyForQuery(ActiveTxStatus)))
+      .typecase('I', provide(ReadyForQuery(TxStatus.Idle)))
+      .typecase('E', provide(ReadyForQuery(TxStatus.Failed)))
+      .typecase('T', provide(ReadyForQuery(TxStatus.Active)))
     //TODO error handling
   }
 
@@ -132,9 +132,9 @@ package object backend {
       .as[ParameterDescription]
   }
 
-  def error(implicit charset: Charset): Codec[ErrorMessage] = status(StatusMessage.error)
+  def error(implicit charset: Charset): Codec[StatusMessage.Error] = status(StatusMessage.error)
 
-  def notice(implicit charset: Charset): Codec[NoticeMessage] = status(StatusMessage.notice)
+  def notice(implicit charset: Charset): Codec[StatusMessage.Notice] = status(StatusMessage.notice)
 
   private def status[A <: StatusMessage](creator: Map[Byte, String] => A)(implicit charset: Charset): Codec[A] = pgHeadlessMsg {
     pgParamMap(byte).withContext("fields")

@@ -23,7 +23,10 @@ import io.rdbc.pgsql.core.messages.backend._
 
 import scala.concurrent.Promise
 
-sealed trait SimpleQuerying extends State
+sealed trait SimpleQuerying extends State {
+  def subName: String
+  val name = "simple_querying." + subName
+}
 
 object SimpleQuerying {
   class PullingRows(out: ChannelWriter, promise: Promise[Unit]) extends SimpleQuerying {
@@ -32,25 +35,27 @@ object SimpleQuerying {
       case _: RowDescription => stay
       case _: DataRow => stay
       case CommandComplete(_, _) | EmptyQueryResponse => goto(new SuccessWaitingForReady(promise))
-      case ErrorMessage(statusData) => goto(new FailedWaitingForReady(PgStmtExecutionException(statusData), promise))
+      case StatusMessage.Error(statusData) => goto(new FailureWaitingForReady(PgStmtExecutionException(statusData), promise))
     }
 
-    val shortDesc = "simple_querying.pulling_rows"
+    val subName = "pulling_rows"
   }
 
   class SuccessWaitingForReady(promise: Promise[Unit]) extends SimpleQuerying {
+
     def handleMsg = {
       case ReadyForQuery(txStatus) => goto(Idle(txStatus)) andThen promise.success(())
     }
 
-    val shortDesc = "simple_querying.waiting_for_ready"
+    val subName = "success_waiting_for_ready"
   }
 
-  class FailedWaitingForReady(rdbcEx: RdbcException, promise: Promise[Unit]) extends SimpleQuerying {
+  class FailureWaitingForReady(ex: RdbcException, promise: Promise[Unit]) extends SimpleQuerying {
+
     def handleMsg = {
-      case ReadyForQuery(txStatus) => goto(Idle(txStatus)) andThen promise.failure(rdbcEx)
+      case ReadyForQuery(txStatus) => goto(Idle(txStatus)) andThen promise.failure(ex)
     }
 
-    val shortDesc = "simple_querying.waiting_for_ready"
+    val subName = "failure_waiting_for_ready"
   }
 }

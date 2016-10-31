@@ -52,7 +52,7 @@ class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: C
       if (txMgmt) goto(new CompletedPendingCommit(publisher))
       else goto(new CompletedWaitingForReady(publisher))
 
-    case err: ErrorMessage if err.isFatal =>
+    case err: StatusMessage.Error if err.isFatal =>
       val ex = PgStmtExecutionException(err.statusData)
       goto(ConnectionClosed(ConnectionClosedException("TODO cause"))) andThen {
         publisher.failure(ex)
@@ -63,7 +63,7 @@ class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: C
 
     //TODO massive code dupl
 
-    case err: ErrorMessage =>
+    case err: StatusMessage.Error =>
       val ex = PgStmtExecutionException(err.statusData)
       goto(Failed(txMgmt) {
         publisher.failure(ex)
@@ -72,5 +72,5 @@ class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: C
       })
   }
 
-  val shortDesc = "extended_querying.pulling_rows"
+  val name = "extended_querying.pulling_rows"
 }

@@ -56,8 +56,8 @@ object NettyPgConnectionFactory {
       authenticator = new UsernamePasswordAuthenticator(username, password),
       rdbcTypeConvRegistry = BuiltInConverters,
       pgTypeConvRegistry = ScodecBuiltInTypes,
-      msgDecoderFactory = new ScodecDecoderFactory,
-      msgEncoderFactory = new ScodecEncoderFactory,
+      msgDecoderFactory = ScodecDecoderFactory,
+      msgEncoderFactory = ScodecEncoderFactory,
       writeTimeout = 10.seconds,
       channelFactory = defaultChannelFactory,
       eventLoopGroup = defaultEventLoopGroup,
@@ -107,8 +107,8 @@ class NettyPgConnectionFactory protected(remoteAddr: SocketAddress,
       .remoteAddress(remoteAddr)
       .handler(new ChannelInitializer[Channel] {
         def initChannel(ch: Channel): Unit = {
-          val decoderHandler = new PgMsgDecoderHandler(msgDecoderFactory.decoder())
-          val encoderHandler = new PgMsgEncoderHandler(msgEncoderFactory.encoder())
+          val decoderHandler = new PgMsgDecoderHandler(msgDecoderFactory.decoder)
+          val encoderHandler = new PgMsgEncoderHandler(msgEncoderFactory.encoder)
           conn = new NettyPgConnection(pgTypeConvRegistry, rdbcTypeConvRegistry, new NettyChannelWriter(ch), decoderHandler, encoderHandler, ec, scheduler, thisFactory.abortRequest)
 
           ch.pipeline().addLast(framingHandler)
@@ -143,7 +143,7 @@ class NettyPgConnectionFactory protected(remoteAddr: SocketAddress,
       .remoteAddress(remoteAddr)
       .handler(new ChannelInitializer[Channel] {
         def initChannel(ch: Channel): Unit = {
-          ch.pipeline().addLast(new PgMsgEncoderHandler(msgEncoderFactory.encoder()))
+          ch.pipeline().addLast(new PgMsgEncoderHandler(msgEncoderFactory.encoder))
         }
       })
 

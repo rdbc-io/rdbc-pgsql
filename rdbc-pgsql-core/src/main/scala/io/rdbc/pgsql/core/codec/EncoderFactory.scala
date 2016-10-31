@@ -17,5 +17,5 @@
 package io.rdbc.pgsql.core.codec
 
 trait EncoderFactory {
-  def encoder(): Encoder
+  def encoder: Encoder
 }

@@ -60,5 +60,5 @@ class BeginningTx protected(maybeParse: Option[Parse],
       }
   }
 
-  val shortDesc = "extended_querying.beginning_tx"
+  val name = "extended_querying.beginning_tx"
 }

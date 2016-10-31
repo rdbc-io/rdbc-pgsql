@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.transport.netty
+package io.rdbc.pgsql.playground
 
+import io.rdbc.pgsql.transport.netty.NettyPgConnectionFactory
 import io.rdbc.sapi.Row
 import org.reactivestreams.{Subscriber, Subscription}
 import scodec.bits.BitVector

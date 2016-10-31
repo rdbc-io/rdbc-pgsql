@@ -81,7 +81,7 @@ package object scodec {
     }.as[FieldDescription].withToString("FieldDescription")
   }
 
-  val fieldValue: Codec[FieldValue] = new FieldValueCodec
+  val fieldValue: Codec[FieldValue] = FieldValueCodec
 
   val header: Codec[Header] = {
     {

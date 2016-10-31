@@ -18,5 +18,4 @@ package io.rdbc.pgsql.core.messages.backend.auth
 
 import io.rdbc.pgsql.core.messages.backend.PgBackendMessage
 
-
 trait AuthBackendMessage extends PgBackendMessage

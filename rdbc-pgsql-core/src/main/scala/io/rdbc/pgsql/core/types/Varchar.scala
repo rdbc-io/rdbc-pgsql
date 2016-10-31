@@ -23,8 +23,7 @@ trait Varchar extends PgType[String] {
   val typeOid = Oid(1043)
   val cls = classOf[String]
 
-  override def toObj(textualVal: String)(implicit sessionParams: SessionParams): String = textualVal
+  def toObj(textualVal: String)(implicit sessionParams: SessionParams): String = textualVal
 
-  override def toPgTextual(obj: String)(implicit sessionParams: SessionParams): String = obj.toString
-
+  def toPgTextual(obj: String)(implicit sessionParams: SessionParams): String = obj.toString
 }

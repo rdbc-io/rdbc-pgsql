@@ -30,5 +30,5 @@ class CompletedWaitingForReady(publisher: PgRowPublisher)(implicit ec: Execution
       }
   }
 
-  val shortDesc = "extended_querying.waiting_for_ready"
+  val name = "extended_querying.waiting_for_ready"
 }

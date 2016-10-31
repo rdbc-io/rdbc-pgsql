@@ -21,14 +21,14 @@ import _root_.scodec.codecs._
 import _root_.scodec.{Attempt, Codec, DecodeResult, SizeBound}
 import io.rdbc.pgsql.core.messages.frontend._
 
-class ReturnFieldFormatsCodec extends Codec[ReturnFieldFormats] {
-  override def encode(value: ReturnFieldFormats): Attempt[BitVector] = value match {
+object ReturnFieldFormatsCodec extends Codec[ReturnFieldFormats] {
+  def sizeBound: SizeBound = SizeBound.atLeast(1)
+
+  def encode(value: ReturnFieldFormats): Attempt[BitVector] = value match {
     case NoReturnFields | AllTextual => pgInt16.encode(0)
     case AllBinary => (pgInt16 ~ pgInt16).encode(1, 1)
     case SpecificFieldFormats(formats) => listOfN(pgInt16, dbValFormat).encode(formats)
   }
 
-  override def sizeBound: SizeBound = SizeBound.atLeast(1)
-
-  override def decode(bits: BitVector): Attempt[DecodeResult[ReturnFieldFormats]] = ??? //TODO
+  def decode(bits: BitVector): Attempt[DecodeResult[ReturnFieldFormats]] = ??? //TODO
 }

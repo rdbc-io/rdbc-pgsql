@@ -16,17 +16,21 @@
 
 package io.rdbc.pgsql.core.messages.backend
 
+sealed trait StatusMessage extends PgBackendMessage {
+  def statusData: StatusData
+  def isWarning: Boolean = statusData.sqlState.startsWith("01") || statusData.sqlState.startsWith("02")
+}
+
 object StatusMessage {
-  def error(fields: Map[Byte, String]): ErrorMessage = {
-    ErrorMessage(statusData(fields))
+  def error(fields: Map[Byte, String]): StatusMessage.Error = {
+    StatusMessage.Error(statusData(fields))
   }
 
-  def notice(fields: Map[Byte, String]): NoticeMessage = {
-    NoticeMessage(statusData(fields))
+  def notice(fields: Map[Byte, String]): StatusMessage.Notice = {
+    StatusMessage.Notice(statusData(fields))
   }
 
-
-  def statusData(fields: Map[Byte, String]): StatusData = {
+  private def statusData(fields: Map[Byte, String]): StatusData = {
     //mandatory
     val severity: Option[String] = fields.get('V').orElse(fields.get('S'))
     //TODO error on missing
@@ -41,7 +45,7 @@ object StatusMessage {
     val internalPosition: Option[Int] = fields.get('p').map(_.toInt) //TODO error?
 
     StatusData(
-      severity = severity.getOrElse("dupa"),
+      severity = severity.getOrElse("dupa"), //TODO here and below
       sqlState = sqlState.getOrElse("dupa"),
       message = fields.getOrElse('M', "dupa"),
       detail = fields.get('D'),
@@ -60,27 +64,43 @@ object StatusMessage {
       routine = routine.getOrElse("dupa")
     )
   }
+
+  case class Error(statusData: StatusData) extends StatusMessage {
+    def isFatal: Boolean = {
+      if (statusData.sqlState == "57014") {
+        false //query canceled
+      } else {
+        val errCat = statusData.sqlState.take(2)
+        errCat match {
+          case "57" => true //operator intervention
+          case "58" => true //system error
+          case "XX" => true //PG internal error
+          case _ => false
+        }
+      }
+    }
+  }
+
+  case class Notice(statusData: StatusData) extends StatusMessage
 }
 
-case class StatusData(
-                       severity: String,
-                       sqlState: String,
-                       message: String,
-                       detail: Option[String],
-                       hint: Option[String],
-                       position: Option[Int],
-                       internalPosition: Option[Int],
-                       internalQuery: Option[String],
-                       where: Option[String],
-                       schemaName: Option[String],
-                       tableName: Option[String],
-                       columnName: Option[String],
-                       dataTypeName: Option[String],
-                       constraintName: Option[String],
-                       file: String,
-                       line: String,
-                       routine: String
-                     ) {
+case class StatusData(severity: String,
+                      sqlState: String,
+                      message: String,
+                      detail: Option[String],
+                      hint: Option[String],
+                      position: Option[Int],
+                      internalPosition: Option[Int],
+                      internalQuery: Option[String],
+                      where: Option[String],
+                      schemaName: Option[String],
+                      tableName: Option[String],
+                      columnName: Option[String],
+                      dataTypeName: Option[String],
+                      constraintName: Option[String],
+                      file: String,
+                      line: String,
+                      routine: String) {
 
   def shortInfo: String = s"$severity-$sqlState: $message"
 
@@ -107,25 +127,4 @@ case class StatusData(
   }
 }
 
-sealed trait StatusMessage extends PgBackendMessage {
-  def statusData: StatusData
-  def isWarning: Boolean = statusData.sqlState.startsWith("01") || statusData.sqlState.startsWith("02")
-}
 
-case class ErrorMessage(statusData: StatusData) extends StatusMessage {
-  def isFatal: Boolean = {
-    if (statusData.sqlState == "57014") {
-      false //query canceled
-    } else {
-      val errCat = statusData.sqlState.take(2)
-      errCat match {
-        case "57" => true //operator intervention
-        case "58" => true //system error
-        case "XX" => true //PG internal error
-        case _ => false
-      }
-    }
-  }
-}
-
-case class NoticeMessage(statusData: StatusData) extends StatusMessage
