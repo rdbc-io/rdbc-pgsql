@@ -26,7 +26,7 @@ import io.rdbc.pgsql.core.exception.PgDecodeException
 import io.rdbc.pgsql.core.messages.backend.{Header, PgBackendMessage}
 import io.rdbc.pgsql.scodec.msg.backend._
 
-class ScodecDecoder extends Decoder {
+object ScodecDecoder extends Decoder {
   override def decodeMsg(bytes: Array[Byte])(implicit charset: Charset): Decoded[PgBackendMessage] = {
     pgBackendMessage.decode(BitVector.view(bytes)) match {
       case Successful(DecodeResult(msg, remainder)) => Decoded(msg, remainder.toByteArray)

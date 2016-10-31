@@ -17,10 +17,7 @@
 package io.rdbc.pgsql.core.fsm
 
 import io.rdbc.api.exceptions.ConnectionClosedException
-import io.rdbc.pgsql.core.fsm.State.Outcome
-import io.rdbc.pgsql.core.messages.backend.PgBackendMessage
 
-case class ConnectionClosed(cause: ConnectionClosedException) extends State {
-  override def handleMsg: PartialFunction[PgBackendMessage, Outcome] = PartialFunction.empty
-  override def shortDesc: String = "connection_closed"
+case class ConnectionClosed(cause: ConnectionClosedException) extends EmptyState {
+  val name = "connection_closed"
 }

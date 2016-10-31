@@ -14,8 +14,12 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.messages.backend
+package io.rdbc.pgsql
 
-case class UnknownPgMessage(head: Byte, body: Array[Byte]) extends PgBackendMessage {
-  override def toString = s"UnknownPgMessage(head = ${head.toChar}, body = $body)"
+package object core {
+
+  implicit class ArrayToHex(array: Array[Byte]) {
+    def toHex: String = array.map("%02X" format _).mkString
+  }
+
 }

@@ -30,7 +30,7 @@ package object frontend {
       ("portal" | pgStringOption) ::
         ("statement" | pgStringOption) ::
         ("paramValues" | new ParamValuesCodec) ::
-        ("resultColumns" | new ReturnFieldFormatsCodec)
+        ("resultColumns" | ReturnFieldFormatsCodec)
     }.as[Bind]
   }
 

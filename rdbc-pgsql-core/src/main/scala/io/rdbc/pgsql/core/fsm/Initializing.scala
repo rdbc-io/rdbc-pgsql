@@ -33,14 +33,12 @@ class Initializing(initPromise: Promise[BackendKeyData])(implicit out: ChannelWr
 
     case ReadyForQuery(txStatus) =>
       backendKeyData match {
-        case Some(bkd) =>
-          goto(Idle(txStatus)) andThen initPromise.success(bkd)
-
+        case Some(bkd) => goto(Idle(txStatus)) andThen initPromise.success(bkd)
         case None =>
-          initPromise.failure(new ProtocolViolationException("Ready for query received in initializing state without prior backend key data message"))
-          stay //TODO fatal ex
+          val ex = new ProtocolViolationException("Ready for query received in initializing state without prior backend key data message")
+          fatal(ex) andThen initPromise.failure(ex)
       }
   }
 
-  val shortDesc = "initializing"
+  val name = "initializing"
 }

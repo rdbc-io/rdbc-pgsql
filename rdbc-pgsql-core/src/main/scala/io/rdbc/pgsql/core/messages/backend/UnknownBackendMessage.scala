@@ -16,4 +16,8 @@
 
 package io.rdbc.pgsql.core.messages.backend
 
-case class Header(msgLength: Int)
+import io.rdbc.pgsql.core._
+
+case class UnknownBackendMessage(head: Byte, body: Array[Byte]) extends PgBackendMessage {
+  override def toString = s"UnknownPgMessage(head = ${head.toChar}, body = ${body.toHex})"
+}

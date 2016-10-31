@@ -16,12 +16,13 @@
 
 package io.rdbc.pgsql.core.fsm
 
+import io.rdbc.api.exceptions.ConnectException.AuthFailureException
 import io.rdbc.pgsql.core.ChannelWriter
 import io.rdbc.pgsql.core.auth.AuthState.{AuthComplete, AuthContinue}
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.exception.PgConnectException
-import io.rdbc.pgsql.core.messages.backend.auth.{AuthBackendMessage, AuthOk}
-import io.rdbc.pgsql.core.messages.backend.{BackendKeyData, ErrorMessage}
+import io.rdbc.pgsql.core.messages.backend.auth.{AuthOk, AuthRequest}
+import io.rdbc.pgsql.core.messages.backend.{BackendKeyData, StatusMessage}
 
 import scala.concurrent.{ExecutionContext, Promise}
 
@@ -31,24 +32,27 @@ class Authenticating(initPromise: Promise[BackendKeyData], authenticator: Authen
   private var waitingForOk = false
 
   def handleMsg = {
-    case authMsg: AuthBackendMessage if !waitingForOk =>
-      authenticator.authenticate(authMsg) match {
-        case AuthContinue(answers) =>
-          out.writeAndFlush(answers)
-          stay
-
-        case AuthComplete(answers) =>
-          out.writeAndFlush(answers)
-          waitingForOk = true
-          stay
+    case authReq: AuthRequest if !waitingForOk =>
+      if (authenticator.supports(authReq)) {
+        val answersToWrite = authenticator.authenticate(authReq) match {
+          case AuthContinue(answers) => answers
+          case AuthComplete(answers) =>
+            waitingForOk = true
+            answers
+        }
+        out.writeAndFlush(answersToWrite)
+        stay
+      } else {
+        val ex = AuthFailureException(s"Authentication mechanism '${authReq.authMechanismName}' requested by server is not supported by provided authenticator")
+        fatal(ex) andThenFailPromise initPromise
       }
 
     case AuthOk if waitingForOk => goto(new Initializing(initPromise))
 
-    case ErrorMessage(statusData) =>
-      initPromise.failure(PgConnectException(statusData))
-      stay //TODO fatal error
+    case StatusMessage.Error(statusData) =>
+      val ex = PgConnectException(statusData)
+      fatal(ex) andThenFailPromise initPromise
   }
 
-  val shortDesc = "authenticating"
+  val name = "authenticating"
 }

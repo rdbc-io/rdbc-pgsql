@@ -21,10 +21,5 @@ trait AuthRequest extends AuthBackendMessage {
 }
 
 case class AuthRequestMd5(salt: Array[Byte]) extends AuthRequest {
-  override val authMechanismName: String = "md5"
-
-  override def toString = {
-    val saltHex = salt.map("%02X" format _).mkString
-    s"${getClass.getSimpleName}(salt = 0x$saltHex)"
-  }
+  val authMechanismName: String = "md5"
 }

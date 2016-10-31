@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.core.fsm
 
 import io.rdbc.pgsql.core.PgRowPublisher
-import io.rdbc.pgsql.core.messages.backend.NoticeMessage
+import io.rdbc.pgsql.core.messages.backend.StatusMessage
 
 import scala.concurrent.Promise
 
@@ -25,6 +25,6 @@ package object extendedquery {
   trait ExtendedQuerying extends State
 
   case class AfterDescData(publisher: PgRowPublisher,
-                           warningsPromise: Promise[Vector[NoticeMessage]],
+                           warningsPromise: Promise[Vector[StatusMessage.Notice]],
                            rowsAffectedPromise: Promise[Long])
 }

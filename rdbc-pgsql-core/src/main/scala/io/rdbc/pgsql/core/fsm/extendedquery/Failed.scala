@@ -18,7 +18,7 @@ package io.rdbc.pgsql.core.fsm.extendedquery
 
 import io.rdbc.pgsql.core.ChannelWriter
 import io.rdbc.pgsql.core.fsm.Idle
-import io.rdbc.pgsql.core.messages.backend.{FailedTxStatus, ReadyForQuery}
+import io.rdbc.pgsql.core.messages.backend.{ReadyForQuery, TxStatus}
 import io.rdbc.pgsql.core.messages.frontend.Query
 
 object Failed {
@@ -27,9 +27,9 @@ object Failed {
   }
 }
 
-class Failed protected (txMgmt: Boolean, onIdle: => Unit)(implicit out: ChannelWriter) extends ExtendedQueryingCommon {
+class Failed protected(txMgmt: Boolean, onIdle: => Unit)(implicit out: ChannelWriter) extends ExtendedQueryingCommon {
   def handleMsg = {
-    case ReadyForQuery(txStatus@FailedTxStatus) =>
+    case ReadyForQuery(txStatus@TxStatus.Failed) =>
       if (txMgmt) {
         goto(new FailedWaitingForReadyAfterRollback(onIdle)) andThen {
           out.writeAndFlush(Query("ROLLBACK"))
@@ -39,5 +39,5 @@ class Failed protected (txMgmt: Boolean, onIdle: => Unit)(implicit out: ChannelW
       }
   }
 
-  val shortDesc = "extended_querying.errored"
+  val name = "extended_querying.errored"
 }

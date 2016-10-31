@@ -21,24 +21,22 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import com.typesafe.scalalogging.StrictLogging
 import io.rdbc.api.exceptions.{ConnectionClosedException, IllegalSessionStateException}
-import io.rdbc.implbase.ConnectionPartialImpl
+import io.rdbc.implbase.{ConnectionPartialImpl, ReturningInsertImpl}
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.exception.PgUncategorizedException
+import io.rdbc.pgsql.core.fsm.State.{Fatal, Goto, Stay, Unhandled}
 import io.rdbc.pgsql.core.fsm._
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.core.messages.frontend.{Query, StartupMessage, Terminate}
 import io.rdbc.pgsql.core.scheduler.TaskScheduler
 import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.sapi.{Connection, Statement, TypeConverterRegistry}
+import io.rdbc.sapi.{Connection, ReturningInsert, Statement, TypeConverterRegistry}
 import org.reactivestreams.Publisher
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.stm.{Ref, _}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-/**
-  * Created by krzysztofpado on 31/10/2016.
-  */
 //TODO make a note in Connection scaladoc that implementations must be thread safe
 abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
                             val rdbcTypeConvRegistry: TypeConverterRegistry,
@@ -48,7 +46,6 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
                             requestCanceler: (BackendKeyData) => Future[Unit])
   extends Connection
     with ConnectionPartialImpl
-    with PgConnectionPartialImpl
     with StrictLogging {
 
   private val idle: Ref[Boolean] = Ref(false)
@@ -66,6 +63,22 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
 
   def statement(sql: String): Future[Statement] = {
     Future.successful(new PgStatement(this, PgNativeStatement.parse(sql)))
+  }
+
+  def beginTx()(implicit timeout: FiniteDuration): Future[Unit] = simpleQueryIgnoreResult("BEGIN")
+  def commitTx()(implicit timeout: FiniteDuration): Future[Unit] = simpleQueryIgnoreResult("COMMIT")
+  def rollbackTx()(implicit timeout: FiniteDuration): Future[Unit] = simpleQueryIgnoreResult("ROLLBACK")
+  def returningInsert(sql: String): Future[ReturningInsert] = returningInsert(sql, "*")
+  def validate(): Future[Boolean] = simpleQueryIgnoreResult("")(FiniteDuration(100, "seconds")).map(_ => true).recoverWith {
+    case ex: IllegalSessionStateException => Future.failed(ex)
+    case _ => Future.successful(false) //TODO finite duration hardcoded here
+  }
+
+  def returningInsert(sql: String, keyColumns: String*): Future[ReturningInsert] = {
+    val returningSql = sql + " returning " + keyColumns.mkString(",")
+    statement(returningSql).map { stmt =>
+      new ReturningInsertImpl(stmt)
+    }
   }
 
   def streamIntoTable(sql: String, paramsPublisher: Publisher[Map[String, Any]]): Future[Unit] = ???
@@ -94,15 +107,14 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
       state() match {
         case ConnectionClosed(_) => false
         case _ =>
-          logger.trace(s"Transitioning from state '${state()}' to '$newState'")
           newState match {
             case Idle(_) =>
-              idlePromise().success(this)
+              idlePromise().success(this) //TODO urgent - can't mutate things in atomic
               idle() = true
 
             case ConnectionClosed(cause) =>
               if (!idlePromise().isCompleted) {
-                idlePromise().failure(cause)
+                idlePromise().failure(cause) //TODO urgent - can't mutate things in atomic
               }
               idle() = false
 
@@ -113,6 +125,8 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
       }
     }
     if (successful) {
+      logger.trace(s"Transitioned to state '$newState'")
+      //TODO note that afterTransition action can't access state or any transactional data (Refs)
       afterTransition.foreach(_.apply())
     }
   }
@@ -127,9 +141,20 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
     }
   }
 
-  def clientCharsetChanged(charset: Charset): Unit
+  protected def clientCharsetChanged(charset: Charset): Unit
 
-  def serverCharsetChanged(charset: Charset): Unit
+  protected def serverCharsetChanged(charset: Charset): Unit
+
+  protected def onMessage(msg: PgBackendMessage): Unit = {
+    logger.trace(s"Received backend message '$msg'")
+    val localState = state.single()
+    localState.handleMsg.applyOrElse(msg, (_: PgBackendMessage) => Unhandled) match {
+      case Unhandled => onUnhandled(msg, localState)
+      case Stay => ()
+      case Goto(newState, afterTransitionAction) => triggerTransition(newState, afterTransitionAction)
+      case Fatal(ex, afterReleaseAction) => doRelease(ex).map(_ => afterReleaseAction.foreach(_.apply()))
+    }
+  }
 
   protected def onUnhandled(msg: PgBackendMessage, localState: State): Unit = msg match {
     case ParameterStatus("client_encoding", pgCharsetName) => handleCharsetChange(pgCharsetName) { charset =>
@@ -144,7 +169,7 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
 
     case ParameterStatus(name, value) => logger.debug(s"Received parameter '$name' = '$value'")
 
-    case err: ErrorMessage =>
+    case err: StatusMessage.Error =>
       logger.error(s"Unhandled error message received: ${err.statusData.shortInfo}")
       val ex = new PgUncategorizedException(err.statusData)
       doRelease(ex)
@@ -156,7 +181,7 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
         logger.debug(s"Notice received: ${statusMsg.statusData.shortInfo}")
       }
 
-    case unknownMsg: UnknownPgMessage =>
+    case unknownMsg: UnknownBackendMessage =>
       val msg = s"Unknown message received: '$unknownMsg'"
       logger.error(msg)
       doRelease(msg)

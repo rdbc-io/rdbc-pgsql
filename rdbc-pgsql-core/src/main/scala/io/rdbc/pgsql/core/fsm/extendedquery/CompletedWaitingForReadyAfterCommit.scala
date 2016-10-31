@@ -36,5 +36,5 @@ class CompletedWaitingForReadyAfterCommit(publisher: PgRowPublisher)(implicit ec
       }
   }
 
-  val shortDesc = "extended_querying.waiting_for_ready_after_commit"
+  val name = "extended_querying.waiting_for_ready_after_commit"
 }

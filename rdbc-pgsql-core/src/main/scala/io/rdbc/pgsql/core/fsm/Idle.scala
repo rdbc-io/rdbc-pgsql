@@ -18,8 +18,6 @@ package io.rdbc.pgsql.core.fsm
 
 import io.rdbc.pgsql.core.messages.backend.TxStatus
 
-case class Idle(txStatus: TxStatus) extends State {
-  def handleMsg = PartialFunction.empty
-
-  val shortDesc = "idle"
+case class Idle(txStatus: TxStatus) extends EmptyState {
+  val name = "idle"
 }

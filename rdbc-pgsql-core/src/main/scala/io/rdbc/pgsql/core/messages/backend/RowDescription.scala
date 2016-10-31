@@ -16,16 +16,4 @@
 
 package io.rdbc.pgsql.core.messages.backend
 
-import io.rdbc.pgsql.core.messages.data.{DataType, DbValFormat, Oid}
-
-
-case class FieldDescription(
-                             name: String,
-                             tableOid: Option[Oid],
-                             columnAttr: Option[Int],
-                             dataType: DataType,
-                             fieldFormat: DbValFormat
-                           )
-
-
 case class RowDescription(fieldDescriptions: Vector[FieldDescription]) extends PgBackendMessage

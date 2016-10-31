@@ -17,5 +17,5 @@
 package io.rdbc.pgsql.core.codec
 
 trait DecoderFactory {
-  def decoder(): Decoder
+  def decoder: Decoder
 }

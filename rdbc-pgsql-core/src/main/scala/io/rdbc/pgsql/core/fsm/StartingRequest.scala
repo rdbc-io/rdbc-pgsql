@@ -16,8 +16,6 @@
 
 package io.rdbc.pgsql.core.fsm
 
-case object StartingRequest extends State {
-  def handleMsg = PartialFunction.empty
-
-  val shortDesc = "starting_request"
+case object StartingRequest extends EmptyState {
+  val name = "starting_request"
 }

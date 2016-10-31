@@ -17,16 +17,16 @@
 package io.rdbc.pgsql.core.fsm.extendedquery
 
 import io.rdbc.pgsql.core.fsm.State.Outcome
-import io.rdbc.pgsql.core.messages.backend.{NoticeMessage, PgBackendMessage}
+import io.rdbc.pgsql.core.messages.backend.{PgBackendMessage, StatusMessage}
 
 abstract protected class ExtendedQueryingCommon extends ExtendedQuerying {
 
-  private var _warnings = Vector.empty[NoticeMessage]
+  private var _warnings = Vector.empty[StatusMessage.Notice]
 
   protected def warnings = _warnings
 
   protected def handleCommon: PartialFunction[PgBackendMessage, Outcome] = {
-    case notice: NoticeMessage if notice.isWarning =>
+    case notice: StatusMessage.Notice if notice.isWarning =>
       _warnings = _warnings :+ notice
       stay
   }

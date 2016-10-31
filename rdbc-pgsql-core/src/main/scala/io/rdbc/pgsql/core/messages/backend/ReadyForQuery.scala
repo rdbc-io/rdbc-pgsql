@@ -17,7 +17,10 @@
 package io.rdbc.pgsql.core.messages.backend
 
 case class ReadyForQuery(txStatus: TxStatus) extends PgBackendMessage
+
 sealed trait TxStatus
-case object IdleTxStatus extends TxStatus
-case object ActiveTxStatus extends TxStatus
-case object FailedTxStatus extends TxStatus
+object TxStatus {
+  case object Idle extends TxStatus
+  case object Active extends TxStatus
+  case object Failed extends TxStatus
+}

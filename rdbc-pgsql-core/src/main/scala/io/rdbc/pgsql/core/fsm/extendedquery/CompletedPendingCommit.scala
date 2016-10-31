@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.fsm.extendedquery
 
-import io.rdbc.pgsql.core.messages.backend.{ActiveTxStatus, ReadyForQuery}
+import io.rdbc.pgsql.core.messages.backend.{ReadyForQuery, TxStatus}
 import io.rdbc.pgsql.core.messages.frontend.Query
 import io.rdbc.pgsql.core.{ChannelWriter, PgRowPublisher}
 
@@ -25,11 +25,11 @@ import scala.concurrent.ExecutionContext
 class CompletedPendingCommit(publisher: PgRowPublisher)(implicit out: ChannelWriter, ec: ExecutionContext) extends ExtendedQueryingCommon {
 
   def handleMsg = {
-    case ReadyForQuery(ActiveTxStatus) =>
+    case ReadyForQuery(TxStatus.Active) =>
       goto(new CompletedWaitingForReadyAfterCommit(publisher)) andThen {
         out.writeAndFlush(Query("COMMIT"))
       }
   }
 
-  val shortDesc = "extended_querying.pending_commit"
+  val name = "extended_querying.pending_commit"
 }

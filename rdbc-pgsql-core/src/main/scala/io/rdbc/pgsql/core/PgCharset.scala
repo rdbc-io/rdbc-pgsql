@@ -27,7 +27,7 @@ object PgCharset {
   /**
     * Mapping between PostgreSQL charset name and IANA charset name used by java.nio.Charset
     */
-  val mapping = Map(
+  private val mapping = Map(
     "BIG5" -> "Big5",
     "EUC_CN" -> "EUC_CN",
     "EUC_JP" -> "EUC-JP",

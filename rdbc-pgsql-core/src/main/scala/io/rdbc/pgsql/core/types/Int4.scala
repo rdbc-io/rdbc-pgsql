@@ -24,8 +24,7 @@ trait Int4 extends PgType[Int] {
   val cls = classOf[Int]
   override val otherClasses = Vector(classOf[Integer])
 
-  override def toObj(textualVal: String)(implicit sessionParams: SessionParams): Int = textualVal.toInt
+  def toObj(textualVal: String)(implicit sessionParams: SessionParams): Int = textualVal.toInt
 
-  override def toPgTextual(obj: Int)(implicit sessionParams: SessionParams): String = obj.toString
-
+  def toPgTextual(obj: Int)(implicit sessionParams: SessionParams): String = obj.toString
 }

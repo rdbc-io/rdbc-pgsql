@@ -24,7 +24,9 @@ import _root_.scodec.{Attempt, Codec, DecodeResult, SizeBound}
 import io.rdbc.pgsql.core.messages.frontend.{BinaryDbValue, DbValue, NullDbValue, TextualDbValue}
 
 class ParamValuesCodec(implicit charset: Charset) extends Codec[List[DbValue]] {
-  override def encode(params: List[DbValue]): Attempt[BitVector] = {
+  def sizeBound: SizeBound = SizeBound.unknown
+
+  def encode(params: List[DbValue]): Attempt[BitVector] = {
     val lenBits = pgInt16.encode(params.length)
 
     val paramFormatAttempts = params.map {
@@ -44,13 +46,11 @@ class ParamValuesCodec(implicit charset: Charset) extends Codec[List[DbValue]] {
     concatAttempts(Traversable(lenBits, paramFormatBits, lenBits, paramValueBits))
   }
 
-  def concatAttempts(attempts: Traversable[Attempt[BitVector]]): Attempt[BitVector] = {
+  def decode(bits: BitVector): Attempt[DecodeResult[List[DbValue]]] = ??? //TODO
+
+  private def concatAttempts(attempts: Traversable[Attempt[BitVector]]): Attempt[BitVector] = {
     attempts.foldLeft(Attempt.successful(BitVector.empty)) { (accAttempt, attempt) =>
       accAttempt.flatMap(accBits => attempt.map(bits => accBits ++ bits))
     }
   }
-
-  override def decode(bits: BitVector): Attempt[DecodeResult[List[DbValue]]] = ??? //TODO
-
-  override def sizeBound: SizeBound = SizeBound.unknown
 }

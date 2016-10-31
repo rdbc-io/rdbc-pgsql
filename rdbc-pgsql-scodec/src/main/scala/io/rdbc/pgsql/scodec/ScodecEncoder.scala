@@ -22,7 +22,7 @@ import io.rdbc.pgsql.core.codec.Encoder
 import io.rdbc.pgsql.core.messages.frontend._
 import io.rdbc.pgsql.scodec.msg.frontend._
 
-class ScodecEncoder extends Encoder {
+object ScodecEncoder extends Encoder {
   override def encode(msg: PgFrontendMessage)(implicit charset: Charset): Array[Byte] = {
     val codec = msg match {
       case m: StartupMessage => startup.upcast[PgFrontendMessage]

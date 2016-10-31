@@ -18,6 +18,6 @@ package io.rdbc.pgsql.scodec
 
 import io.rdbc.pgsql.core.codec.DecoderFactory
 
-class ScodecDecoderFactory extends DecoderFactory {
-  val decoder = new ScodecDecoder
+object ScodecDecoderFactory extends DecoderFactory {
+  val decoder = ScodecDecoder
 }
