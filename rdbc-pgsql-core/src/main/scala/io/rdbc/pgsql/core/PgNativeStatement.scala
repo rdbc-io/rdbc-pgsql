@@ -25,7 +25,7 @@ object PgNativeStatement {
     val params = paramPattern.findAllMatchIn(statement).map(_.group(1)).toVector
     val nativeStatement = params.zipWithIndex.foldLeft(statement) { (acc, elem) =>
       val (param, idx) = elem
-      statement.replaceFirst(":" + param, "\\$" + (idx + 1))
+      acc.replaceFirst(":" + param, "\\$" + (idx + 1))
     }
     PgNativeStatement(nativeStatement, params)
   }
