@@ -73,31 +73,8 @@ class WaitingForDescribe protected(txMgmt: Boolean,
 
     case BindComplete => stay
     case _: ParameterDescription => stay
-
-    case rowDesc: RowDescription => maybeAfterDescData match {
-      case Some(_) => onError(new ProtocolViolationException("already received row description"))
-      case None =>
-        val publisher = new PgRowPublisher(out, rowDesc, portalName, pgTypeConvRegistry, rdbcTypeConvRegistry, sessionParams, timeoutScheduler)
-        val warningsPromise = Promise[Vector[StatusMessage.Notice]]
-        val rowsAffectedPromise = Promise[Long]
-
-        maybeAfterDescData = Some(AfterDescData(
-          publisher = publisher,
-          warningsPromise = warningsPromise,
-          rowsAffectedPromise = rowsAffectedPromise
-        ))
-
-        val stream = new PgResultStream(
-          publisher,
-          rowDesc = rowDesc,
-          rowsAffected = rowsAffectedPromise.future,
-          warningMsgsFut = warningsPromise.future,
-          pgTypeConvRegistry = pgTypeConvRegistry,
-          rdbcTypeConvRegistry = rdbcTypeConvRegistry
-        )
-        streamPromise.success(stream)
-        stay
-    }
+    case NoData => onRowDescription(RowDescription.empty)
+    case rowDesc: RowDescription => onRowDescription(rowDesc)
 
     case _: ReadyForQuery => maybeAfterDescData match {
       case None => throw new ProtocolViolationException("ready for query received without prior row desc")
@@ -127,6 +104,31 @@ class WaitingForDescribe protected(txMgmt: Boolean,
     case err: StatusMessage.Error => onError(PgStmtExecutionException(err.statusData))
 
     //TODO massive code duplication
+  }
+
+  private def onRowDescription(rowDesc: RowDescription): Outcome = maybeAfterDescData match {
+    case Some(_) => onError(new ProtocolViolationException("already received row description"))
+    case None =>
+      val publisher = new PgRowPublisher(out, rowDesc, portalName, pgTypeConvRegistry, rdbcTypeConvRegistry, sessionParams, timeoutScheduler)
+      val warningsPromise = Promise[Vector[StatusMessage.Notice]]
+      val rowsAffectedPromise = Promise[Long]
+
+      maybeAfterDescData = Some(AfterDescData(
+        publisher = publisher,
+        warningsPromise = warningsPromise,
+        rowsAffectedPromise = rowsAffectedPromise
+      ))
+
+      val stream = new PgResultStream(
+        publisher,
+        rowDesc = rowDesc,
+        rowsAffected = rowsAffectedPromise.future,
+        warningMsgsFut = warningsPromise.future,
+        pgTypeConvRegistry = pgTypeConvRegistry,
+        rdbcTypeConvRegistry = rdbcTypeConvRegistry
+      )
+      streamPromise.success(stream)
+      stay
   }
 
   private def onError(ex: RdbcException): Outcome = maybeAfterDescData match {

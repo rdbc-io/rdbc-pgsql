@@ -16,4 +16,8 @@
 
 package io.rdbc.pgsql.core.messages.backend
 
+object RowDescription {
+  val empty = RowDescription(Vector.empty)
+}
+
 case class RowDescription(fieldDescriptions: Vector[FieldDescription]) extends PgBackendMessage
