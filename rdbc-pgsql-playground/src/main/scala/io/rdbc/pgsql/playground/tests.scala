@@ -57,6 +57,38 @@ object Tst extends App {
 
 }
 
+
+object BindByIdxTst extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+
+  fact.connection().flatMap { conn =>
+    println("hai\n\n\n")
+
+    val rsFut = for {
+      stmt <- conn.statement("select * from test where x > :x and x > :y and x > :z")
+      parametrized <- stmt.bindByIdxF(-100, -200, -300)
+      rs <- parametrized.executeForSet()
+    } yield rs
+
+    rsFut.map { rs =>
+      rs.foreach { row =>
+        println(s"x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
+      }
+      println("DONE")
+    }.map { _ =>
+      conn.release()
+    }
+
+  }.recover {
+    case ex => ex.printStackTrace()
+  }.onComplete(_ => fact.shutdown())
+
+}
+
 object IdleTest extends App {
 
   implicit val ec = ExecutionContext.global
@@ -269,7 +301,7 @@ object DecodeTst extends App {
 object TimeoutTest extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(3, "seconds")
+  implicit val timeout = FiniteDuration.apply(5, "seconds")
 
   NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
     println("hai\n\n\n")
