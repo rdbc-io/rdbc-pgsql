@@ -42,6 +42,12 @@ class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: C
       publisher.resume()
       stay
 
+    case EmptyQueryResponse =>
+      rowsAffectedPromise.success(0L)
+      warningsPromise.success(warnings)
+      if (txMgmt) goto(new CompletedPendingCommit(publisher))
+      else goto(new CompletedWaitingForReady(publisher))
+
     case CommandComplete(_, rowsAffected) =>
       rowsAffectedPromise.success(rowsAffected.map(_.toLong).getOrElse(0L))
       warningsPromise.success(warnings)
