@@ -31,29 +31,13 @@ class PgStatement(conn: PgConnection, val nativeStmt: PgNativeStatement)
   extends Statement
     with BindablePartialImpl[ParametrizedStatement] {
 
-  val pgTypeRegistry = conn.pgTypeConvRegistry
-  implicit def sessionParams = conn.sessionParams
-
-  private def parametrizedStmt(dbValues: ImmutIndexedSeq[DbValue]): ParametrizedStatement = {
-    new PgParametrizedStatement(conn, nativeStmt.statement, dbValues)
-  }
+  private val pgTypeRegistry = conn.pgTypeConvRegistry
+  private implicit def sessionParams = conn.sessionParams
 
   def nativeSql: String = nativeStmt.statement
 
-  def convertParams(params: Map[String, Any]): Map[String, DbValue] = params.map { anyParamEntry =>
-    val (anyParamName, anyParamValue) = anyParamEntry
-    pgTypeRegistry.byClass(anyParamValue.getClass)
-      .map(pgType => {
-        val binVal = pgType.asInstanceOf[PgType[Any]].toPgBinary(anyParamValue) //TODO textual vs binary
-        (anyParamName, BinaryDbValue(binVal): DbValue)
-      })
-      .getOrElse(throw NoSuitableConverterFoundException(anyParamValue))
-  }
-
-
-  override def bind(params: (String, Any)*): ParametrizedStatement = {
-    //TODO make it configurable whether use textual or binary
-    val dbValues: Map[String, DbValue] = convertParams(Map(params: _*))
+  def bind(params: (String, Any)*): ParametrizedStatement = {
+    val dbValues: Map[String, DbValue] = convertNamedParams(Map(params: _*))
     val indexedDbValues = nativeStmt.params.foldLeft(Vector.empty[DbValue]) { (acc, paramName) =>
       dbValues.get(paramName) match {
         case Some(paramValue) => acc :+ paramValue
@@ -63,11 +47,14 @@ class PgStatement(conn: PgConnection, val nativeStmt: PgNativeStatement)
     parametrizedStmt(indexedDbValues)
   }
 
-  override def bindByIdx(params: Any*): ParametrizedStatement = ???
+  def bindByIdx(params: Any*): ParametrizedStatement = {
+    val dbValues = params.map(convertParam).toVector
+    parametrizedStmt(dbValues)
+  }
 
-  override def noParams: ParametrizedStatement = parametrizedStmt(Vector.empty) //TODO validate whether there really are no params in the statement
+  def noParams: ParametrizedStatement = parametrizedStmt(Vector.empty) //TODO validate whether there really are no params in the statement
 
-  override def streamParams(paramsPublisher: Publisher[Map[String, Any]]): Future[Unit] = {
+  def streamParams(paramsPublisher: Publisher[Map[String, Any]]): Future[Unit] = {
     //TODO parse first
     /*
         //Parse(stmtName, sql, List.empty)
@@ -102,4 +89,24 @@ class PgStatement(conn: PgConnection, val nativeStmt: PgNativeStatement)
         */
     ???
   }
+
+  private def parametrizedStmt(dbValues: ImmutIndexedSeq[DbValue]): ParametrizedStatement = {
+    new PgParametrizedStatement(conn, nativeStmt.statement, dbValues)
+  }
+
+  private def convertParam(value: Any): DbValue = {
+    //TODO make it configurable whether use textual or binary
+    pgTypeRegistry.byClass(value.getClass)
+      .map(pgType => {
+        val binVal = pgType.asInstanceOf[PgType[Any]].toPgBinary(value) //TODO textual vs binary
+        BinaryDbValue(binVal)
+      })
+      .getOrElse(throw NoSuitableConverterFoundException(value))
+  }
+
+  private def convertNamedParams(params: Map[String, Any]): Map[String, DbValue] = params.map { nameValue =>
+    val (name, value) = nameValue
+    (name, convertParam(value))
+  }
+
 }
