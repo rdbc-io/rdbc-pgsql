@@ -181,6 +181,7 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
         logger.debug(s"Notice received: ${statusMsg.statusData.shortInfo}")
       }
 
+    /* TODO unknown and unhandled msgs have to be handled inside fsm to complete a promise that client's waiting on */
     case unknownMsg: UnknownBackendMessage =>
       val msg = s"Unknown message received: '$unknownMsg'"
       logger.error(msg)

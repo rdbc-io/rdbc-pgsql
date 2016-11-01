@@ -58,6 +58,39 @@ object Tst extends App {
 }
 
 
+object NoDataTest extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+
+  fact.connection().flatMap { conn =>
+    println("hai\n\n\n")
+
+    val rsFut = for {
+      stmt <- conn.statement("create table if not exists dupa (x varchar)")
+      parametrized <- stmt.noParamsF
+      rs <- parametrized.executeForSet()
+    } yield rs
+
+    val result = rsFut.map { rs =>
+      rs.foreach { row =>
+        println(s"x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
+      }
+      println("DONE")
+    }
+
+    result.onComplete(_ => conn.release())
+    result
+
+  }.recover {
+    case ex => ex.printStackTrace()
+  }.onComplete(_ => fact.shutdown())
+
+}
+
+
 object BindByIdxTst extends App {
 
   implicit val ec = ExecutionContext.global
