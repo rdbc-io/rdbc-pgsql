@@ -99,7 +99,7 @@ class PgStatement(conn: PgConnection, val nativeStmt: PgNativeStatement)
     pgTypeRegistry.byClass(value.getClass)
       .map(pgType => {
         val binVal = pgType.asInstanceOf[PgType[Any]].toPgBinary(value) //TODO textual vs binary
-        BinaryDbValue(binVal)
+        BinaryDbValue(binVal, pgType.typeOid)
       })
       .getOrElse(throw NoSuitableConverterFoundException(value))
   }

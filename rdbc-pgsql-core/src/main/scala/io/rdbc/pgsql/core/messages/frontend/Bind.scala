@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.messages.frontend
 
-import io.rdbc.pgsql.core.messages.data.DbValFormat
+import io.rdbc.pgsql.core.messages.data.{DbValFormat, Oid}
 
 sealed trait ReturnFieldFormats
 
@@ -29,13 +29,15 @@ case object AllTextual extends ReturnFieldFormats
 case class SpecificFieldFormats(formats: List[DbValFormat]) extends ReturnFieldFormats
 
 
-sealed trait DbValue
+sealed trait DbValue {
+  def dataTypeOid: Oid
+}
 
-case object NullDbValue extends DbValue
+case class NullDbValue(dataTypeOid: Oid) extends DbValue
 
-case class TextualDbValue(value: String) extends DbValue
+case class TextualDbValue(value: String, dataTypeOid: Oid) extends DbValue
 
-case class BinaryDbValue(value: Array[Byte]) extends DbValue
+case class BinaryDbValue(value: Array[Byte], dataTypeOid: Oid) extends DbValue
 
 
 case class Bind(portal: Option[String], preparedStmt: Option[String], params: List[DbValue], returnFieldFormats: ReturnFieldFormats) extends PgFrontendMessage
