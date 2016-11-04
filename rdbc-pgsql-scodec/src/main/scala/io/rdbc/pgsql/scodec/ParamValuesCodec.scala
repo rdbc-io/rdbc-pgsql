@@ -30,15 +30,15 @@ class ParamValuesCodec(implicit charset: Charset) extends Codec[List[DbValue]] {
     val lenBits = pgInt16.encode(params.length)
 
     val paramFormatAttempts = params.map {
-      case NullDbValue | TextualDbValue(_) => pgInt16.encode(0)
-      case BinaryDbValue(_) => pgInt16.encode(1)
+      case _: NullDbValue | _: TextualDbValue => pgInt16.encode(0)
+      case _: BinaryDbValue => pgInt16.encode(1)
     }
     val paramFormatBits = concatAttempts(paramFormatAttempts)
 
     val paramValueAttempts: List[Attempt[BitVector]] = params.map {
-      case NullDbValue => pgInt32.encode(-1)
-      case TextualDbValue(value) => variableSizeBytes(pgInt32, pgStringNonTerminated).encode(value) //TODO check whether not cstring
-      case BinaryDbValue(value) => variableSizeBytes(pgInt32, bytes).encode(ByteVector.view(value))
+      case _: NullDbValue => pgInt32.encode(-1)
+      case TextualDbValue(value, _) => variableSizeBytes(pgInt32, pgStringNonTerminated).encode(value) //TODO check whether not cstring
+      case BinaryDbValue(value, _) => variableSizeBytes(pgInt32, bytes).encode(ByteVector.view(value))
     }
 
     val paramValueBits = concatAttempts(paramValueAttempts)

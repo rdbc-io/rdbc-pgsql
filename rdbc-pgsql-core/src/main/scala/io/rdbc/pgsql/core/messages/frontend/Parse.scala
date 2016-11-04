@@ -18,5 +18,4 @@ package io.rdbc.pgsql.core.messages.frontend
 
 import io.rdbc.pgsql.core.messages.data.Oid
 
-//TODO should be List[Option[Oid]] because type can be left unspecified
-case class Parse(optionalName: Option[String], query: String, paramTypes: List[Oid]) extends PgFrontendMessage
+case class Parse(optionalName: Option[String], query: String, paramTypes: Vector[Oid]) extends PgFrontendMessage

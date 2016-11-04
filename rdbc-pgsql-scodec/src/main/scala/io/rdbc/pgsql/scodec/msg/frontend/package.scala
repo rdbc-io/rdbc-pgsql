@@ -57,7 +57,7 @@ package object frontend {
     {
       ("preparedStmt" | pgStringOption) ::
         ("query" | pgString) ::
-        ("paramTypes" | listOfN(pgInt16, oid))
+        ("paramTypes" | vectorOfN(pgInt16, oid))
     }.as[Parse]
   }
 

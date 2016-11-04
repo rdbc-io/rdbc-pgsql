@@ -510,3 +510,32 @@ object ParallelTest extends App {
   }
 
 }
+
+object SmallintTest extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+
+  fact.connection().flatMap { conn =>
+    println("hai\n\n\n")
+
+    val rsFut = for {
+      stmt <- conn.insert("insert into test_smallint(x) values (:x)")
+      parametrized <- stmt.bindF("x" -> Int.MaxValue)
+      rs <- parametrized.execute()
+    } yield rs
+
+    val result = rsFut.map { _ =>
+      println("DONE")
+    }
+
+    result.onComplete(_ => conn.release())
+    result
+
+  }.recover {
+    case ex => ex.printStackTrace()
+  }.onComplete(_ => fact.shutdown())
+
+}
