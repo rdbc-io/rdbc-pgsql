@@ -46,7 +46,7 @@ class PgParametrizedStatement(conn: PgConnection,
       (cachedPreparedStatement, Option.empty[Parse])
     } else {
       val stmtName = if (shouldCache()) Some(conn.nextStmtName()) else None
-      val parse = Some(Parse(stmtName, nativeSql, List.empty))
+      val parse = Some(Parse(stmtName, nativeSql, params.map(_.dataTypeOid).toVector))
       (stmtName, parse)
     }
 
