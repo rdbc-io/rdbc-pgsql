@@ -69,5 +69,8 @@ lazy val playground = (project in file("rdbc-pgsql-playground"))
   .settings(
     name := "pgsql-playground",
     publishArtifact := false,
-    bintrayReleaseOnPublish := false
+    bintrayReleaseOnPublish := false,
+    libraryDependencies ++= Vector(
+      "org.postgresql" % "postgresql" % "9.4.1211"
+    )
   ).dependsOn(core, scodec, nettyTransport)
