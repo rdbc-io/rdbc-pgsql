@@ -16,6 +16,6 @@
 
 package io.rdbc.pgsql.core.fsm
 
-trait EmptyState extends State {
-  def handleMsg = PartialFunction.empty
+trait EmptyState extends State with DefaultErrorHandling {
+  def msgHandler = PartialFunction.empty
 }

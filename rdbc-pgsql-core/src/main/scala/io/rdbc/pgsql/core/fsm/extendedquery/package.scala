@@ -17,12 +17,32 @@
 package io.rdbc.pgsql.core.fsm
 
 import io.rdbc.pgsql.core.PgRowPublisher
-import io.rdbc.pgsql.core.messages.backend.StatusMessage
+import io.rdbc.pgsql.core.fsm.State.Outcome
+import io.rdbc.pgsql.core.messages.backend.{PgBackendMessage, StatusMessage}
 
 import scala.concurrent.Promise
+import scala.util.control.NonFatal
 
 package object extendedquery {
-  trait ExtendedQuerying extends State
+
+  trait WarningCollection extends State {
+    private var _warnings = Vector.empty[StatusMessage.Notice]
+
+    protected def warnings = _warnings
+
+    abstract override def onMessage(msg: PgBackendMessage): Outcome = {
+      try {
+        msg match {
+          case notice: StatusMessage.Notice if notice.isWarning =>
+            _warnings = _warnings :+ notice
+            stay
+          case _ => super.onMessage(msg)
+        }
+      } catch {
+        case NonFatal(ex) => fatal(ex) andThen onFatalError(ex)
+      }
+    }
+  }
 
   case class AfterDescData(publisher: PgRowPublisher,
                            warningsPromise: Promise[Vector[StatusMessage.Notice]],

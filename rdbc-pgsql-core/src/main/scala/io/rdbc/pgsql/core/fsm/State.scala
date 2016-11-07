@@ -16,10 +16,13 @@
 
 package io.rdbc.pgsql.core.fsm
 
-import io.rdbc.pgsql.core.fsm.State.{Fatal, Goto, Outcome, Stay}
-import io.rdbc.pgsql.core.messages.backend.PgBackendMessage
+import com.typesafe.scalalogging.StrictLogging
+import io.rdbc.pgsql.core.exception.PgStatusDataException
+import io.rdbc.pgsql.core.fsm.State._
+import io.rdbc.pgsql.core.messages.backend.{PgBackendMessage, StatusMessage, UnknownBackendMessage}
 
 import scala.concurrent.Promise
+import scala.util.control.NonFatal
 
 object State {
   sealed trait Outcome
@@ -41,14 +44,75 @@ object State {
       andThen(promise.failure(ex))
     }
   }
-
-  case object Unhandled extends Outcome
 }
 
-trait State {
-  def handleMsg: PartialFunction[PgBackendMessage, Outcome]
+trait State extends StrictLogging {
+
+  def onMessage(msg: PgBackendMessage): Outcome = {
+    try {
+      val outcome = msg match {
+        case err: StatusMessage.Error if !err.isFatal =>
+          val ex = PgStatusDataException(err.statusData)
+          Some(onNonFatalError(ex))
+
+        case err: StatusMessage.Error =>
+          val ex = PgStatusDataException(err.statusData)
+          Some(fatal(ex) andThen onFatalError(ex))
+
+        case any => msgHandler.lift.apply(any)
+      }
+
+      outcome match {
+        case None => msg match {
+          case noticeMsg: StatusMessage.Notice =>
+            if (noticeMsg.isWarning) {
+              logger.warn(s"Warning received: ${noticeMsg.statusData.shortInfo}")
+            } else {
+              logger.debug(s"Notice received: ${noticeMsg.statusData.shortInfo}")
+            }
+            stay
+
+          case unknownMsg: UnknownBackendMessage =>
+            val msg = s"Unknown message received: '$unknownMsg'"
+            val ex = new RuntimeException(msg) //TODO internal error
+            fatal(ex) andThen onFatalError(ex)
+
+          case unhandledMsg =>
+            val msg = s"Unhandled message '$unhandledMsg' in state '$name'"
+            val ex = new RuntimeException(msg) //TODO internal error
+            fatal(ex) andThen onFatalError(ex)
+        }
+
+        case Some(handled) => handled
+      }
+
+    } catch {
+      case NonFatal(ex) => fatal(ex) andThen onFatalError(ex)
+    }
+  }
+
   def name: String
-  def stay = Stay
-  def fatal(ex: Throwable) = Fatal(ex, None)
-  def goto(next: State) = Goto(next, None)
+
+  protected def msgHandler: PartialFunction[PgBackendMessage, Outcome]
+  protected def onFatalError(ex: Throwable): Unit
+  protected def onNonFatalError(ex: Throwable): Outcome
+
+  protected def stay = Stay
+  protected def fatal(ex: Throwable) = Fatal(ex, None)
+  protected def goto(next: State) = Goto(next, None)
+}
+
+trait DefaultErrorHandling extends NonFatalErrorsAreFatal {
+  this: State =>
+
+  protected def onFatalError(ex: Throwable): Unit = ()
+}
+
+trait NonFatalErrorsAreFatal {
+  this: State =>
+
+  protected def onNonFatalError(ex: Throwable): Outcome = {
+    logger.debug(s"State '$name' does not override non-fatal error handler, treating error as fatal")
+    fatal(ex) andThen onFatalError(ex)
+  }
 }

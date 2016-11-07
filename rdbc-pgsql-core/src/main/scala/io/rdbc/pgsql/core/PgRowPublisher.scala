@@ -117,7 +117,7 @@ class PgRowPublisher(out: ChannelWriter,
     subscriber.get().foreach(_.onComplete())
   }
 
-  private[core] def failure(ex: RdbcException): Unit = {
+  private[core] def failure(ex: Throwable): Unit = {
     cancelTimeoutScheduler()
     subscriber.get().foreach(_.onError(ex))
   }

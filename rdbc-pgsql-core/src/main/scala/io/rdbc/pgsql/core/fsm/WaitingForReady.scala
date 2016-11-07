@@ -14,20 +14,17 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.fsm.extendedquery
+package io.rdbc.pgsql.core.fsm
 
-import io.rdbc.pgsql.core.fsm.State.Outcome
-import io.rdbc.pgsql.core.messages.backend.{PgBackendMessage, StatusMessage}
+import io.rdbc.pgsql.core.messages.backend.ReadyForQuery
 
-abstract protected class ExtendedQueryingCommon extends ExtendedQuerying {
+class WaitingForReady(onIdle: => Unit)
+  extends State
+    with DefaultErrorHandling {
 
-  private var _warnings = Vector.empty[StatusMessage.Notice]
-
-  protected def warnings = _warnings
-
-  protected def handleCommon: PartialFunction[PgBackendMessage, Outcome] = {
-    case notice: StatusMessage.Notice if notice.isWarning =>
-      _warnings = _warnings :+ notice
-      stay
+  def msgHandler = {
+    case ReadyForQuery(txStatus) => goto(Idle(txStatus)) andThen onIdle
   }
+
+  val name = "waiting_for_ready"
 }

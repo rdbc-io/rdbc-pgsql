@@ -16,9 +16,8 @@
 
 package io.rdbc.pgsql.core.fsm.extendedquery
 
-import io.rdbc.api.exceptions.{ConnectionClosedException, RdbcException}
-import io.rdbc.pgsql.core.exception.{PgStmtExecutionException, ProtocolViolationException}
-import io.rdbc.pgsql.core.fsm.ConnectionClosed
+import io.rdbc.pgsql.core.exception.ProtocolViolationException
+import io.rdbc.pgsql.core.fsm.State
 import io.rdbc.pgsql.core.fsm.State.Outcome
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.core.scheduler.TimeoutScheduler
@@ -62,11 +61,12 @@ class WaitingForDescribe protected(txMgmt: Boolean,
                                    rdbcTypeConvRegistry: TypeConverterRegistry,
                                    sessionParams: SessionParams,
                                    timeoutScheduler: TimeoutScheduler
-                                  )(implicit out: ChannelWriter, ec: ExecutionContext) extends ExtendedQueryingCommon {
+                                  )(implicit out: ChannelWriter, ec: ExecutionContext)
+  extends State {
 
   private var maybeAfterDescData = Option.empty[AfterDescData]
 
-  def handleMsg = handleCommon.orElse {
+  def msgHandler = {
     case ParseComplete =>
       parsePromise.success(())
       stay
@@ -77,37 +77,16 @@ class WaitingForDescribe protected(txMgmt: Boolean,
     case rowDesc: RowDescription => onRowDescription(rowDesc)
 
     case _: ReadyForQuery => maybeAfterDescData match {
-      case None => throw new ProtocolViolationException("ready for query received without prior row desc")
+      case None => onNonFatalError(new ProtocolViolationException("ready for query received without prior row desc"))
       case Some(afterDescData@AfterDescData(publisher, _, _)) =>
         goto(new PullingRows(txMgmt, afterDescData)) andThen {
           publisher.resume()
         }
     }
-
-    case err: StatusMessage.Error if err.isFatal =>
-      val ex = PgStmtExecutionException(err.statusData)
-      maybeAfterDescData match {
-        case Some(AfterDescData(publisher, warningsPromise, rowsAffectedPromise)) =>
-          goto(ConnectionClosed(ConnectionClosedException("TODO cause"))) andThen {
-            publisher.failure(ex)
-            warningsPromise.failure(ex)
-            rowsAffectedPromise.failure(ex)
-            parsePromise.failure(ex)
-          }
-
-        case None =>
-          goto(ConnectionClosed(ConnectionClosedException("TODO cause"))) andThen {
-            streamPromise.failure(ex)
-          }
-      }
-
-    case err: StatusMessage.Error => onError(PgStmtExecutionException(err.statusData))
-
-    //TODO massive code duplication
   }
 
   private def onRowDescription(rowDesc: RowDescription): Outcome = maybeAfterDescData match {
-    case Some(_) => onError(new ProtocolViolationException("already received row description"))
+    case Some(_) => onNonFatalError(new ProtocolViolationException("already received row description"))
     case None =>
       val publisher = new PgRowPublisher(out, rowDesc, portalName, pgTypeConvRegistry, rdbcTypeConvRegistry, sessionParams, timeoutScheduler)
       val warningsPromise = Promise[Vector[StatusMessage.Notice]]
@@ -131,20 +110,29 @@ class WaitingForDescribe protected(txMgmt: Boolean,
       stay
   }
 
-  private def onError(ex: RdbcException): Outcome = maybeAfterDescData match {
-    case Some(AfterDescData(publisher, warningsPromise, rowsAffectedPromise)) =>
-      goto(Failed(txMgmt) {
+  def sendFailureToClient(ex: Throwable): Unit = {
+    maybeAfterDescData match {
+      case Some(AfterDescData(publisher, warningsPromise, rowsAffectedPromise)) =>
         publisher.failure(ex)
         warningsPromise.failure(ex)
         rowsAffectedPromise.failure(ex)
         parsePromise.failure(ex)
-      })
 
-    case None =>
-      goto(Failed(txMgmt) {
+      case None =>
         streamPromise.failure(ex)
-      })
+    }
+  }
+
+  protected def onNonFatalError(ex: Throwable): Outcome = {
+    goto(Failed(txMgmt) {
+      sendFailureToClient(ex)
+    })
+  }
+
+  protected def onFatalError(ex: Throwable): Unit = {
+    sendFailureToClient(ex)
   }
 
   val name = "extended_querying.waiting_for_describe"
+
 }
