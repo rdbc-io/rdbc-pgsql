@@ -16,21 +16,21 @@
 
 package io.rdbc.pgsql.core.fsm.extendedquery
 
-import io.rdbc.api.exceptions.ConnectionClosedException
 import io.rdbc.pgsql.core.ChannelWriter
-import io.rdbc.pgsql.core.exception.PgStmtExecutionException
-import io.rdbc.pgsql.core.fsm.ConnectionClosed
+import io.rdbc.pgsql.core.fsm.{State, WaitingForReady}
 import io.rdbc.pgsql.core.messages.backend._
 
 import scala.concurrent.ExecutionContext
 
-class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: ChannelWriter, ec: ExecutionContext) extends ExtendedQueryingCommon {
+class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: ChannelWriter, ec: ExecutionContext)
+  extends State
+    with WarningCollection { //TODO warnings should be collected in all extended query states
 
   val publisher = afterDescData.publisher
   val warningsPromise = afterDescData.warningsPromise
   val rowsAffectedPromise = afterDescData.rowsAffectedPromise
 
-  def handleMsg = handleCommon.orElse {
+  def msgHandler = {
     case PortalSuspended =>
       stay
 
@@ -46,36 +46,33 @@ class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: C
       rowsAffectedPromise.success(0L)
       warningsPromise.success(warnings)
       if (txMgmt) goto(new CompletedPendingCommit(publisher))
-      else goto(new CompletedWaitingForReady(publisher))
+      else goto(new WaitingForReady(onIdle = publisher.complete()))
 
     case CommandComplete(_, rowsAffected) =>
       rowsAffectedPromise.success(rowsAffected.map(_.toLong).getOrElse(0L))
       warningsPromise.success(warnings)
       if (txMgmt) goto(new CompletedPendingCommit(publisher))
-      else goto(new CompletedWaitingForReady(publisher))
+      else goto(new WaitingForReady(onIdle = publisher.complete()))
 
     case CloseComplete =>
       if (txMgmt) goto(new CompletedPendingCommit(publisher))
-      else goto(new CompletedWaitingForReady(publisher))
+      else goto(new WaitingForReady(onIdle = publisher.complete()))
+  }
 
-    case err: StatusMessage.Error if err.isFatal =>
-      val ex = PgStmtExecutionException(err.statusData)
-      goto(ConnectionClosed(ConnectionClosedException("TODO cause"))) andThen {
-        publisher.failure(ex)
-        warningsPromise.failure(ex)
-        rowsAffectedPromise.failure(ex)
-      }
-    //TODO after transitioning to connectionclosed, a channel needs to be closed
+  protected def onNonFatalError(ex: Throwable) = {
+    goto(Failed(txMgmt) {
+      sendFailureToClient(ex)
+    })
+  }
 
-    //TODO massive code dupl
+  protected def onFatalError(ex: Throwable) = {
+    sendFailureToClient(ex)
+  }
 
-    case err: StatusMessage.Error =>
-      val ex = PgStmtExecutionException(err.statusData)
-      goto(Failed(txMgmt) {
-        publisher.failure(ex)
-        warningsPromise.failure(ex)
-        rowsAffectedPromise.failure(ex)
-      })
+  def sendFailureToClient(ex: Throwable) = {
+    publisher.failure(ex)
+    warningsPromise.failure(ex)
+    rowsAffectedPromise.failure(ex)
   }
 
   val name = "extended_querying.pulling_rows"

@@ -28,8 +28,7 @@ import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder
 import io.netty.handler.timeout.WriteTimeoutHandler
 import io.rdbc.ImmutSeq
-import io.rdbc.api.exceptions.ConnectException
-import io.rdbc.api.exceptions.ConnectException.UncategorizedConnectException
+import io.rdbc.api.exceptions.{RdbcException, UncategorizedRdbcException}
 import io.rdbc.pgsql.core.PgConnection
 import io.rdbc.pgsql.core.auth.{Authenticator, UsernamePasswordAuthenticator}
 import io.rdbc.pgsql.core.codec.{DecoderFactory, EncoderFactory}
@@ -124,8 +123,8 @@ class NettyPgConnectionFactory protected(remoteAddr: SocketAddress,
     val connectionFut = bootstrap.connect().scalaFut.flatMap { _ =>
       conn.init(dbUser, dbName, authenticator).map(_ => conn)
     }.recoverWith {
-      case ex: ConnectException => Future.failed(ex)
-      case NonFatal(ex) => Future.failed(UncategorizedConnectException(ex.getMessage)) //TODO cause
+      case ex: RdbcException => Future.failed(ex)
+      case NonFatal(ex) => Future.failed(new UncategorizedRdbcException(ex.getMessage)) //TODO cause
     }
 
     connectionFut.onFailure {

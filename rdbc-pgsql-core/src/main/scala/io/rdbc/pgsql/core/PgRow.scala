@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core
 
-import io.rdbc.api.exceptions.ResultProcessingException.MissingColumnException
+import io.rdbc.api.exceptions.MissingColumnException
 import io.rdbc.implbase.RowPartialImpl
 import io.rdbc.pgsql.core.messages.backend.RowDescription
 import io.rdbc.pgsql.core.messages.data.DbValFormat.{BinaryDbValFormat, TextualDbValFormat}
@@ -37,7 +37,7 @@ class PgRow(rowDesc: RowDescription,
   protected def notConverted(name: String): Any = {
     nameMapping.get(name) match {
       case Some(idx) => notConverted(idx)
-      case None => throw MissingColumnException(name)
+      case None => throw new MissingColumnException(name)
     }
   }
 
