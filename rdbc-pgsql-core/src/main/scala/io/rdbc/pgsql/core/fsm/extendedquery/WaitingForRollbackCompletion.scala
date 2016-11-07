@@ -17,31 +17,19 @@
 package io.rdbc.pgsql.core.fsm.extendedquery
 
 import com.typesafe.scalalogging.StrictLogging
-import io.rdbc.pgsql.core.ChannelWriter
 import io.rdbc.pgsql.core.fsm.State.Outcome
-import io.rdbc.pgsql.core.fsm.{Idle, State, WaitingForReady}
-import io.rdbc.pgsql.core.messages.backend.ReadyForQuery
-import io.rdbc.pgsql.core.messages.frontend.Query
+import io.rdbc.pgsql.core.fsm._
+import io.rdbc.pgsql.core.messages.backend.CommandComplete
 
-object Failed {
-  def apply(txMgmt: Boolean)(onIdle: => Unit)(implicit out: ChannelWriter): Failed = {
-    new Failed(txMgmt, onIdle)
-  }
-}
-
-class Failed protected(txMgmt: Boolean, sendFailureCause: => Unit)(implicit out: ChannelWriter)
+class WaitingForRollbackCompletion(sendFailureCause: => Unit)
   extends State
     with StrictLogging {
 
   def msgHandler = {
-    case ReadyForQuery(txStatus) =>
-      if (txMgmt) {
-        goto(new WaitingForRollbackCompletion(sendFailureCause)) andThen {
-          out.writeAndFlush(Query("ROLLBACK"))
-        }
-      } else {
-        goto(Idle(txStatus)) andThen sendFailureCause
-      }
+    case CommandComplete("ROLLBACK", _) =>
+      goto(new WaitingForReady(
+        onIdle = sendFailureCause
+      ))
   }
 
   def sendFailureToClient(ex: Throwable): Unit = {
@@ -57,5 +45,6 @@ class Failed protected(txMgmt: Boolean, sendFailureCause: => Unit)(implicit out:
     sendFailureToClient(ex)
   }
 
-  val name = "extended_querying.failed"
+  val name = "extended_querying.waiting_for_ready_after_commit"
+
 }

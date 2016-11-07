@@ -17,8 +17,7 @@
 package io.rdbc.pgsql.core
 
 import io.rdbc.ImmutIndexedSeq
-import io.rdbc.api.exceptions.BindException.MissingParamValException
-import io.rdbc.api.exceptions.NoSuitableConverterFoundException
+import io.rdbc.api.exceptions.{MissingParamValException, NoSuitableConverterFoundException}
 import io.rdbc.implbase.BindablePartialImpl
 import io.rdbc.pgsql.core.messages.frontend.{BinaryDbValue, DbValue}
 import io.rdbc.pgsql.core.types.PgType
@@ -41,7 +40,7 @@ class PgStatement(conn: PgConnection, val nativeStmt: PgNativeStatement)
     val indexedDbValues = nativeStmt.params.foldLeft(Vector.empty[DbValue]) { (acc, paramName) =>
       dbValues.get(paramName) match {
         case Some(paramValue) => acc :+ paramValue
-        case None => throw MissingParamValException(paramName)
+        case None => throw new MissingParamValException(paramName)
       }
     }
     parametrizedStmt(indexedDbValues)

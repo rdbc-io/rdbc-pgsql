@@ -16,17 +16,7 @@
 
 package io.rdbc.pgsql.core.exception
 
-import io.rdbc.api.exceptions.ParseException
-import io.rdbc.api.exceptions.ParseException.{SyntaxErrorException, UncategorizedParseException}
+import io.rdbc.api.exceptions._
 import io.rdbc.pgsql.core.messages.backend.StatusData
 
-object PgParseException {
-  def apply(statusData: StatusData): ParseException = {
-    if (statusData.sqlState.startsWith("42")) new PgSyntaxErrorException(statusData)
-    else new PgUncategorizedParseException(statusData)
-  }
-}
-
-class PgSyntaxErrorException(val pgStatusData: StatusData) extends SyntaxErrorException(pgStatusData.shortInfo, pgStatusData.position) with PgException
-
-class PgUncategorizedParseException(val pgStatusData: StatusData) extends UncategorizedParseException(pgStatusData.shortInfo, pgStatusData.detail) with PgException
+class PgUncategorizedException(val pgStatusData: StatusData) extends UncategorizedRdbcException(pgStatusData.shortInfo) with PgStatusDataException

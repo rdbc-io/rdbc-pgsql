@@ -16,6 +16,8 @@
 
 package io.rdbc.pgsql.core.fsm.extendedquery
 
+import io.rdbc.pgsql.core.fsm.State
+import io.rdbc.pgsql.core.fsm.State.Outcome
 import io.rdbc.pgsql.core.messages.backend.{CommandComplete, ReadyForQuery}
 import io.rdbc.pgsql.core.messages.frontend._
 import io.rdbc.pgsql.core.scheduler.TimeoutScheduler
@@ -44,11 +46,11 @@ class BeginningTx protected(maybeParse: Option[Parse],
                             pgTypeConvRegistry: PgTypeRegistry)
                            (implicit out: ChannelWriter,
                             ec: ExecutionContext)
-  extends ExtendedQueryingCommon {
+  extends State {
 
   private var beginComplete = false
 
-  def handleMsg = handleCommon.orElse {
+  def msgHandler = {
     case CommandComplete("BEGIN", _) =>
       beginComplete = true
       stay
@@ -60,5 +62,21 @@ class BeginningTx protected(maybeParse: Option[Parse],
       }
   }
 
+  protected def sendFailureToClient(ex: Throwable): Unit = {
+    streamPromise.failure(ex)
+    parsePromise.failure(ex)
+  }
+
+  protected def onNonFatalError(ex: Throwable): Outcome = {
+    goto(Failed(txMgmt = true) {
+      sendFailureToClient(ex)
+    })
+  }
+
+  protected def onFatalError(ex: Throwable): Unit = {
+
+  }
+
   val name = "extended_querying.beginning_tx"
+
 }

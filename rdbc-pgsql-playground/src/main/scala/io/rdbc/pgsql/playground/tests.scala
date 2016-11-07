@@ -23,7 +23,7 @@ import scodec.bits.BitVector
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.{Failure, Random, Success}
+import scala.util.{Failure, Random, Success, Try}
 
 object Tst extends App {
 
@@ -537,5 +537,28 @@ object SmallintTest extends App {
   }.recover {
     case ex => ex.printStackTrace()
   }.onComplete(_ => fact.shutdown())
+
+}
+
+class TryPartialFunction[-A, +B](delegate: PartialFunction[A, B]) extends PartialFunction[A, B] {
+  def isDefinedAt(x: A): Boolean = delegate.isDefinedAt(x)
+
+  def apply(v: A): B = {
+    try {
+      delegate.apply(v)
+    } catch {
+      case ex => println("HAI"); ???
+    }
+  }
+}
+
+object PartialFunTest extends App {
+
+  val pf: PartialFunction[String, String] = {
+    case "dupa" => "penis"
+  }
+
+
+  pf.apply("zło")
 
 }

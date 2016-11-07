@@ -16,9 +16,9 @@
 
 package io.rdbc.pgsql.core.fsm
 
-import io.rdbc.api.exceptions.RdbcException
 import io.rdbc.pgsql.core.ChannelWriter
-import io.rdbc.pgsql.core.exception.PgStmtExecutionException
+import io.rdbc.pgsql.core.exception.PgStatusDataException
+import io.rdbc.pgsql.core.fsm.State.Outcome
 import io.rdbc.pgsql.core.messages.backend._
 
 import scala.concurrent.Promise
@@ -31,29 +31,47 @@ sealed trait SimpleQuerying extends State {
 object SimpleQuerying {
   class PullingRows(out: ChannelWriter, promise: Promise[Unit]) extends SimpleQuerying {
 
-    def handleMsg = {
+    def msgHandler = {
       case _: RowDescription => stay
       case _: DataRow => stay
       case CommandComplete(_, _) | EmptyQueryResponse => goto(new SuccessWaitingForReady(promise))
-      case StatusMessage.Error(statusData) => goto(new FailureWaitingForReady(PgStmtExecutionException(statusData), promise))
+      case StatusMessage.Error(statusData) => goto(new FailureWaitingForReady(PgStatusDataException(statusData), promise))
+    }
+
+    override protected def onNonFatalError(ex: Throwable): Outcome = {
+      goto(new FailureWaitingForReady(ex, promise))
+    }
+
+    protected def onFatalError(ex: Throwable): Unit = {
+      promise.failure(ex)
     }
 
     val subName = "pulling_rows"
   }
 
-  class SuccessWaitingForReady(promise: Promise[Unit]) extends SimpleQuerying {
+  class SuccessWaitingForReady(promise: Promise[Unit]) extends SimpleQuerying
+    with NonFatalErrorsAreFatal {
 
-    def handleMsg = {
+    def msgHandler = {
       case ReadyForQuery(txStatus) => goto(Idle(txStatus)) andThen promise.success(())
+    }
+
+    protected def onFatalError(ex: Throwable): Unit = {
+      promise.failure(ex)
     }
 
     val subName = "success_waiting_for_ready"
   }
 
-  class FailureWaitingForReady(ex: RdbcException, promise: Promise[Unit]) extends SimpleQuerying {
+  class FailureWaitingForReady(ex: Throwable, promise: Promise[Unit]) extends SimpleQuerying
+    with NonFatalErrorsAreFatal {
 
-    def handleMsg = {
+    def msgHandler = {
       case ReadyForQuery(txStatus) => goto(Idle(txStatus)) andThen promise.failure(ex)
+    }
+
+    protected def onFatalError(ex: Throwable): Unit = {
+      promise.failure(ex)
     }
 
     val subName = "failure_waiting_for_ready"
