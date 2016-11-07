@@ -22,11 +22,12 @@ import io.rdbc.pgsql.core.messages.backend.{BackendKeyData, ReadyForQuery}
 
 import scala.concurrent.{ExecutionContext, Promise}
 
-class Initializing(initPromise: Promise[BackendKeyData])(implicit out: ChannelWriter, ec: ExecutionContext) extends State {
+class Initializing(initPromise: Promise[BackendKeyData])(implicit out: ChannelWriter, ec: ExecutionContext)
+  extends State with NonFatalErrorsAreFatal {
 
   private var backendKeyData: Option[BackendKeyData] = None
 
-  def handleMsg = {
+  def msgHandler = {
     case bkd: BackendKeyData =>
       backendKeyData = Some(bkd)
       stay
@@ -38,6 +39,10 @@ class Initializing(initPromise: Promise[BackendKeyData])(implicit out: ChannelWr
           val ex = new ProtocolViolationException("Ready for query received in initializing state without prior backend key data message")
           fatal(ex) andThen initPromise.failure(ex)
       }
+  }
+
+  protected def onFatalError(ex: Throwable): Unit = {
+    initPromise.failure(ex)
   }
 
   val name = "initializing"

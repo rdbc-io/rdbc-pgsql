@@ -16,22 +16,22 @@
 
 package io.rdbc.pgsql.core.fsm
 
-import io.rdbc.api.exceptions.ConnectException.AuthFailureException
+import io.rdbc.api.exceptions.AuthFailureException
 import io.rdbc.pgsql.core.ChannelWriter
 import io.rdbc.pgsql.core.auth.AuthState.{AuthComplete, AuthContinue}
 import io.rdbc.pgsql.core.auth.Authenticator
-import io.rdbc.pgsql.core.exception.PgConnectException
+import io.rdbc.pgsql.core.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.messages.backend.auth.{AuthOk, AuthRequest}
-import io.rdbc.pgsql.core.messages.backend.{BackendKeyData, StatusMessage}
 
 import scala.concurrent.{ExecutionContext, Promise}
 
 class Authenticating(initPromise: Promise[BackendKeyData], authenticator: Authenticator)
-                    (implicit out: ChannelWriter, ec: ExecutionContext) extends State {
+                    (implicit out: ChannelWriter, ec: ExecutionContext)
+  extends State with NonFatalErrorsAreFatal {
 
   private var waitingForOk = false
 
-  def handleMsg = {
+  def msgHandler = {
     case authReq: AuthRequest if !waitingForOk =>
       if (authenticator.supports(authReq)) {
         val answersToWrite = authenticator.authenticate(authReq) match {
@@ -43,15 +43,15 @@ class Authenticating(initPromise: Promise[BackendKeyData], authenticator: Authen
         out.writeAndFlush(answersToWrite)
         stay
       } else {
-        val ex = AuthFailureException(s"Authentication mechanism '${authReq.authMechanismName}' requested by server is not supported by provided authenticator")
+        val ex = new AuthFailureException(s"Authentication mechanism '${authReq.authMechanismName}' requested by server is not supported by provided authenticator")
         fatal(ex) andThenFailPromise initPromise
       }
 
     case AuthOk if waitingForOk => goto(new Initializing(initPromise))
+  }
 
-    case StatusMessage.Error(statusData) =>
-      val ex = PgConnectException(statusData)
-      fatal(ex) andThenFailPromise initPromise
+  protected def onFatalError(ex: Throwable): Unit = {
+    initPromise.failure(ex)
   }
 
   val name = "authenticating"

@@ -23,8 +23,7 @@ import com.typesafe.scalalogging.StrictLogging
 import io.rdbc.api.exceptions.{ConnectionClosedException, IllegalSessionStateException}
 import io.rdbc.implbase.{ConnectionPartialImpl, ReturningInsertImpl}
 import io.rdbc.pgsql.core.auth.Authenticator
-import io.rdbc.pgsql.core.exception.PgUncategorizedException
-import io.rdbc.pgsql.core.fsm.State.{Fatal, Goto, Stay, Unhandled}
+import io.rdbc.pgsql.core.fsm.State.{Fatal, Goto, Stay}
 import io.rdbc.pgsql.core.fsm._
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.core.messages.frontend.{Query, StartupMessage, Terminate}
@@ -147,50 +146,29 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
 
   protected def onMessage(msg: PgBackendMessage): Unit = {
     logger.trace(s"Received backend message '$msg'")
-    val localState = state.single()
-    localState.handleMsg.applyOrElse(msg, (_: PgBackendMessage) => Unhandled) match {
-      case Unhandled => onUnhandled(msg, localState)
-      case Stay => ()
-      case Goto(newState, afterTransitionAction) => triggerTransition(newState, afterTransitionAction)
-      case Fatal(ex, afterReleaseAction) => doRelease(ex).map(_ => afterReleaseAction.foreach(_.apply()))
-    }
-  }
-
-  protected def onUnhandled(msg: PgBackendMessage, localState: State): Unit = msg match {
-    case ParameterStatus("client_encoding", pgCharsetName) => handleCharsetChange(pgCharsetName) { charset =>
-      clientCharsetChanged(charset)
-      sessionParams = sessionParams.copy(clientCharset = charset)
-    }
-
-    case ParameterStatus("server_encoding", pgCharsetName) => handleCharsetChange(pgCharsetName) { charset =>
-      serverCharsetChanged(charset)
-      sessionParams = sessionParams.copy(serverCharset = charset)
-    }
-
-    case ParameterStatus(name, value) => logger.debug(s"Received parameter '$name' = '$value'")
-
-    case err: StatusMessage.Error =>
-      logger.error(s"Unhandled error message received: ${err.statusData.shortInfo}")
-      val ex = new PgUncategorizedException(err.statusData)
-      doRelease(ex)
-
-    case statusMsg: StatusMessage =>
-      if (statusMsg.isWarning) {
-        logger.warn(s"Warning received: ${statusMsg.statusData.shortInfo}")
-      } else {
-        logger.debug(s"Notice received: ${statusMsg.statusData.shortInfo}")
+    msg match {
+      case ParameterStatus("client_encoding", pgCharsetName) => handleCharsetChange(pgCharsetName) { charset =>
+        clientCharsetChanged(charset)
+        sessionParams = sessionParams.copy(clientCharset = charset)
       }
 
-    /* TODO unknown and unhandled msgs have to be handled inside fsm to complete a promise that client's waiting on */
-    case unknownMsg: UnknownBackendMessage =>
-      val msg = s"Unknown message received: '$unknownMsg'"
-      logger.error(msg)
-      doRelease(msg)
+      case ParameterStatus("server_encoding", pgCharsetName) => handleCharsetChange(pgCharsetName) { charset =>
+        serverCharsetChanged(charset)
+        sessionParams = sessionParams.copy(serverCharset = charset)
+      }
 
-    case unhandledMsg =>
-      val msg = s"Unhandled message '$unhandledMsg' in state '$localState'"
-      logger.error(msg)
-      doRelease(msg)
+      case ParameterStatus(name, value) => logger.debug(s"Received parameter '$name' = '$value'")
+
+      case _ =>
+        val localState = state.single()
+        localState.onMessage(msg) match {
+          case Stay => ()
+          case Goto(newState, afterTransitionAction) => triggerTransition(newState, afterTransitionAction)
+          case Fatal(ex, afterReleaseAction) =>
+            logger.error("Fatal error occurred, connection will be closed", ex)
+            doRelease(ex).map(_ => afterReleaseAction.foreach(_.apply()))
+        }
+    }
   }
 
   private[pgsql] def onTimeout[A](reqId: Long): Unit = {
@@ -226,7 +204,7 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
         }
       } else state() match {
         case ConnectionClosed(cause) => () => Future.failed(cause)
-        case _ => () => Future.failed(IllegalSessionStateException(s"Session is busy"))
+        case _ => () => Future.failed(new IllegalSessionStateException(s"Session is busy"))
       }
     }
     action()
@@ -242,14 +220,14 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
       out.close()
       val connClosedEx = cause match {
         case ex: ConnectionClosedException => ex
-        case ex => ConnectionClosedException("Connection closed", ex)
+        case ex => new ConnectionClosedException("Connection closed", ex)
       }
       triggerTransition(ConnectionClosed(connClosedEx))
     }
   }
 
   protected def doRelease(cause: String): Future[Unit] = {
-    doRelease(ConnectionClosedException(cause))
+    doRelease(new ConnectionClosedException(cause))
   }
 
   def forceRelease(): Future[Unit] = {

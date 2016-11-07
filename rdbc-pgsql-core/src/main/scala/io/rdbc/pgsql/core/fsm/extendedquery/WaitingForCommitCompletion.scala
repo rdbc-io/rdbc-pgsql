@@ -17,21 +17,18 @@
 package io.rdbc.pgsql.core.fsm.extendedquery
 
 import io.rdbc.pgsql.core.fsm.State.Outcome
-import io.rdbc.pgsql.core.fsm.{State, WaitingForReady}
-import io.rdbc.pgsql.core.messages.backend.{ReadyForQuery, TxStatus}
-import io.rdbc.pgsql.core.messages.frontend.Query
+import io.rdbc.pgsql.core.fsm._
+import io.rdbc.pgsql.core.messages.backend.CommandComplete
 import io.rdbc.pgsql.core.{ChannelWriter, PgRowPublisher}
 
-import scala.concurrent.ExecutionContext
-
-class CompletedPendingCommit(publisher: PgRowPublisher)(implicit out: ChannelWriter, ec: ExecutionContext)
+class WaitingForCommitCompletion(publisher: PgRowPublisher)(implicit out: ChannelWriter)
   extends State {
 
   def msgHandler = {
-    case ReadyForQuery(TxStatus.Active) =>
-      goto(new WaitingForCommitCompletion(publisher)) andThen {
-        out.writeAndFlush(Query("COMMIT"))
-      }
+    case CommandComplete("COMMIT", _) =>
+      goto(new WaitingForReady(
+        onIdle = publisher.complete()
+      ))
   }
 
   def sendFailureToClient(ex: Throwable): Unit = {
@@ -39,13 +36,14 @@ class CompletedPendingCommit(publisher: PgRowPublisher)(implicit out: ChannelWri
   }
 
   protected def onNonFatalError(ex: Throwable): Outcome = {
-    goto(new WaitingForReady(onIdle = sendFailureToClient(ex)))
+    goto(Failed(txMgmt = true) {
+      sendFailureToClient(ex)
+    })
   }
 
   protected def onFatalError(ex: Throwable): Unit = {
     sendFailureToClient(ex)
   }
 
-  val name = "extended_querying.pending_commit"
-
+  val name = "extended_querying.waiting_for_ready_after_commit"
 }
