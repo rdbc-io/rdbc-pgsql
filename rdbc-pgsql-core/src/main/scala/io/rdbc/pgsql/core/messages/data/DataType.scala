@@ -20,4 +20,5 @@ case class Oid(code: Long)
 
 case class DataType(oid: Oid, size: Int, modifier: Int)
 
+object Unknown extends DataType(Oid(705L), -2, -1)
 object PgInt4 extends DataType(Oid(23L), 4, -1)

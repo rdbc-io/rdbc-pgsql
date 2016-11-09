@@ -19,9 +19,10 @@ package io.rdbc.pgsql.core
 import io.rdbc.ImmutIndexedSeq
 import io.rdbc.api.exceptions.{MissingParamValException, NoSuitableConverterFoundException}
 import io.rdbc.implbase.BindablePartialImpl
-import io.rdbc.pgsql.core.messages.frontend.{BinaryDbValue, DbValue}
+import io.rdbc.pgsql.core.messages.data.{Oid, Unknown}
+import io.rdbc.pgsql.core.messages.frontend.{BinaryDbValue, DbValue, NullDbValue}
 import io.rdbc.pgsql.core.types.PgType
-import io.rdbc.sapi.{ParametrizedStatement, Statement}
+import io.rdbc.sapi.{NotNullParam, NullParam, ParametrizedStatement, Statement}
 import org.reactivestreams.Publisher
 
 import scala.concurrent.Future
@@ -94,13 +95,28 @@ class PgStatement(conn: PgConnection, val nativeStmt: PgNativeStatement)
   }
 
   private def convertParam(value: Any): DbValue = {
+    //TODO document in bind null/None/Some support
+    value match {
+      case null | None => NullDbValue(Unknown.oid)
+      case NullParam(cls) => withPgType(cls)(pgType => NullDbValue(pgType.typeOid))
+      case NotNullParam(notNullVal) => convertNotNullParam(notNullVal)
+      case Some(notNullVal) => convertNotNullParam(notNullVal)
+      case notNullVal => convertNotNullParam(notNullVal)
+    }
+  }
+
+  private def withPgType[A, B](cls: Class[A])(block: PgType[A] => B): B = {
+    pgTypeRegistry.byClass(cls)
+      .map(block)
+      .getOrElse(throw NoSuitableConverterFoundException(cls)) //TODO NoSuitableConverterFound should accept cls, not value
+  }
+
+  private def convertNotNullParam(value: Any): DbValue = {
     //TODO make it configurable whether use textual or binary
-    pgTypeRegistry.byClass(value.getClass)
-      .map(pgType => {
-        val binVal = pgType.asInstanceOf[PgType[Any]].toPgBinary(value) //TODO textual vs binary
-        BinaryDbValue(binVal, pgType.typeOid)
-      })
-      .getOrElse(throw NoSuitableConverterFoundException(value))
+    withPgType(value.getClass) { pgType =>
+      val binVal = pgType.asInstanceOf[PgType[Any]].toPgBinary(value) //TODO textual vs binary
+      BinaryDbValue(binVal, pgType.typeOid)
+    }
   }
 
   private def convertNamedParams(params: Map[String, Any]): Map[String, DbValue] = params.map { nameValue =>

@@ -540,6 +540,73 @@ object SmallintTest extends App {
 
 }
 
+object NullTest extends App {
+
+  import io.rdbc.sapi.SqlParam._
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+
+  fact.connection().flatMap { conn =>
+    println("hai\n\n\n")
+
+    val intOpt = Option.empty[Int]
+    val yOpt = Some(10)
+
+    val rsFut = for {
+      stmt <- conn.select("select :x as x, :y as y, :z as z")
+      parametrized <- stmt.bindF("x" -> intOpt.toSqlParam, "y" -> yOpt.toSqlParam, "z" -> Some(1))
+      rs <- parametrized.executeForSet()
+    } yield rs
+
+    val result = rsFut.map { rs =>
+      rs.foreach { row =>
+        println(s"x = ${row.col[String]("x")}, y = ${row.col[Int]("y")}, z = ${row.col[Int]("z")}")
+      }
+      println("DONE")
+    }
+
+    result.onComplete(_ => conn.release())
+    result
+
+  }.recover {
+    case ex => ex.printStackTrace()
+  }.onComplete(_ => fact.shutdown())
+
+}
+
+object NullTest2 extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+
+  fact.connection().flatMap { conn =>
+    println("hai\n\n\n")
+
+    val rsFut = for {
+      stmt <- conn.insert("insert into test(x, s) values(:x, 'dupa')")
+      parametrized <- stmt.bindF("x" -> Some(1))
+      rs <- parametrized.execute()
+    } yield rs
+
+    val result = rsFut.map { _ =>
+      println("DONE")
+    }
+
+    result.onComplete(_ => conn.release())
+    result
+
+  }.recover {
+    case ex => ex.printStackTrace()
+  }.onComplete(_ => fact.shutdown())
+
+}
+
+
 class TryPartialFunction[-A, +B](delegate: PartialFunction[A, B]) extends PartialFunction[A, B] {
   def isDefinedAt(x: A): Boolean = delegate.isDefinedAt(x)
 
