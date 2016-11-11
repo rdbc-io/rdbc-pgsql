@@ -37,7 +37,7 @@ object PasswordMessage {
     val hex2 = bytesToHex(digest2)
 
     val md5String = "md5" + hex2
-    val credentials = md5String.getBytes("US-ASCII")
+    val credentials = Array.concat(md5String.getBytes("US-ASCII"), Array(0.toByte)) //TODO optimize
 
     PasswordMessage(credentials)
   }
