@@ -39,13 +39,14 @@ object Tst extends App {
       stmt <- conn.statement("select * from test where x > :x")
       parametrized <- stmt.bindF("x" -> -100)
       rs <- parametrized.executeForSet()
-    } yield rs
+    } yield (stmt, rs)
 
-    rsFut.map { rs =>
+    rsFut.flatMap { case (stmt, rs) =>
       rs.foreach { row =>
         println(s"x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
       }
       println("DONE")
+      stmt.deallocate()
     }.map { _ =>
       conn.release()
       fact.shutdown()
