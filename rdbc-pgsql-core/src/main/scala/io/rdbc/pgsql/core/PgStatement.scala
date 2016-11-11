@@ -90,6 +90,8 @@ class PgStatement(conn: PgConnection, val nativeStmt: PgNativeStatement)
     ???
   }
 
+  def deallocate(): Future[Unit] = conn.deallocateStatement(nativeSql)
+
   private def parametrizedStmt(dbValues: ImmutIndexedSeq[DbValue]): ParametrizedStatement = {
     new PgParametrizedStatement(conn, nativeStmt.statement, dbValues)
   }
@@ -123,5 +125,4 @@ class PgStatement(conn: PgConnection, val nativeStmt: PgNativeStatement)
     val (name, value) = nameValue
     (name, convertParam(value))
   }
-
 }
