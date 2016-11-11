@@ -59,7 +59,7 @@ class PgParametrizedStatement(conn: PgConnection,
     true
   }
 
-  override def executeForStream()(implicit timeout: FiniteDuration): Future[ResultStream] = conn.ifReady { (reqId, txStatus) =>
+  def executeForStream()(implicit timeout: FiniteDuration): Future[ResultStream] = conn.ifReady { (reqId, txStatus) =>
     logger.debug(s"Executing statement '$nativeSql'")
     val (parse, bind) = parseAndBind
 
@@ -67,7 +67,6 @@ class PgParametrizedStatement(conn: PgConnection,
     val parsePromise = Promise[Unit]
 
     val timeoutScheduler = TimeoutScheduler {
-      println(s"SCHEDULING TIMEOUT FOR REQ $reqId")
       conn.scheduler.schedule(timeout) {
         conn.onTimeout(reqId)
       }
@@ -89,12 +88,14 @@ class PgParametrizedStatement(conn: PgConnection,
 
     parse.flatMap(_.optionalName).foreach { stmtName =>
       parsePromise.future.onSuccess {
-        case _ => conn.stmtCache.put(nativeSql, stmtName)
+        case _ => conn.stmtCache = conn.stmtCache.put(nativeSql, stmtName)
       }
     }
 
     streamPromise.future
   }
 
-  override def connWatchForIdle: Future[PgConnection] = conn.watchForIdle
+  def deallocate(): Future[Unit] = conn.deallocateStatement(nativeSql)
+
+  def connWatchForIdle: Future[PgConnection] = conn.watchForIdle
 }

@@ -26,7 +26,7 @@ import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.fsm.State.{Fatal, Goto, Stay}
 import io.rdbc.pgsql.core.fsm._
 import io.rdbc.pgsql.core.messages.backend._
-import io.rdbc.pgsql.core.messages.frontend.{Query, StartupMessage, Terminate}
+import io.rdbc.pgsql.core.messages.frontend._
 import io.rdbc.pgsql.core.scheduler.TaskScheduler
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.sapi.{Connection, ReturningInsert, Statement, TypeConverterRegistry}
@@ -228,6 +228,18 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
 
   protected def doRelease(cause: String): Future[Unit] = {
     doRelease(new ConnectionClosedException(cause))
+  }
+
+  private[core] def deallocateStatement(nativeSql: String): Future[Unit] = ifReady { (_, _) =>
+    stmtCache.get(nativeSql) match {
+      case Some(stmtName) =>
+        val promise = Promise[Unit]
+        triggerTransition(new DeallocatingStatement(promise))
+        out.writeAndFlush(CloseStatement(Some(stmtName)), Sync)
+        promise.future
+
+      case None => Future.successful(())
+    }
   }
 
   def forceRelease(): Future[Unit] = {
