@@ -19,83 +19,24 @@ package io.rdbc.pgsql.core
 import com.typesafe.scalalogging.StrictLogging
 import io.rdbc.ImmutSeq
 import io.rdbc.implbase.ParametrizedStatementPartialImpl
-import io.rdbc.pgsql.core.fsm.extendedquery.{BeginningTx, WaitingForDescribe}
-import io.rdbc.pgsql.core.messages.backend.TxStatus
 import io.rdbc.pgsql.core.messages.frontend._
-import io.rdbc.pgsql.core.scheduler.TimeoutScheduler
 import io.rdbc.sapi.{ParametrizedStatement, ResultStream}
 
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 
-class PgParametrizedStatement(conn: PgConnection,
+//TODO decouple pgparametrized statement & connection & fsm manager
+class PgParametrizedStatement(executor: PgStatementExecutor,
+                              deallocator: PgStatementDeallocator,
                               nativeSql: String,
                               params: ImmutSeq[DbValue])
+                             (implicit val ec: ExecutionContext)
   extends ParametrizedStatement
     with ParametrizedStatementPartialImpl
     with StrictLogging {
 
-  implicit val ec = conn.ec
+  def deallocate(): Future[Unit] = deallocator.deallocateStatement(nativeSql)
+  def connWatchForIdle: Future[PgConnection] = ???
+  def executeForStream()(implicit timeout: FiniteDuration): Future[ResultStream] = executor.executeStatement(nativeSql, params)
 
-  private def cachedPreparedStatement: Option[String] = {
-    conn.stmtCache.get(nativeSql)
-  }
-
-  protected def parseAndBind: (Option[Parse], Bind) = {
-    val (stmtName, parse) = if (cachedPreparedStatement.isDefined) {
-      (cachedPreparedStatement, Option.empty[Parse])
-    } else {
-      val stmtName = if (shouldCache()) Some(conn.nextStmtName()) else None
-      val parse = Some(Parse(stmtName, nativeSql, params.map(_.dataTypeOid).toVector))
-      (stmtName, parse)
-    }
-
-    //TODO AllTextual TODO toList
-    (parse, Bind(stmtName.map(_ + "P"), stmtName, params.toList, AllBinary))
-  }
-
-  protected def shouldCache(): Boolean = {
-    //TODO introduce a cache threshold
-    true
-  }
-
-  def executeForStream()(implicit timeout: FiniteDuration): Future[ResultStream] = conn.ifReady { (reqId, txStatus) =>
-    logger.debug(s"Executing statement '$nativeSql'")
-    val (parse, bind) = parseAndBind
-
-    val streamPromise = Promise[PgResultStream]
-    val parsePromise = Promise[Unit]
-
-    val timeoutScheduler = TimeoutScheduler {
-      conn.scheduler.schedule(timeout) {
-        conn.onTimeout(reqId)
-      }
-    }
-
-    txStatus match {
-      case TxStatus.Active =>
-        conn.triggerTransition(WaitingForDescribe.withoutTxMgmt(bind.portal, streamPromise, parsePromise, conn.sessionParams,
-          timeoutScheduler, conn.rdbcTypeConvRegistry, conn.pgTypeConvRegistry)(conn.out, ec))
-        parse.foreach(conn.out.write(_))
-        conn.out.writeAndFlush(bind, Describe(PortalType, bind.portal), Sync)
-
-      case TxStatus.Idle =>
-        conn.triggerTransition(BeginningTx(parse, bind, streamPromise, parsePromise, conn.sessionParams, timeoutScheduler, conn.rdbcTypeConvRegistry, conn.pgTypeConvRegistry)(conn.out, ec))
-        conn.out.writeAndFlush(Query("BEGIN"))
-
-      case TxStatus.Failed => ??? //TODO
-    }
-
-    parse.flatMap(_.optionalName).foreach { stmtName =>
-      parsePromise.future.onSuccess {
-        case _ => conn.stmtCache = conn.stmtCache.put(nativeSql, stmtName)
-      }
-    }
-
-    streamPromise.future
-  }
-
-  def deallocate(): Future[Unit] = conn.deallocateStatement(nativeSql)
-
-  def connWatchForIdle: Future[PgConnection] = conn.watchForIdle
 }

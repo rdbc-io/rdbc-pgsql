@@ -22,11 +22,11 @@ object PreparedStmtCache {
 
 class PreparedStmtCache(cache: Map[String, String]) {
   //TODO replace with LRU or sth
-  //TOOD when element is evicted from the cache ClosePortal needs to be sent to the backend
+  //TODO when element is evicted from the cache CloseStatement needs to be sent to the backend
 
   def get(sql: String): Option[String] = cache.get(sql)
 
-  def put(sql: String, stmtName: String): PreparedStmtCache = {
+  def updated(sql: String, stmtName: String): PreparedStmtCache = {
     new PreparedStmtCache(cache + (sql -> stmtName))
   }
 

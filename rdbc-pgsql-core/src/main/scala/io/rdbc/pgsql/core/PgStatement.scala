@@ -19,20 +19,21 @@ package io.rdbc.pgsql.core
 import io.rdbc.ImmutIndexedSeq
 import io.rdbc.api.exceptions.{MissingParamValException, NoSuitableConverterFoundException}
 import io.rdbc.implbase.BindablePartialImpl
-import io.rdbc.pgsql.core.messages.data.{Oid, Unknown}
+import io.rdbc.pgsql.core.messages.data.Unknown
 import io.rdbc.pgsql.core.messages.frontend.{BinaryDbValue, DbValue, NullDbValue}
-import io.rdbc.pgsql.core.types.PgType
+import io.rdbc.pgsql.core.types.{PgType, PgTypeRegistry}
 import io.rdbc.sapi.{NotNullParam, NullParam, ParametrizedStatement, Statement}
 import org.reactivestreams.Publisher
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class PgStatement(conn: PgConnection, val nativeStmt: PgNativeStatement)
+class PgStatement(stmtExecutor: PgStatementExecutor,
+                  stmtDeallocator: PgStatementDeallocator,
+                  pgTypeRegistry: PgTypeRegistry,
+                  sessionParams: SessionParams,
+                  val nativeStmt: PgNativeStatement)(implicit ec: ExecutionContext)
   extends Statement
     with BindablePartialImpl[ParametrizedStatement] {
-
-  private val pgTypeRegistry = conn.pgTypeConvRegistry
-  private implicit def sessionParams = conn.sessionParams
 
   def nativeSql: String = nativeStmt.statement
 
@@ -90,10 +91,10 @@ class PgStatement(conn: PgConnection, val nativeStmt: PgNativeStatement)
     ???
   }
 
-  def deallocate(): Future[Unit] = conn.deallocateStatement(nativeSql)
+  def deallocate(): Future[Unit] = stmtDeallocator.deallocateStatement(nativeSql)
 
   private def parametrizedStmt(dbValues: ImmutIndexedSeq[DbValue]): ParametrizedStatement = {
-    new PgParametrizedStatement(conn, nativeStmt.statement, dbValues)
+    new PgParametrizedStatement(stmtExecutor, stmtDeallocator, nativeStmt.statement, dbValues)
   }
 
   private def convertParam(value: Any): DbValue = {
@@ -116,7 +117,7 @@ class PgStatement(conn: PgConnection, val nativeStmt: PgNativeStatement)
   private def convertNotNullParam(value: Any): DbValue = {
     //TODO make it configurable whether use textual or binary
     withPgType(value.getClass) { pgType =>
-      val binVal = pgType.asInstanceOf[PgType[Any]].toPgBinary(value) //TODO textual vs binary
+      val binVal = pgType.asInstanceOf[PgType[Any]].toPgBinary(value)(sessionParams) //TODO textual vs binary
       BinaryDbValue(binVal, pgType.typeOid)
     }
   }
