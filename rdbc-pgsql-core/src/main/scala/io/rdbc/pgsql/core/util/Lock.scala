@@ -14,15 +14,36 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.exception
+package io.rdbc.pgsql.core.util
 
-import io.rdbc.api.exceptions.ConstraintViolationException
-import io.rdbc.pgsql.core.messages.backend.StatusData
+import java.util.concurrent.locks.ReentrantLock
 
-class PgConstraintViolationException(val pgStatusData: StatusData)
-  extends ConstraintViolationException(
-    schema = pgStatusData.schemaName.getOrElse(""),
-    table = pgStatusData.tableName.getOrElse(""),
-    constraint = pgStatusData.constraintName.getOrElse(""),
-    msg = pgStatusData.shortInfo
-  ) with PgStatusDataException
+trait Lock {
+  def withLock[A](block: => A): A
+}
+
+class SpinLock extends Lock {
+  private[this] val rl = new ReentrantLock
+
+  def withLock[A](block: => A): A = {
+    while (rl.tryLock()) {}
+    try {
+      block
+    } finally {
+      rl.unlock()
+    }
+  }
+}
+
+class SleepLock extends Lock {
+  private[this] val rl = new ReentrantLock
+
+  def withLock[A](block: => A): A = {
+    rl.lock()
+    try {
+      block
+    } finally {
+      rl.unlock()
+    }
+  }
+}

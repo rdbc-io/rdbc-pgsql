@@ -20,21 +20,32 @@ import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.typesafe.scalalogging.StrictLogging
+import io.rdbc._
 import io.rdbc.api.exceptions.{ConnectionClosedException, IllegalSessionStateException}
 import io.rdbc.implbase.{ConnectionPartialImpl, ReturningInsertImpl}
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.fsm.State.{Fatal, Goto, Stay}
 import io.rdbc.pgsql.core.fsm._
+import io.rdbc.pgsql.core.fsm.extendedquery.{BeginningTx, WaitingForDescribe}
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.core.messages.frontend._
-import io.rdbc.pgsql.core.scheduler.TaskScheduler
+import io.rdbc.pgsql.core.scheduler.{TaskScheduler, TimeoutScheduler}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.sapi.{Connection, ReturningInsert, Statement, TypeConverterRegistry}
+import io.rdbc.pgsql.core.util.SleepLock
+import io.rdbc.sapi._
 import org.reactivestreams.Publisher
 
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.stm.{Ref, _}
 import scala.concurrent.{ExecutionContext, Future, Promise}
+
+trait PgStatementExecutor {
+  def executeStatement(nativeSql: String, params: ImmutSeq[DbValue])(implicit timeout: FiniteDuration): Future[ResultStream]
+}
+
+trait PgStatementDeallocator {
+  def deallocateStatement(nativeSql: String): Future[Unit]
+}
+
 
 //TODO make a note in Connection scaladoc that implementations must be thread safe
 abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
@@ -47,21 +58,104 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
     with ConnectionPartialImpl
     with StrictLogging {
 
-  private val idle: Ref[Boolean] = Ref(false)
-  private val handlingTimeout: Ref[Boolean] = Ref(false)
-  protected val state: Ref[State] = Ref(Uninitialized: State)
-  private val idlePromise: Ref[Promise[this.type]] = Ref(Promise[this.type])
+  thisConn =>
 
-  @volatile private[pgsql] var sessionParams = SessionParams.default
-  @volatile private[pgsql] var stmtCache = PreparedStmtCache.empty
+  class FsmManager {
+    private[this] val lock = new SleepLock //TODO make lock impl configurable
+
+    private[this] var ready = false
+    private[this] var handlingTimeout = false
+    private[this] var state: State = Uninitialized
+    private[this] var readyPromise = Promise[thisConn.type]
+    private[this] var lastRequestId = Long.MinValue
+
+    def ifReady[A](block: (Long, TxStatus) => Future[A]): Future[A] = {
+      val action: () => Future[A] = lock.withLock {
+        if (handlingTimeout) {
+          () => Future.failed(new IllegalSessionStateException(s"Session is busy, currently cancelling timed out action"))
+        } else if (ready) {
+          state match {
+            case Idle(txStatus) =>
+              ready = false
+              state = StartingRequest
+              readyPromise = Promise[thisConn.type]
+              lastRequestId = lastRequestId + 1L
+              val localLastRequestId = lastRequestId
+              () => block(localLastRequestId, txStatus)
+
+            case _ => ??? //TODO fatal error bug
+          }
+        } else {
+          state match {
+            case ConnectionClosed(cause) => () => Future.failed(cause)
+            case _ => () => Future.failed(new IllegalSessionStateException(s"Session is busy, currently processing query"))
+          }
+        }
+      }
+      action()
+    }
+
+    def triggerTransition(newState: State, afterTransition: Option[() => Unit] = None): Unit = {
+      val successful = lock.withLock {
+        state match {
+          case ConnectionClosed(_) => false
+          case _ =>
+            newState match {
+              case Idle(_) =>
+                ready = true
+                readyPromise.success(thisConn)
+
+              case ConnectionClosed(cause) =>
+                ready = false
+                if (!readyPromise.isCompleted) {
+                  readyPromise.failure(cause)
+                }
+
+              case _ => ()
+            }
+            state = newState
+            true
+        }
+      }
+      if (successful) {
+        logger.trace(s"Transitioned to state '$newState'")
+        //TODO note that afterTransition action can't access state or any transactional data
+        afterTransition.foreach(_.apply())
+      }
+    }
+
+    def onTimeout[A](reqId: Long): Unit = {
+      val shouldCancel = lock.withLock {
+        if (!handlingTimeout && !ready && lastRequestId == reqId) {
+          handlingTimeout = true
+          true
+        } else false
+      }
+      if (shouldCancel) {
+        logger.debug(s"Timeout occurred for request '$reqId', cancelling it")
+        bkd.foreach { bkd =>
+          requestCanceler(bkd).onComplete(_ => lock.withLock(handlingTimeout = false))
+        }
+      }
+    }
+
+    def currentState: State = lock.withLock(state)
+
+    def readyFuture: Future[thisConn.type] = lock.withLock(readyPromise.future)
+
+  }
+
+  private val fsmManager = new FsmManager
+
+  @volatile private var sessionParams = SessionParams.default
+  @volatile private var stmtCache = PreparedStmtCache.empty
   @volatile private var bkd = Option.empty[BackendKeyData]
   private val stmtCounter = new AtomicInteger(0)
-  private val lastRequestId: Ref[Long] = Ref(Long.MinValue)
 
-  def watchForIdle: Future[this.type] = idlePromise.single().future
+  def watchForIdle: Future[this.type] = fsmManager.readyFuture
 
   def statement(sql: String): Future[Statement] = {
-    Future.successful(new PgStatement(this, PgNativeStatement.parse(sql)))
+    Future.successful(new PgStatement(stmtExecutor, stmtDeallocator, pgTypeConvRegistry, sessionParams, PgNativeStatement.parse(sql)))
   }
 
   def beginTx()(implicit timeout: FiniteDuration): Future[Unit] = simpleQueryIgnoreResult("BEGIN")
@@ -82,10 +176,10 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
 
   def streamIntoTable(sql: String, paramsPublisher: Publisher[Map[String, Any]]): Future[Unit] = ???
 
-  protected def simpleQueryIgnoreResult(sql: String)(implicit timeout: FiniteDuration): Future[Unit] = ifReady { (reqId, _) =>
+  protected def simpleQueryIgnoreResult(sql: String)(implicit timeout: FiniteDuration): Future[Unit] = fsmManager.ifReady { (reqId, _) =>
     //TODO timeout
     val queryPromise = Promise[Unit]
-    triggerTransition(new SimpleQuerying.PullingRows(out, queryPromise))
+    fsmManager.triggerTransition(new SimpleQuerying.PullingRows(out, queryPromise))
     out.writeAndFlush(Query(sql))
     queryPromise.future.flatMap(_ => watchForIdle.map(_ => ()))
   }
@@ -93,40 +187,11 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
   private[pgsql] def init(dbUser: String, dbName: String, authenticator: Authenticator): Future[Unit] = {
     logger.debug(s"Initializing connection")
     val initPromise = Promise[BackendKeyData]
-    triggerTransition(new Authenticating(initPromise, authenticator)(out, ec))
+    fsmManager.triggerTransition(new Authenticating(initPromise, authenticator)(out, ec))
     out.writeAndFlush(StartupMessage(dbUser, dbName))
     initPromise.future.map { returnedBkd =>
       bkd = Some(returnedBkd)
       ()
-    }
-  }
-
-  private[pgsql] def triggerTransition(newState: State, afterTransition: Option[() => Unit] = None): Unit = {
-    val successful = atomic { implicit txn =>
-      state() match {
-        case ConnectionClosed(_) => false
-        case _ =>
-          newState match {
-            case Idle(_) =>
-              idlePromise().success(this) //TODO urgent - can't mutate things in atomic
-              idle() = true
-
-            case ConnectionClosed(cause) =>
-              if (!idlePromise().isCompleted) {
-                idlePromise().failure(cause) //TODO urgent - can't mutate things in atomic
-              }
-              idle() = false
-
-            case _ => ()
-          }
-          state() = newState
-          true
-      }
-    }
-    if (successful) {
-      logger.trace(s"Transitioned to state '$newState'")
-      //TODO note that afterTransition action can't access state or any transactional data (Refs)
-      afterTransition.foreach(_.apply())
     }
   }
 
@@ -160,10 +225,9 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
       case ParameterStatus(name, value) => logger.debug(s"Received parameter '$name' = '$value'")
 
       case _ =>
-        val localState = state.single()
-        localState.onMessage(msg) match {
+        fsmManager.currentState.onMessage(msg) match {
           case Stay => ()
-          case Goto(newState, afterTransitionAction) => triggerTransition(newState, afterTransitionAction)
+          case Goto(newState, afterTransitionAction) => fsmManager.triggerTransition(newState, afterTransitionAction)
           case Fatal(ex, afterReleaseAction) =>
             logger.error("Fatal error occurred, connection will be closed", ex)
             doRelease(ex).map(_ => afterReleaseAction.foreach(_.apply()))
@@ -171,46 +235,9 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
     }
   }
 
-  private[pgsql] def onTimeout[A](reqId: Long): Unit = {
-    val shouldCancel = atomic { implicit txn =>
-      if (!handlingTimeout() && !idle() && lastRequestId() == reqId) {
-        handlingTimeout() = true
-        true
-      } else false
-    }
-    if (shouldCancel) {
-      logger.debug(s"Timeout occurred for request '$reqId', cancelling it")
-      bkd.foreach { bkd =>
-        requestCanceler(bkd).onComplete(_ => handlingTimeout.single() = false)
-      }
-    }
-  }
-
   private[pgsql] def nextStmtName(): String = "S" + stmtCounter.incrementAndGet()
 
-  private[pgsql] def ifReady[A](block: (Long, TxStatus) => Future[A]): Future[A] = {
-    val action = atomic { implicit txn =>
-      if (idle() && !handlingTimeout()) {
-        state() match {
-          case Idle(txStatus) =>
-            idle() = false
-            state() = StartingRequest
-            idlePromise() = Promise[this.type]
-            lastRequestId() = lastRequestId() + 1L
-            val localLastRequestId = lastRequestId()
-            () => block(localLastRequestId, txStatus)
-
-          case _ => ??? //TODO fatal error bug
-        }
-      } else state() match {
-        case ConnectionClosed(cause) => () => Future.failed(cause)
-        case _ => () => Future.failed(new IllegalSessionStateException(s"Session is busy"))
-      }
-    }
-    action()
-  }
-
-  def release(): Future[Unit] = ifReady { (_, _) =>
+  def release(): Future[Unit] = fsmManager.ifReady { (_, _) =>
     logger.debug(s"Releasing connection on client request")
     doRelease("Connection released by client")
   }
@@ -222,7 +249,7 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
         case ex: ConnectionClosedException => ex
         case ex => new ConnectionClosedException("Connection closed", ex)
       }
-      triggerTransition(ConnectionClosed(connClosedEx))
+      fsmManager.triggerTransition(ConnectionClosed(connClosedEx))
     }
   }
 
@@ -230,20 +257,84 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
     doRelease(new ConnectionClosedException(cause))
   }
 
-  private[core] def deallocateStatement(nativeSql: String): Future[Unit] = ifReady { (_, _) =>
-    stmtCache.get(nativeSql) match {
-      case Some(stmtName) =>
-        val promise = Promise[Unit]
-        triggerTransition(new DeallocatingStatement(promise))
-        out.writeAndFlush(CloseStatement(Some(stmtName)), Sync)
-        promise.future
-
-      case None => Future.successful(())
-    }
-  }
 
   def forceRelease(): Future[Unit] = {
     logger.info("Forcing a connection release")
     doRelease("Connection released by client (forced)")
   }
+
+  private val stmtDeallocator = new PgStatementDeallocator {
+    def deallocateStatement(nativeSql: String): Future[Unit] = fsmManager.ifReady { (_, _) =>
+      stmtCache.get(nativeSql) match {
+        case Some(stmtName) =>
+          val promise = Promise[Unit]
+          fsmManager.triggerTransition(new DeallocatingStatement(promise))
+          out.writeAndFlush(CloseStatement(Some(stmtName)), Sync)
+          promise.future
+
+        case None => Future.successful(())
+      }
+    }
+  }
+
+  private val stmtExecutor = new PgStatementExecutor {
+    def executeStatement(nativeSql: String, params: ImmutSeq[DbValue])
+                        (implicit timeout: FiniteDuration): Future[ResultStream] = {
+      fsmManager.ifReady { (reqId, txStatus) =>
+        logger.debug(s"Executing statement '$nativeSql'")
+        val (parse, bind) = parseAndBind(nativeSql, params)
+
+        val streamPromise = Promise[PgResultStream]
+        val parsePromise = Promise[Unit]
+
+        val timeoutScheduler = TimeoutScheduler {
+          scheduler.schedule(timeout) {
+            fsmManager.onTimeout(reqId)
+          }
+        }
+
+        txStatus match {
+          case TxStatus.Active =>
+            fsmManager.triggerTransition(WaitingForDescribe.withoutTxMgmt(bind.portal, streamPromise, parsePromise, sessionParams,
+              timeoutScheduler, rdbcTypeConvRegistry, pgTypeConvRegistry)(out, ec))
+            parse.foreach(out.write(_))
+            out.writeAndFlush(bind, Describe(PortalType, bind.portal), Sync)
+
+          case TxStatus.Idle =>
+            fsmManager.triggerTransition(BeginningTx(parse, bind, streamPromise, parsePromise, sessionParams, timeoutScheduler, rdbcTypeConvRegistry, pgTypeConvRegistry)(out, ec))
+            out.writeAndFlush(Query("BEGIN"))
+
+          case TxStatus.Failed => ??? //TODO
+        }
+
+        parse.flatMap(_.optionalName).foreach { stmtName =>
+          parsePromise.future.onSuccess {
+            case _ => stmtCache = stmtCache.updated(nativeSql, stmtName)
+          }
+        }
+
+        streamPromise.future
+      }
+    }
+
+    protected def parseAndBind(nativeSql: String, params: ImmutSeq[DbValue]): (Option[Parse], Bind) = {
+      val cachedPreparedStatement = stmtCache.get(nativeSql)
+      val (stmtName, parse) = if (cachedPreparedStatement.isDefined) {
+        (cachedPreparedStatement, Option.empty[Parse])
+      } else {
+        val stmtName = if (shouldCache()) Some(nextStmtName()) else None
+        val parse = Some(Parse(stmtName, nativeSql, params.map(_.dataTypeOid).toVector))
+        (stmtName, parse)
+      }
+
+      //TODO AllTextual TODO toList
+      (parse, Bind(stmtName.map(_ + "P"), stmtName, params.toList, AllBinary))
+    }
+
+    protected def shouldCache(): Boolean = {
+      //TODO introduce a cache threshold
+      true
+    }
+  }
+
 }

@@ -23,7 +23,7 @@ import scodec.bits.BitVector
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.{Failure, Random, Success}
 
 object Tst extends App {
 
@@ -607,26 +607,46 @@ object NullTest2 extends App {
 
 }
 
+/*
+object StmTest extends App {
 
-class TryPartialFunction[-A, +B](delegate: PartialFunction[A, B]) extends PartialFunction[A, B] {
-  def isDefinedAt(x: A): Boolean = delegate.isDefinedAt(x)
+  import scala.concurrent.stm._
 
-  def apply(v: A): B = {
-    try {
-      delegate.apply(v)
-    } catch {
-      case ex => println("HAI"); ???
+  class Mutable {
+    var i: Int = 0
+  }
+
+  val mutable = Ref(new Mutable)
+  val immutable = Ref(0)
+
+  val latch = new CountDownLatch(1)
+
+  val r = new Runnable {
+    override def run(): Unit = {
+      latch.await()
+      atomic { implicit txn =>
+       // println(s"Thread ${Thread.currentThread()} entered atomic block")
+        mutable().i = mutable().i + 1
+        immutable() = immutable() + 1
+
+
+        Txn.afterCommit(_ => println(s"Thread ${Thread.currentThread()} committed"))
+       // Txn.afterRollback(_ => println(s"Thread ${Thread.currentThread()} rolled back"))
+
+      }
     }
   }
+
+  val threads = (1 to 1000).map(_ => new Thread(r))
+
+  threads.foreach(_.start())
+
+  latch.countDown()
+
+  threads.foreach(_.join())
+
+  println("mutable = " + mutable.single().i)
+  println("immutable = " + immutable.single())
+
 }
-
-object PartialFunTest extends App {
-
-  val pf: PartialFunction[String, String] = {
-    case "dupa" => "penis"
-  }
-
-
-  pf.apply("zło")
-
-}
+*/
