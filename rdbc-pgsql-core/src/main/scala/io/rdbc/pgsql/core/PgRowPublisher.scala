@@ -18,16 +18,13 @@ package io.rdbc.pgsql.core
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
-import io.rdbc.api.exceptions.RdbcException
 import io.rdbc.pgsql.core.messages.backend.{DataRow, RowDescription}
 import io.rdbc.pgsql.core.messages.frontend.{ClosePortal, Execute, Sync}
 import io.rdbc.pgsql.core.scheduler.{ScheduledTask, TimeoutScheduler}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
+import io.rdbc.pgsql.core.util.SleepLock
 import io.rdbc.sapi.{Row, TypeConverterRegistry}
 import org.reactivestreams.{Publisher, Subscriber, Subscription}
-
-import scala.concurrent.stm._
-
 
 
 class PgRowPublisher(out: ChannelWriter,
@@ -135,19 +132,21 @@ class PgRowPublisher(out: ChannelWriter,
     timeoutScheduledTask.foreach(_.cancel())
   }
 
-  class State() {
-    private val ready: Ref[Boolean] = Ref(false)
-    private val demand: Ref[Long] = Ref(0L)
-    private val unboundedDemand: Ref[Boolean] = Ref(false)
+  class State {
+    private[this] val lock = new SleepLock
+
+    private[this] var ready = false
+    private[this] var demand = 0L
+    private[this] var unboundedDemand = false
 
     def ifCanQuery(block: (Option[Int]) => Unit): Unit = {
-      val action = atomic { implicit txn =>
-        if (ready() && (demand() > 0L || unboundedDemand())) {
-          ready() = false
-          if (unboundedDemand()) {
+      val action = lock.withLock {
+        if (ready && (demand > 0L || unboundedDemand)) {
+          ready = false
+          if (unboundedDemand) {
             () => block(None)
           } else {
-            val localDemand = demand()
+            val localDemand = demand
             () => block(Some(localDemand.toInt))
           }
         } else () => ()
@@ -156,9 +155,9 @@ class PgRowPublisher(out: ChannelWriter,
     }
 
     def ifCanCancel(block: => Unit): Unit = {
-      val can = atomic { implicit txn =>
-        if (ready()) {
-          ready() = false
+      val can = lock.withLock {
+        if (ready) {
+          ready = false
           true
         } else false
       }
@@ -168,25 +167,29 @@ class PgRowPublisher(out: ChannelWriter,
     }
 
     def increaseDemand(n: Long): Unit = {
-      atomic { implicit txn =>
-        demand() = demand() + n //TODO handle overflows
+      lock.withLock {
+        demand = demand + n //TODO handle overflows
       }
     }
 
     def decrementDemand(): Unit = {
-      atomic { implicit txn =>
-        if (!unboundedDemand()) {
-          demand() = demand() - 1L
+      lock.withLock {
+        if (!unboundedDemand) {
+          demand = demand - 1L
         }
       }
     }
 
     def setUnboundedDemand(): Unit = {
-      unboundedDemand.single() = true
+      lock.withLock {
+        unboundedDemand = true
+      }
     }
 
     def setReady(): Unit = {
-      ready.single() = true
+      lock.withLock {
+        ready = true
+      }
     }
   }
 
