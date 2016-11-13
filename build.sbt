@@ -3,7 +3,8 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 lazy val commonSettings = Seq(
   organization := "io.rdbc.pgsql",
   version := "0.0.1",
-  scalaVersion := "2.11.8",
+  scalaVersion := "2.12.0",
+  crossScalaVersions := Vector("2.11.8"),
   scalacOptions ++= Vector(
     "-unchecked",
     "-deprecation",
@@ -35,7 +36,6 @@ lazy val core = (project in file("rdbc-pgsql-core"))
       Library.rdbcTypeconv,
       Library.rdbcImplbase,
       Library.typesafeConfig,
-      Library.stm,
       Library.scalaLogging
     )
   )
@@ -58,7 +58,6 @@ lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
       Library.nettyHandler,
       Library.nettyEpoll,
       Library.rdbcTypeconv,
-      Library.stm,
       Library.scalaLogging,
       Library.logback
     )

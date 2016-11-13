@@ -1,7 +1,7 @@
 import sbt._
 
 object Version {
-  val rdbc = "0.0.17"
+  val rdbc = "0.0.18"
   val netty = "4.1.6.Final"
 }
 
@@ -16,7 +16,6 @@ object Library {
   val typesafeConfig = "com.typesafe" % "config" % "1.3.1"
   val nettyHandler = "io.netty" % "netty-handler" % Version.netty
   val nettyEpoll = "io.netty" % "netty-transport-native-epoll" % Version.netty classifier "linux-x86_64"
-  val stm = "org.scala-stm" %% "scala-stm" % "0.7"
   val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0"
   val logback = "ch.qos.logback" % "logback-classic" % "1.1.7"
 }
