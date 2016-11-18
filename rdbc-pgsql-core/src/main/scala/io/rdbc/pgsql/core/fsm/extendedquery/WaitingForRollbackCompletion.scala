@@ -28,7 +28,11 @@ class WaitingForRollbackCompletion(sendFailureCause: => Unit)
   def msgHandler = {
     case CommandComplete("ROLLBACK", _) =>
       goto(new WaitingForReady(
-        onIdle = sendFailureCause
+        onIdle = sendFailureCause,
+        onFailure = { ex =>
+          logger.error("Error occurred when waiting for ready", ex)
+          sendFailureCause
+        }
       ))
   }
 
@@ -38,7 +42,12 @@ class WaitingForRollbackCompletion(sendFailureCause: => Unit)
   }
 
   protected def onNonFatalError(ex: Throwable): Outcome = {
-    goto(new WaitingForReady(onIdle = sendFailureToClient(ex)))
+    goto(new WaitingForReady(
+      onIdle = sendFailureToClient(ex),
+      onFailure = { ex =>
+        logger.error("Error occurred when waiting for ready", ex)
+        sendFailureToClient(ex)
+      }))
   }
 
   protected def onFatalError(ex: Throwable): Unit = {

@@ -58,6 +58,35 @@ object Tst extends App {
 
 }
 
+object InsertTst extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+
+  fact.connection().flatMap { conn =>
+    println("hai\n\n\n")
+
+    val rsFut = for {
+      stmt <- conn.statement("insert into test(x) (select x from test)")
+      parametrized <- stmt.noParamsF
+      count <- parametrized.executeForRowsAffected()
+    } yield (stmt, count)
+
+    rsFut.map { case (stmt, count) =>
+      println(s"inserted $count")
+      println("DONE")
+      conn.release()
+      fact.shutdown()
+    }
+
+  }.recover {
+    case ex => ex.printStackTrace()
+  }
+
+}
+
 
 object NoDataTest extends App {
 

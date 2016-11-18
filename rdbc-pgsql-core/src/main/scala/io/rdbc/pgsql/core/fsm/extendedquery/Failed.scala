@@ -50,7 +50,10 @@ class Failed protected(txMgmt: Boolean, sendFailureCause: => Unit)(implicit out:
   }
 
   protected def onNonFatalError(ex: Throwable): Outcome = {
-    goto(new WaitingForReady(onIdle = sendFailureToClient(ex)))
+    goto(new WaitingForReady(onIdle = sendFailureToClient(ex), onFailure = { exWhenWaiting =>
+      logger.error("Error occurred when waiting for ready", exWhenWaiting)
+      sendFailureToClient(ex)
+    })) //TODO this pattern repeats
   }
 
   protected def onFatalError(ex: Throwable): Unit = {
