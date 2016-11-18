@@ -27,7 +27,8 @@ class WaitingForCommitCompletion(publisher: PgRowPublisher)(implicit out: Channe
   def msgHandler = {
     case CommandComplete("COMMIT", _) =>
       goto(new WaitingForReady(
-        onIdle = publisher.complete()
+        onIdle = publisher.complete(),
+        onFailure = publisher.failure
       ))
   }
 

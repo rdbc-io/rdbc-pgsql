@@ -18,13 +18,14 @@ package io.rdbc.pgsql.core.fsm
 
 import io.rdbc.pgsql.core.messages.backend.ReadyForQuery
 
-class WaitingForReady(onIdle: => Unit)
-  extends State
-    with DefaultErrorHandling {
+class WaitingForReady(onIdle: => Unit, onFailure: (Throwable) => Unit)
+  extends State with NonFatalErrorsAreFatal {
 
   def msgHandler = {
     case ReadyForQuery(txStatus) => goto(Idle(txStatus)) andThen onIdle
   }
+
+  protected def onFatalError(ex: Throwable): Unit = onFailure(ex)
 
   val name = "waiting_for_ready"
 }

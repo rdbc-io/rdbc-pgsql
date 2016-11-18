@@ -17,19 +17,22 @@
 package io.rdbc.pgsql.core.fsm
 
 import io.rdbc.pgsql.core.fsm.State.Outcome
-import io.rdbc.pgsql.core.messages.backend.{CloseComplete, PgBackendMessage, ReadyForQuery}
+import io.rdbc.pgsql.core.messages.backend.CloseComplete
 
 import scala.concurrent.Promise
 
 class DeallocatingStatement(promise: Promise[Unit]) extends State {
   protected def msgHandler = {
-    case CloseComplete => goto(new WaitingForReady(promise.success(())))
+    case CloseComplete => goto(new WaitingForReady(onIdle = promise.success(()), onFailure = (ex) => promise.failure(ex)))
   }
 
   protected def onFatalError(ex: Throwable): Unit = promise.failure(ex)
 
   protected def onNonFatalError(ex: Throwable): Outcome = {
-    goto(new WaitingForReady(promise.failure(ex)))
+    goto(new WaitingForReady(onIdle = promise.failure(ex), onFailure = { exWhenWaiting =>
+      logger.error("Error occurred when waiting for ready", exWhenWaiting)
+      promise.failure(ex)
+    })) //TODO this pattern repeats in many places
   }
 
   val name = "deallocating_statement"
