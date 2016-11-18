@@ -25,7 +25,6 @@ import io.rdbc.sapi.{ParametrizedStatement, ResultStream}
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
-//TODO decouple pgparametrized statement & connection & fsm manager
 class PgParametrizedStatement(executor: PgStatementExecutor,
                               deallocator: PgStatementDeallocator,
                               nativeSql: String,
@@ -36,7 +35,6 @@ class PgParametrizedStatement(executor: PgStatementExecutor,
     with StrictLogging {
 
   def deallocate(): Future[Unit] = deallocator.deallocateStatement(nativeSql)
-  def connWatchForIdle: Future[PgConnection] = ???
-  def executeForStream()(implicit timeout: FiniteDuration): Future[ResultStream] = executor.executeStatement(nativeSql, params)
-
+  def executeForStream()(implicit timeout: FiniteDuration): Future[ResultStream] = executor.executeStatementForStream(nativeSql, params)
+  override def executeForRowsAffected()(implicit timeout: FiniteDuration): Future[Long] = executor.executeStatementForRowsAffected(nativeSql, params)
 }

@@ -26,6 +26,7 @@ import io.rdbc.implbase.{ConnectionPartialImpl, ReturningInsertImpl}
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.fsm.State.{Fatal, Goto, Stay}
 import io.rdbc.pgsql.core.fsm._
+import io.rdbc.pgsql.core.fsm.extendedquery.writeonly.ExecutingWriteOnly
 import io.rdbc.pgsql.core.fsm.extendedquery.{BeginningTx, WaitingForDescribe}
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.core.messages.frontend._
@@ -39,7 +40,8 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 trait PgStatementExecutor {
-  def executeStatement(nativeSql: String, params: ImmutSeq[DbValue])(implicit timeout: FiniteDuration): Future[ResultStream]
+  def executeStatementForStream(nativeSql: String, params: ImmutSeq[DbValue])(implicit timeout: FiniteDuration): Future[ResultStream]
+  def executeStatementForRowsAffected(nativeSql: String, params: ImmutSeq[DbValue])(implicit timeout: FiniteDuration): Future[Long]
 }
 
 trait PgStatementDeallocator {
@@ -210,7 +212,7 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
   protected def serverCharsetChanged(charset: Charset): Unit
 
   protected def onMessage(msg: PgBackendMessage): Unit = {
-    logger.trace(s"Received backend message '$msg'")
+    logger.debug(s"Received backend message '$msg'")
     msg match {
       case ParameterStatus("client_encoding", pgCharsetName) => handleCharsetChange(pgCharsetName) { charset =>
         clientCharsetChanged(charset)
@@ -278,8 +280,8 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
   }
 
   private val stmtExecutor = new PgStatementExecutor {
-    def executeStatement(nativeSql: String, params: ImmutSeq[DbValue])
-                        (implicit timeout: FiniteDuration): Future[ResultStream] = {
+    def executeStatementForStream(nativeSql: String, params: ImmutSeq[DbValue])
+                                 (implicit timeout: FiniteDuration): Future[ResultStream] = {
       fsmManager.ifReady { (reqId, txStatus) =>
         logger.debug(s"Executing statement '$nativeSql'")
         val (parse, bind) = parseAndBind(nativeSql, params)
@@ -334,6 +336,29 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
     protected def shouldCache(): Boolean = {
       //TODO introduce a cache threshold
       true
+    }
+
+    def executeStatementForRowsAffected(nativeSql: String, params: ImmutSeq[DbValue])(implicit timeout: FiniteDuration): Future[Long] = {
+      fsmManager.ifReady { (reqId, _) =>
+        logger.debug(s"Executing write-only statement '$nativeSql'")
+        val (parse, bind) = parseAndBind(nativeSql, params)
+
+        val timeoutScheduler = TimeoutScheduler {
+          scheduler.schedule(timeout) {
+            fsmManager.onTimeout(reqId)
+          }
+        }
+        timeoutScheduler.scheduleTimeout()
+        //TODO code dupl
+
+        val promise = Promise[Long]
+        fsmManager.triggerTransition(new ExecutingWriteOnly(promise))
+
+        parse.foreach(out.write(_))
+        out.writeAndFlush(bind, Execute(bind.portal, None), Sync) //TODO is portal closed after this execute?
+
+        promise.future
+      }
     }
   }
 
