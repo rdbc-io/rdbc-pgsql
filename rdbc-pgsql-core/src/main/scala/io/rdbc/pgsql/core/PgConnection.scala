@@ -156,8 +156,8 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
 
   def watchForIdle: Future[this.type] = fsmManager.readyFuture
 
-  def statement(sql: String): Future[Statement] = {
-    Future.successful(new PgStatement(stmtExecutor, stmtDeallocator, pgTypeConvRegistry, sessionParams, PgNativeStatement.parse(sql)))
+  def statement(sql: String): Future[AnyStatement] = {
+    Future.successful(new PgAnyStatement(stmtExecutor, stmtDeallocator, pgTypeConvRegistry, sessionParams, PgNativeStatement.parse(sql)))
   }
 
   def beginTx()(implicit timeout: FiniteDuration): Future[Unit] = simpleQueryIgnoreResult("BEGIN")
