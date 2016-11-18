@@ -18,9 +18,9 @@ package io.rdbc.pgsql.core
 
 import com.typesafe.scalalogging.StrictLogging
 import io.rdbc.ImmutSeq
-import io.rdbc.implbase.ParametrizedStatementPartialImpl
+import io.rdbc.implbase.AnyParametrizedStatementPartialImpl
 import io.rdbc.pgsql.core.messages.frontend._
-import io.rdbc.sapi.{ParametrizedStatement, ResultStream}
+import io.rdbc.sapi.{AnyParametrizedStatement, ResultStream}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
@@ -30,8 +30,8 @@ class PgParametrizedStatement(executor: PgStatementExecutor,
                               nativeSql: String,
                               params: ImmutSeq[DbValue])
                              (implicit val ec: ExecutionContext)
-  extends ParametrizedStatement
-    with ParametrizedStatementPartialImpl
+  extends AnyParametrizedStatement
+    with AnyParametrizedStatementPartialImpl
     with StrictLogging {
 
   def deallocate(): Future[Unit] = deallocator.deallocateStatement(nativeSql)
