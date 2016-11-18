@@ -22,22 +22,22 @@ import io.rdbc.implbase.BindablePartialImpl
 import io.rdbc.pgsql.core.messages.data.Unknown
 import io.rdbc.pgsql.core.messages.frontend.{BinaryDbValue, DbValue, NullDbValue}
 import io.rdbc.pgsql.core.types.{PgType, PgTypeRegistry}
-import io.rdbc.sapi.{NotNullParam, NullParam, ParametrizedStatement, Statement}
+import io.rdbc.sapi._
 import org.reactivestreams.Publisher
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class PgStatement(stmtExecutor: PgStatementExecutor,
-                  stmtDeallocator: PgStatementDeallocator,
-                  pgTypeRegistry: PgTypeRegistry,
-                  sessionParams: SessionParams,
-                  val nativeStmt: PgNativeStatement)(implicit ec: ExecutionContext)
-  extends Statement
-    with BindablePartialImpl[ParametrizedStatement] {
+class PgAnyStatement(stmtExecutor: PgStatementExecutor,
+                     stmtDeallocator: PgStatementDeallocator,
+                     pgTypeRegistry: PgTypeRegistry,
+                     sessionParams: SessionParams,
+                     val nativeStmt: PgNativeStatement)(implicit ec: ExecutionContext)
+  extends AnyStatement
+    with BindablePartialImpl[AnyParametrizedStatement] {
 
   def nativeSql: String = nativeStmt.statement
 
-  def bind(params: (String, Any)*): ParametrizedStatement = {
+  def bind(params: (String, Any)*): AnyParametrizedStatement = {
     val dbValues: Map[String, DbValue] = convertNamedParams(Map(params: _*))
     val indexedDbValues = nativeStmt.params.foldLeft(Vector.empty[DbValue]) { (acc, paramName) =>
       dbValues.get(paramName) match {
@@ -48,12 +48,12 @@ class PgStatement(stmtExecutor: PgStatementExecutor,
     parametrizedStmt(indexedDbValues)
   }
 
-  def bindByIdx(params: Any*): ParametrizedStatement = {
+  def bindByIdx(params: Any*): AnyParametrizedStatement = {
     val dbValues = params.map(convertParam).toVector
     parametrizedStmt(dbValues)
   }
 
-  def noParams: ParametrizedStatement = parametrizedStmt(Vector.empty) //TODO validate whether there really are no params in the statement
+  def noParams: AnyParametrizedStatement = parametrizedStmt(Vector.empty) //TODO validate whether there really are no params in the statement
 
   def streamParams(paramsPublisher: Publisher[Map[String, Any]]): Future[Unit] = {
     //TODO parse first
@@ -93,7 +93,7 @@ class PgStatement(stmtExecutor: PgStatementExecutor,
 
   def deallocate(): Future[Unit] = stmtDeallocator.deallocateStatement(nativeSql)
 
-  private def parametrizedStmt(dbValues: ImmutIndexedSeq[DbValue]): ParametrizedStatement = {
+  private def parametrizedStmt(dbValues: ImmutIndexedSeq[DbValue]): AnyParametrizedStatement = {
     new PgParametrizedStatement(stmtExecutor, stmtDeallocator, nativeStmt.statement, dbValues)
   }
 
