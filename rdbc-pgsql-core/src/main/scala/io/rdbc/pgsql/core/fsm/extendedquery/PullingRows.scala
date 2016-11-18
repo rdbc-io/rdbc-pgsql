@@ -46,17 +46,17 @@ class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: C
       rowsAffectedPromise.success(0L)
       warningsPromise.success(warnings)
       if (txMgmt) goto(new CompletedPendingCommit(publisher))
-      else goto(new WaitingForReady(onIdle = publisher.complete()))
+      else goto(new WaitingForReady(onIdle = publisher.complete(), onFailure = publisher.failure))
 
     case CommandComplete(_, rowsAffected) =>
       rowsAffectedPromise.success(rowsAffected.map(_.toLong).getOrElse(0L))
       warningsPromise.success(warnings)
       if (txMgmt) goto(new CompletedPendingCommit(publisher))
-      else goto(new WaitingForReady(onIdle = publisher.complete()))
+      else goto(new WaitingForReady(onIdle = publisher.complete(), onFailure = publisher.failure))
 
     case CloseComplete =>
       if (txMgmt) goto(new CompletedPendingCommit(publisher))
-      else goto(new WaitingForReady(onIdle = publisher.complete()))
+      else goto(new WaitingForReady(onIdle = publisher.complete(), onFailure = publisher.failure))
   }
 
   protected def onNonFatalError(ex: Throwable) = {
