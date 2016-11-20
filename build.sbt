@@ -36,7 +36,8 @@ lazy val core = (project in file("rdbc-pgsql-core"))
       Library.rdbcTypeconv,
       Library.rdbcImplbase,
       Library.typesafeConfig,
-      Library.scalaLogging
+      Library.scalaLogging,
+      Library.akkaStream
     )
   )
 

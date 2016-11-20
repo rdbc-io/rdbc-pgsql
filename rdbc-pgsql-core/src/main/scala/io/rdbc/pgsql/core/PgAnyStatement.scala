@@ -38,13 +38,7 @@ class PgAnyStatement(stmtExecutor: PgStatementExecutor,
   def nativeSql: String = nativeStmt.statement
 
   def bind(params: (String, Any)*): AnyParametrizedStatement = {
-    val dbValues: Map[String, DbValue] = convertNamedParams(Map(params: _*))
-    val indexedDbValues = nativeStmt.params.foldLeft(Vector.empty[DbValue]) { (acc, paramName) =>
-      dbValues.get(paramName) match {
-        case Some(paramValue) => acc :+ paramValue
-        case None => throw new MissingParamValException(paramName)
-      }
-    }
+    val indexedDbValues = convertParamsToSeq(Map(params: _*))
     parametrizedStmt(indexedDbValues)
   }
 
@@ -56,42 +50,28 @@ class PgAnyStatement(stmtExecutor: PgStatementExecutor,
   def noParams: AnyParametrizedStatement = parametrizedStmt(Vector.empty) //TODO validate whether there really are no params in the statement
 
   def streamParams(paramsPublisher: Publisher[Map[String, Any]]): Future[Unit] = {
-    //TODO parse first
-    /*
-        //Parse(stmtName, sql, List.empty)
-        //, Bind(stmtName.map(_ + "_portal"), stmtName, params.toList, AllTextual)) //TODO toList, //TODO AllTextual
+    import akka.stream.scaladsl._
 
-        //sessionRef.actor ! Parse
+    val stmtSource = Source.fromPublisher(paramsPublisher).map { paramMap =>
+      //TODO this is very inefficient, only the first element should parse native stmt etc
+      convertParamsToSeq(paramMap)
+    }
 
-        val src: Source[Bind, NotUsed] = Source.fromPublisher(paramsPublisher).map { params =>
-          //TODO massive code dupl
-
-          val errorsOrDbValues: ImmutSeq[BindEx Xor (String, DbValue)] = convertParams(params)
-          val errorOrDbValues: CompositeBindEx Xor Map[String, DbValue] = foldConvertedParams(errorsOrDbValues)
-          val errorOrIndexedDbValues: Xor[BindEx, Vector[DbValue]] = errorOrDbValues.flatMap { providedParams =>
-            nativeStmt.params.foldLeft(Xor.right[BindEx, Vector[DbValue]](Vector.empty[DbValue])) { (xorAcc, paramName) =>
-              xorAcc.flatMap { acc =>
-                providedParams.get(paramName) match {
-                  case Some(paramValue) => Xor.right(acc :+ paramValue)
-                  case None => Xor.left(MissingParamValEx(paramName))
-                }
-              }
-            }
-          }
-
-          val dbParams = errorOrIndexedDbValues.getOrElse(???) //TODO
-
-          Bind(Some("STREAMING_P"), Some("STREAMING_S"), dbParams.toList, AllTextual)
-        }
-
-        sessionRef.actor ! SubscribeBinds(src)
-
-        XorF(Xor.right())
-        */
-    ???
+    stmtExecutor.executeParamsStream(nativeSql, stmtSource)
   }
 
   def deallocate(): Future[Unit] = stmtDeallocator.deallocateStatement(nativeSql)
+
+  private def convertParamsToSeq(params: Map[String, Any]): ImmutIndexedSeq[DbValue] = {
+    val dbValues: Map[String, DbValue] = convertNamedParams(params)
+    val indexedDbValues = nativeStmt.params.foldLeft(Vector.empty[DbValue]) { (acc, paramName) =>
+      dbValues.get(paramName) match {
+        case Some(paramValue) => acc :+ paramValue
+        case None => throw new MissingParamValException(paramName)
+      }
+    }
+    indexedDbValues
+  }
 
   private def parametrizedStmt(dbValues: ImmutIndexedSeq[DbValue]): AnyParametrizedStatement = {
     new PgParametrizedStatement(stmtExecutor, stmtDeallocator, nativeStmt.statement, dbValues)
@@ -111,7 +91,7 @@ class PgAnyStatement(stmtExecutor: PgStatementExecutor,
   private def withPgType[A, B](cls: Class[A])(block: PgType[A] => B): B = {
     pgTypeRegistry.byClass(cls)
       .map(block)
-      .getOrElse(throw NoSuitableConverterFoundException(cls)) //TODO NoSuitableConverterFound should accept cls, not value
+      .getOrElse(throw NoSuitableConverterFoundException(cls))
   }
 
   private def convertNotNullParam(value: Any): DbValue = {
