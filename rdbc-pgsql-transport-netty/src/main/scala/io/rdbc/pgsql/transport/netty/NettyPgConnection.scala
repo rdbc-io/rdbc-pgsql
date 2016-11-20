@@ -18,6 +18,7 @@ package io.rdbc.pgsql.transport.netty
 
 import java.nio.charset.Charset
 
+import akka.stream.Materializer
 import com.typesafe.scalalogging.StrictLogging
 import io.netty.channel.{ChannelHandlerContext, SimpleChannelInboundHandler}
 import io.rdbc.pgsql.core._
@@ -35,8 +36,9 @@ class NettyPgConnection(pgTypeRegistry: PgTypeRegistry,
                         encoder: PgMsgEncoderHandler,
                         ec: ExecutionContext,
                         scheduler: TaskScheduler,
-                        requestCanceler: (BackendKeyData) => Future[Unit])
-  extends PgConnection(pgTypeRegistry, rdbcTypeConvRegistry, out, ec, scheduler, requestCanceler)
+                        requestCanceler: (BackendKeyData) => Future[Unit],
+                        streamMaterializer: Materializer)
+  extends PgConnection(pgTypeRegistry, rdbcTypeConvRegistry, out, ec, scheduler, requestCanceler, streamMaterializer)
     with StrictLogging {
 
   val handler = new SimpleChannelInboundHandler[PgBackendMessage] {
