@@ -769,3 +769,15 @@ object ManyInsertTest extends App {
   }
 
 }
+
+object MultiConnTst extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+
+  val f = (1 to 10).map(_ => fact.connection()).reduce((f1, f2) => f1.flatMap(_ => f2))
+  Await.ready(f, Duration.Inf)
+  println("conns open")
+}
