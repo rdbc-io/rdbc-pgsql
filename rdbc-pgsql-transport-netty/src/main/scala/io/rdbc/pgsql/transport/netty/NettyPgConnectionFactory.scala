@@ -102,7 +102,7 @@ class NettyPgConnectionFactory protected(remoteAddr: SocketAddress,
   private implicit val actorSystem = ActorSystem("RdbcPgSystem") //TODO unique system name?, TODO configurable system
   private implicit val streamMaterializer = ActorMaterializer()
 
-  def connection(): Future[PgConnection] = { //TODO important - it looks like you can't have multiple connections at the same time :D
+  def connection(): Future[PgConnection] = {
 
     var conn: NettyPgConnection = null
     //TODO bossGroup, workerGroup - familarize yourself
@@ -167,7 +167,7 @@ class NettyPgConnectionFactory protected(remoteAddr: SocketAddress,
     }
   }
 
-  private val framingHandler: LengthFieldBasedFrameDecoder = {
+  private def framingHandler: LengthFieldBasedFrameDecoder = {
     val lengthFieldLength = 4
     new LengthFieldBasedFrameDecoder(
       Int.MaxValue, /* max frame length */
