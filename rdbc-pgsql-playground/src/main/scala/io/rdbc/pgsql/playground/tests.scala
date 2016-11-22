@@ -16,6 +16,7 @@
 
 package io.rdbc.pgsql.playground
 
+import akka.stream.scaladsl.{Sink, Source}
 import io.rdbc.pgsql.transport.netty.NettyPgConnectionFactory
 import io.rdbc.sapi.Row
 import org.reactivestreams.{Subscriber, Subscription}
@@ -679,3 +680,92 @@ object StmTest extends App {
 
 }
 */
+
+
+object StreamParamsTst extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+
+  import akka.actor.ActorSystem
+  import akka.stream._
+
+  implicit val system = ActorSystem("tst")
+  implicit val materializer = ActorMaterializer()
+
+
+  fact.connection().foreach { conn =>
+    println("hai\n\n\n")
+
+    var i = 0
+    while (i < 100) {
+      val params = Source(1 to 10000).map(i => Map("x" -> i.asInstanceOf[Any])).runWith(Sink.asPublisher(false))
+
+      val start = System.nanoTime()
+      val stmtFut = for {
+        _ <- conn.beginTx()
+        stmt <- conn.statement("insert into test(x) values (:x)")
+        _ <- stmt.streamParams(params)
+      } yield stmt
+
+      val c = stmtFut.map(_ => conn.commitTx())
+
+      val fut = c.map { _ =>
+        val time = System.nanoTime() - start
+        println(s"DONE: ${time / 1000000}ms")
+      }
+
+      Await.ready(fut, Duration.Inf)
+
+      i += 1
+    }
+  }
+
+
+}
+
+object ManyInsertTest extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+
+  fact.connection().foreach { conn =>
+    println("hai\n\n\n")
+
+    var i = 0
+
+
+    while (i < 100) {
+      var j = 0
+      val start = System.nanoTime()
+
+      Await.ready(conn.beginTx(), Duration.Inf)
+
+      val insert = Await.result(conn.insert("insert into test(x) values (:x)"), Duration.Inf)
+
+      while (j < 10000) {
+        val rsFut = for {
+          parametrized <- insert.bindF("x" -> j)
+          _ <- parametrized.execute()
+        } yield ()
+
+        Await.ready(rsFut, Duration.Inf)
+        j += 1
+      }
+
+      Await.ready(conn.commitTx(), Duration.Inf)
+
+      val time = System.nanoTime() - start
+      println(s"DONE: ${time / 1000000}ms")
+
+      i += 1
+    }
+
+
+  }
+
+}

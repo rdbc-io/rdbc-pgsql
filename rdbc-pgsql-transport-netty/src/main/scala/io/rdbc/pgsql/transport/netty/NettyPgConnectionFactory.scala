@@ -18,6 +18,8 @@ package io.rdbc.pgsql.transport.netty
 
 import java.net.{InetSocketAddress, SocketAddress}
 
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.ChannelOption.SO_KEEPALIVE
 import io.netty.channel._
@@ -96,7 +98,11 @@ class NettyPgConnectionFactory protected(remoteAddr: SocketAddress,
   private val scheduler = new EventLoopGroupScheduler(eventLoopGroup)
   private implicit val ec = new EventLoopGroupExecutionContext(eventLoopGroup, fallbackExecutionContext) //TODO are you sure?
 
-  def connection(): Future[PgConnection] = {
+
+  private implicit val actorSystem = ActorSystem("RdbcPgSystem") //TODO unique system name?, TODO configurable system
+  private implicit val streamMaterializer = ActorMaterializer()
+
+  def connection(): Future[PgConnection] = { //TODO important - it looks like you can't have multiple connections at the same time :D
 
     var conn: NettyPgConnection = null
     //TODO bossGroup, workerGroup - familarize yourself
@@ -108,7 +114,12 @@ class NettyPgConnectionFactory protected(remoteAddr: SocketAddress,
         def initChannel(ch: Channel): Unit = {
           val decoderHandler = new PgMsgDecoderHandler(msgDecoderFactory.decoder)
           val encoderHandler = new PgMsgEncoderHandler(msgEncoderFactory.encoder)
-          conn = new NettyPgConnection(pgTypeConvRegistry, rdbcTypeConvRegistry, new NettyChannelWriter(ch), decoderHandler, encoderHandler, ec, scheduler, thisFactory.abortRequest)
+          conn = new NettyPgConnection(
+            pgTypeConvRegistry,
+            rdbcTypeConvRegistry,
+            new NettyChannelWriter(ch),
+            decoderHandler, encoderHandler, ec, scheduler, thisFactory.abortRequest, streamMaterializer
+          )
 
           ch.pipeline().addLast(framingHandler)
           ch.pipeline().addLast(decoderHandler)
@@ -127,9 +138,7 @@ class NettyPgConnectionFactory protected(remoteAddr: SocketAddress,
       case NonFatal(ex) => Future.failed(new UncategorizedRdbcException(ex.getMessage)) //TODO cause
     }
 
-    connectionFut.onFailure {
-      case _ => conn.release()
-    }
+    connectionFut.failed.foreach(_ => conn.release())
 
     connectionFut
   }

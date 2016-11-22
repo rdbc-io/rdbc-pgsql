@@ -106,7 +106,7 @@ class PgRowPublisher(out: ChannelWriter,
   }
 
   private def doCancel(): Unit = {
-    out.writeAndFlush(ClosePortal(portalName), Sync)
+    out.writeAndFlush(ClosePortal(portalName), Sync) //TODO should the portal be closed on complete as well?
   }
 
   private[core] def complete(): Unit = {

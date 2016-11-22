@@ -8,16 +8,14 @@ object Jdbc extends App {
   val props = new Properties()
   props.setProperty("user", "povder")
   props.setProperty("password", "povder")
-  props.setProperty("binaryTransferEnable", "16423")
   val conn = DriverManager.getConnection("jdbc:postgresql://localhost/povder", props)
   try {
-    val stmt = conn.prepareStatement("select * from geom_table")
-
-    val rs = stmt.executeQuery()
-    while (rs.next()) {
-      println(rs.getObject(1))
+    val stmt = conn.prepareStatement("insert into test(x) values (?)")
+    (1 to 100).foreach { i =>
+      stmt.setInt(1, i)
+      stmt.addBatch()
     }
-
+    stmt.executeBatch()
 
   } finally {
     conn.close()
