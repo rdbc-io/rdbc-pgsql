@@ -17,18 +17,19 @@
 package io.rdbc.pgsql.core.util
 
 import java.util.concurrent.locks.ReentrantLock
+import scala.concurrent.blocking
 
 trait Lock {
-  def withLock[A](block: => A): A
+  def withLock[A](body: => A): A
 }
 
 class SpinLock extends Lock {
   private[this] val rl = new ReentrantLock
 
-  def withLock[A](block: => A): A = {
+  def withLock[A](body: => A): A = {
     while (rl.tryLock()) {}
     try {
-      block
+      body
     } finally {
       rl.unlock()
     }
@@ -38,12 +39,14 @@ class SpinLock extends Lock {
 class SleepLock extends Lock {
   private[this] val rl = new ReentrantLock
 
-  def withLock[A](block: => A): A = {
-    rl.lock()
-    try {
-      block
-    } finally {
-      rl.unlock()
+  def withLock[A](body: => A): A = {
+    blocking {
+      rl.lock()
+      try {
+        body
+      } finally {
+        rl.unlock()
+      }
     }
   }
 }

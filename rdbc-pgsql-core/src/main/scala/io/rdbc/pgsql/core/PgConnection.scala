@@ -19,6 +19,9 @@ package io.rdbc.pgsql.core
 import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicInteger
 
+import akka.NotUsed
+import akka.stream.Materializer
+import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.scalalogging.StrictLogging
 import io.rdbc._
 import io.rdbc.api.exceptions.{ConnectionClosedException, IllegalSessionStateException}
@@ -26,6 +29,7 @@ import io.rdbc.implbase.{ConnectionPartialImpl, ReturningInsertImpl}
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.fsm.State.{Fatal, Goto, Stay}
 import io.rdbc.pgsql.core.fsm._
+import io.rdbc.pgsql.core.fsm.extendedquery.batch.ExecutingBatch
 import io.rdbc.pgsql.core.fsm.extendedquery.writeonly.ExecutingWriteOnly
 import io.rdbc.pgsql.core.fsm.extendedquery.{BeginningTx, WaitingForDescribe}
 import io.rdbc.pgsql.core.messages.backend._
@@ -34,7 +38,6 @@ import io.rdbc.pgsql.core.scheduler.{TaskScheduler, TimeoutScheduler}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.util.SleepLock
 import io.rdbc.sapi._
-import org.reactivestreams.Publisher
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -42,6 +45,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 trait PgStatementExecutor {
   def executeStatementForStream(nativeSql: String, params: ImmutSeq[DbValue])(implicit timeout: FiniteDuration): Future[ResultStream]
   def executeStatementForRowsAffected(nativeSql: String, params: ImmutSeq[DbValue])(implicit timeout: FiniteDuration): Future[Long]
+  def executeParamsStream(nativeSql: String, params: Source[ImmutSeq[DbValue], NotUsed]): Future[Unit]
 }
 
 trait PgStatementDeallocator {
@@ -55,7 +59,8 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
                             private[pgsql] val out: ChannelWriter,
                             implicit val ec: ExecutionContext,
                             private[pgsql] val scheduler: TaskScheduler,
-                            requestCanceler: (BackendKeyData) => Future[Unit])
+                            requestCanceler: (BackendKeyData) => Future[Unit],
+                            implicit val streamMaterializer: Materializer)
   extends Connection
     with ConnectionPartialImpl
     with StrictLogging {
@@ -176,8 +181,6 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
     }
   }
 
-  def streamIntoTable(sql: String, paramsPublisher: Publisher[Map[String, Any]]): Future[Unit] = ???
-
   protected def simpleQueryIgnoreResult(sql: String)(implicit timeout: FiniteDuration): Future[Unit] = fsmManager.ifReady { (reqId, _) =>
     //TODO timeout
     val queryPromise = Promise[Unit]
@@ -212,7 +215,7 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
   protected def serverCharsetChanged(charset: Charset): Unit
 
   protected def onMessage(msg: PgBackendMessage): Unit = {
-    logger.debug(s"Received backend message '$msg'")
+    logger.trace(s"Received backend message '$msg'")
     msg match {
       case ParameterStatus("client_encoding", pgCharsetName) => handleCharsetChange(pgCharsetName) { charset =>
         clientCharsetChanged(charset)
@@ -266,7 +269,7 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
   }
 
   private val stmtDeallocator = new PgStatementDeallocator {
-    def deallocateStatement(nativeSql: String): Future[Unit] = fsmManager.ifReady { (_, _) =>
+    def deallocateStatement(nativeSql: String): Future[Unit] = fsmManager.ifReady { (_, txStatus) =>
       stmtCache.get(nativeSql) match {
         case Some(stmtName) =>
           val promise = Promise[Unit]
@@ -274,7 +277,9 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
           out.writeAndFlush(CloseStatement(Some(stmtName)), Sync)
           promise.future
 
-        case None => Future.successful(())
+        case None =>
+          fsmManager.triggerTransition(Idle(txStatus))
+          Future.successful(())
       }
     }
   }
@@ -282,6 +287,7 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
   private val stmtExecutor = new PgStatementExecutor {
     def executeStatementForStream(nativeSql: String, params: ImmutSeq[DbValue])
                                  (implicit timeout: FiniteDuration): Future[ResultStream] = {
+      //TODO close portal after completion?
       fsmManager.ifReady { (reqId, txStatus) =>
         logger.debug(s"Executing statement '$nativeSql'")
         val (parse, bind) = parseAndBind(nativeSql, params)
@@ -310,8 +316,8 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
         }
 
         parse.flatMap(_.optionalName).foreach { stmtName =>
-          parsePromise.future.onSuccess {
-            case _ => stmtCache = stmtCache.updated(nativeSql, stmtName)
+          parsePromise.future.foreach { _ =>
+            stmtCache = stmtCache.updated(nativeSql, stmtName)
           }
         }
 
@@ -321,6 +327,7 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
 
     protected def parseAndBind(nativeSql: String, params: ImmutSeq[DbValue]): (Option[Parse], Bind) = {
       val cachedPreparedStatement = stmtCache.get(nativeSql)
+      //TODO can't use the same cached prepared statement for other param types. nativeSql + paramTypes have to be the cache key
       val (stmtName, parse) = if (cachedPreparedStatement.isDefined) {
         (cachedPreparedStatement, Option.empty[Parse])
       } else {
@@ -355,7 +362,46 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
         fsmManager.triggerTransition(new ExecutingWriteOnly(promise))
 
         parse.foreach(out.write(_))
-        out.writeAndFlush(bind, Execute(bind.portal, None), Sync) //TODO is portal closed after this execute?
+        out.writeAndFlush(bind.copy(portal = None), Execute(None, None), Sync)
+
+        val fut = promise.future
+
+        fut.map { rowsAffected =>
+          parse.flatMap(_.optionalName).foreach { stmtName =>
+            stmtCache = stmtCache.updated(nativeSql, stmtName)
+          }
+          rowsAffected
+        }
+      }
+    }
+
+    def executeParamsStream(nativeSql: String, paramsSource: Source[ImmutSeq[DbValue], NotUsed]): Future[Unit] = {
+      fsmManager.ifReady { (_, _) =>
+        val promise = Promise[Unit]
+
+        val stmtName = Option.empty[String]
+        val portalName = Option.empty[String]
+        val execute = Execute(portalName, None)
+        var first = true
+        //TODO make max batch size configurable
+        paramsSource.batch(100L, first => Vector(first))((acc, elem) => acc :+ elem).mapAsyncUnordered(1) { batch =>
+          val promise = Promise[TxStatus]
+          fsmManager.triggerTransition(new ExecutingBatch(promise))
+
+          if (first) {
+            val parse = Parse(stmtName, nativeSql, batch.head.map(_.dataTypeOid).toVector) //TODO use cached value if available
+            out.write(parse)
+            first = false
+          }
+
+          batch.foreach { oneParamSet =>
+            out.write(Bind(portalName, stmtName, oneParamSet.toList, AllBinary), execute)
+          }
+          out.writeAndFlush(Sync)
+          promise.future
+        }.runWith(Sink.last).map { txStatus =>
+          fsmManager.triggerTransition(Idle(txStatus), afterTransition = Some(() => promise.success(())))
+        }.failed.map(ex => promise.failure(ex))
 
         promise.future
       }
