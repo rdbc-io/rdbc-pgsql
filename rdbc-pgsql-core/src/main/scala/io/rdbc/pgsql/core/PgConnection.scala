@@ -169,9 +169,10 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
   def commitTx()(implicit timeout: FiniteDuration): Future[Unit] = simpleQueryIgnoreResult("COMMIT")
   def rollbackTx()(implicit timeout: FiniteDuration): Future[Unit] = simpleQueryIgnoreResult("ROLLBACK")
   def returningInsert(sql: String): Future[ReturningInsert] = returningInsert(sql, "*")
-  def validate(): Future[Boolean] = simpleQueryIgnoreResult("")(FiniteDuration(100, "seconds")).map(_ => true).recoverWith {
+
+  def validate()(implicit timeout: FiniteDuration): Future[Boolean] = simpleQueryIgnoreResult("").map(_ => true).recoverWith {
     case ex: IllegalSessionStateException => Future.failed(ex)
-    case _ => Future.successful(false) //TODO finite duration hardcoded here
+    case _ => Future.successful(false)
   }
 
   def returningInsert(sql: String, keyColumns: String*): Future[ReturningInsert] = {
