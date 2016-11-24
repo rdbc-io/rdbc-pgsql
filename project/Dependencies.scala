@@ -1,7 +1,7 @@
 import sbt._
 
 object Version {
-  val rdbc = "0.0.21"
+  val rdbc = "0.0.22"
   val netty = "4.1.6.Final"
 }
 
@@ -10,7 +10,7 @@ object Library {
   val rdbcImplbase = "io.rdbc" %% "rdbc-implbase" % Version.rdbc
   val rdbcTypeconv = "io.rdbc" %% "rdbc-typeconv" % Version.rdbc
   val reactiveStreams = "org.reactivestreams" % "reactive-streams" % "1.0.0"
-  val akkaStream  = "com.typesafe.akka" %% "akka-stream" % "2.4.12"
+  val akkaStream  = "com.typesafe.akka" %% "akka-stream" % "2.4.14"
   val scodecBits = "org.scodec" %% "scodec-bits" % "1.1.2"
   val scodecCore = "org.scodec" %% "scodec-core" % "1.10.3"
   val typesafeConfig = "com.typesafe" % "config" % "1.3.1"
