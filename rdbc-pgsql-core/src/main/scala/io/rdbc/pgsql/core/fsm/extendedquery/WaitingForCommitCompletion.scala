@@ -21,7 +21,9 @@ import io.rdbc.pgsql.core.fsm._
 import io.rdbc.pgsql.core.messages.backend.CommandComplete
 import io.rdbc.pgsql.core.{ChannelWriter, PgRowPublisher}
 
-class WaitingForCommitCompletion(publisher: PgRowPublisher)(implicit out: ChannelWriter)
+import scala.concurrent.ExecutionContext
+
+class WaitingForCommitCompletion(publisher: PgRowPublisher)(implicit out: ChannelWriter, ec: ExecutionContext)
   extends State {
 
   def msgHandler = {

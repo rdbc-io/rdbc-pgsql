@@ -41,6 +41,8 @@ import io.rdbc.sapi._
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 trait PgStatementExecutor {
   def executeStatementForStream(nativeSql: String, params: ImmutSeq[DbValue])(implicit timeout: FiniteDuration): Future[ResultStream]
@@ -102,7 +104,7 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
       action()
     }
 
-    def triggerTransition(newState: State, afterTransition: Option[() => Unit] = None): Unit = {
+    def triggerTransition(newState: State, afterTransition: Option[() => Future[Unit]] = None): Unit = {
       val successful = lock.withLock {
         state match {
           case ConnectionClosed(_) => false
@@ -127,7 +129,9 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
       if (successful) {
         logger.trace(s"Transitioned to state '$newState'")
         //TODO note that afterTransition action can't access state or any transactional data
-        afterTransition.foreach(_.apply())
+        afterTransition.foreach(_.apply().recover {
+          case NonFatal(ex) => onFatalError("Fatal error occurred in handling after state transition logic", ex)
+        })
       }
     }
 
@@ -186,19 +190,24 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
     //TODO timeout
     val queryPromise = Promise[Unit]
     fsmManager.triggerTransition(new SimpleQuerying.PullingRows(out, queryPromise))
-    out.writeAndFlush(Query(sql))
-    queryPromise.future.flatMap(_ => watchForIdle.map(_ => ()))
+    out.writeAndFlush(Query(sql)).recoverWith(writeFailureHandler)
+      .flatMap(_ => queryPromise.future)
+    //TODO common handler for ChannelErrors -> close conn & treat as fatal
+    //TODO handle TCP disconnects
   }
 
   private[pgsql] def init(dbUser: String, dbName: String, authenticator: Authenticator): Future[Unit] = {
     logger.debug(s"Initializing connection")
     val initPromise = Promise[BackendKeyData]
     fsmManager.triggerTransition(new Authenticating(initPromise, authenticator)(out, ec))
-    out.writeAndFlush(StartupMessage(dbUser, dbName))
-    initPromise.future.map { returnedBkd =>
-      bkd = Some(returnedBkd)
-      ()
+
+    out.writeAndFlush(StartupMessage(dbUser, dbName)).recoverWith(writeFailureHandler).flatMap { _ =>
+      initPromise.future.map { returnedBkd =>
+        bkd = Some(returnedBkd)
+        ()
+      }
     }
+
   }
 
   private def handleCharsetChange(pgCharsetName: String)(consumer: (Charset) => Unit) = {
@@ -249,14 +258,29 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
   }
 
   protected def doRelease(cause: Throwable): Future[Unit] = {
-    out.writeAndFlush(Terminate).map { _ =>
+    out.writeAndFlush(Terminate).recover {
+      case writeEx =>
+        logger.error("Write error occurred when terminating connection", writeEx)
+        ()
+    }.map { _ =>
       out.close()
+      //TODO this block needs to happen regardless of the success of Terminate write, so can't use map here
       val connClosedEx = cause match {
         case ex: ConnectionClosedException => ex
         case ex => new ConnectionClosedException("Connection closed", ex)
       }
       fsmManager.triggerTransition(ConnectionClosed(connClosedEx))
     }
+  }
+
+  private def onWriteError(cause: Throwable): Unit = {
+    onFatalError("Write error occurred, the connection will be closed", cause)
+  }
+
+  private def onFatalError(msg: String, cause: Throwable): Unit = {
+    logger.error(msg, cause)
+    out.close()
+    fsmManager.triggerTransition(ConnectionClosed(new ConnectionClosedException("Connection closed", cause)))
   }
 
   protected def doRelease(cause: String): Future[Unit] = {
@@ -275,8 +299,8 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
         case Some(stmtName) =>
           val promise = Promise[Unit]
           fsmManager.triggerTransition(new DeallocatingStatement(promise))
-          out.writeAndFlush(CloseStatement(Some(stmtName)), Sync)
-          promise.future
+          out.writeAndFlush(CloseStatement(Some(stmtName)), Sync).recoverWith(writeFailureHandler)
+            .flatMap(_ => promise.future)
 
         case None =>
           fsmManager.triggerTransition(Idle(txStatus))
@@ -302,27 +326,28 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
           }
         }
 
-        txStatus match {
+        val writeFut = txStatus match {
           case TxStatus.Active =>
             fsmManager.triggerTransition(WaitingForDescribe.withoutTxMgmt(bind.portal, streamPromise, parsePromise, sessionParams,
-              timeoutScheduler, rdbcTypeConvRegistry, pgTypeConvRegistry)(out, ec))
+              timeoutScheduler, rdbcTypeConvRegistry, pgTypeConvRegistry, onFatalError)(out, ec))
             parse.foreach(out.write(_))
             out.writeAndFlush(bind, Describe(PortalType, bind.portal), Sync)
 
           case TxStatus.Idle =>
-            fsmManager.triggerTransition(BeginningTx(parse, bind, streamPromise, parsePromise, sessionParams, timeoutScheduler, rdbcTypeConvRegistry, pgTypeConvRegistry)(out, ec))
+            fsmManager.triggerTransition(BeginningTx(parse, bind, streamPromise, parsePromise, sessionParams, timeoutScheduler, rdbcTypeConvRegistry, pgTypeConvRegistry, onFatalError)(out, ec))
             out.writeAndFlush(Query("BEGIN"))
 
-          case TxStatus.Failed => ??? //TODO
+          case TxStatus.Failed => Future.successful(()) //TODO oooo
         }
 
-        parse.flatMap(_.optionalName).foreach { stmtName =>
-          parsePromise.future.foreach { _ =>
-            stmtCache = stmtCache.updated(nativeSql, stmtName)
+        writeFut.recoverWith(writeFailureHandler).flatMap { _ =>
+          parse.flatMap(_.optionalName).foreach { stmtName =>
+            parsePromise.future.foreach { _ =>
+              stmtCache = stmtCache.updated(nativeSql, stmtName)
+            }
           }
+          streamPromise.future
         }
-
-        streamPromise.future
       }
     }
 
@@ -363,15 +388,15 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
         fsmManager.triggerTransition(new ExecutingWriteOnly(promise))
 
         parse.foreach(out.write(_))
-        out.writeAndFlush(bind.copy(portal = None), Execute(None, None), Sync)
+        out.writeAndFlush(bind.copy(portal = None), Execute(None, None), Sync).recoverWith(writeFailureHandler).flatMap { _ =>
+          val fut = promise.future
 
-        val fut = promise.future
-
-        fut.map { rowsAffected =>
-          parse.flatMap(_.optionalName).foreach { stmtName =>
-            stmtCache = stmtCache.updated(nativeSql, stmtName)
+          fut.map { rowsAffected =>
+            parse.flatMap(_.optionalName).foreach { stmtName =>
+              stmtCache = stmtCache.updated(nativeSql, stmtName)
+            }
+            rowsAffected
           }
-          rowsAffected
         }
       }
     }
@@ -386,8 +411,8 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
         var first = true
         //TODO make max batch size configurable
         paramsSource.batch(100L, first => Vector(first))((acc, elem) => acc :+ elem).mapAsyncUnordered(1) { batch =>
-          val promise = Promise[TxStatus]
-          fsmManager.triggerTransition(new ExecutingBatch(promise))
+          val batchPromise = Promise[TxStatus]
+          fsmManager.triggerTransition(new ExecutingBatch(batchPromise))
 
           if (first) {
             val parse = Parse(stmtName, nativeSql, batch.head.map(_.dataTypeOid).toVector) //TODO use cached value if available
@@ -398,15 +423,29 @@ abstract class PgConnection(val pgTypeConvRegistry: PgTypeRegistry,
           batch.foreach { oneParamSet =>
             out.write(Bind(portalName, stmtName, oneParamSet.toList, AllBinary), execute)
           }
-          out.writeAndFlush(Sync)
-          promise.future
-        }.runWith(Sink.last).map { txStatus =>
-          fsmManager.triggerTransition(Idle(txStatus), afterTransition = Some(() => promise.success(())))
-        }.failed.map(ex => promise.failure(ex))
+
+          out.writeAndFlush(Sync).recoverWith(writeFailureHandler)
+            .flatMap(_ => batchPromise.future)
+
+        }.runWith(Sink.last).onComplete {
+          case Success(txStatus) => fsmManager.triggerTransition(
+            newState = Idle(txStatus),
+            afterTransition = Some(() => Future.successful(promise.success(())))
+          )
+
+          case Failure(ex) => promise.failure(ex)
+        }
 
         promise.future
       }
     }
+  }
+
+  private def writeFailureHandler[T]: PartialFunction[Throwable, Future[T]] = {
+    case writeEx =>
+      logger.error("Write error occurred, connection will be closed", writeEx)
+      onWriteError(writeEx)
+      Future.failed(writeEx)
   }
 
 }

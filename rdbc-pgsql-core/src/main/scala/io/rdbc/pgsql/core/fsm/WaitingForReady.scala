@@ -22,7 +22,7 @@ class WaitingForReady(onIdle: => Unit, onFailure: (Throwable) => Unit)
   extends State with NonFatalErrorsAreFatal {
 
   def msgHandler = {
-    case ReadyForQuery(txStatus) => goto(Idle(txStatus)) andThen onIdle
+    case ReadyForQuery(txStatus) => goto(Idle(txStatus)) andThenF onIdle
   }
 
   protected def onFatalError(ex: Throwable): Unit = onFailure(ex)

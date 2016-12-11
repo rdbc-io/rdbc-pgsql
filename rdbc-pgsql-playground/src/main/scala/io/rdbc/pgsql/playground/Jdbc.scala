@@ -23,3 +23,24 @@ object Jdbc extends App {
 
 
 }
+
+
+object JdbcSelect extends App {
+
+  val props = new Properties()
+  props.setProperty("user", "povder")
+  props.setProperty("password", "povder")
+  val conn = DriverManager.getConnection("jdbc:postgresql://localhost/povder", props)
+  try {
+    val stmt = conn.prepareStatement("select * from test")
+    val rs = stmt.executeQuery()
+    while (rs.next()) {
+      println(rs.getInt(1))
+    }
+
+  } finally {
+    conn.close()
+  }
+
+
+}

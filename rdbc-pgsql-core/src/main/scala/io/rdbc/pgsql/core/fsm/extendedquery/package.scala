@@ -39,7 +39,7 @@ package object extendedquery {
           case _ => super.onMessage(msg)
         }
       } catch {
-        case NonFatal(ex) => fatal(ex) andThen onFatalError(ex)
+        case NonFatal(ex) => fatal(ex) andThenF onFatalError(ex)
       }
     }
   }
