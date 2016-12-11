@@ -3,7 +3,7 @@ import de.heikoseeberger.sbtheader.license.Apache2_0
 lazy val commonSettings = Seq(
   organization := "io.rdbc.pgsql",
   version := "0.0.1",
-  scalaVersion := "2.12.0",
+  scalaVersion := "2.12.1",
   crossScalaVersions := Vector("2.11.8"),
   scalacOptions ++= Vector(
     "-unchecked",
