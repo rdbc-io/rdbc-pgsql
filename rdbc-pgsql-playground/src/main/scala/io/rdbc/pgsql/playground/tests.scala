@@ -35,14 +35,21 @@ object Tst extends App {
 
   fact.connection().flatMap { conn =>
     println("hai\n\n\n")
+    //Thread.sleep(20000L)
+    val start = System.nanoTime()
 
     val rsFut = for {
       stmt <- conn.statement("select * from test where x > :x")
       parametrized <- stmt.bindF("x" -> -100)
       rs <- parametrized.executeForSet()
+    //TODO when i ctrl-c postgresql during pulling rows nothing happens
     } yield (stmt, rs)
 
+
     rsFut.flatMap { case (stmt, rs) =>
+      val time = System.nanoTime() - start
+      println(s"time = ${time / 1000000}")
+
       rs.foreach { row =>
         println(s"x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
       }
@@ -54,7 +61,9 @@ object Tst extends App {
     }
 
   }.recover {
-    case ex => ex.printStackTrace()
+    case ex =>
+      println("ERROR")
+      ex.printStackTrace()
   }
 
 }

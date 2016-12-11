@@ -21,27 +21,34 @@ import io.rdbc.pgsql.core.exception.PgStatusDataException
 import io.rdbc.pgsql.core.fsm.State._
 import io.rdbc.pgsql.core.messages.backend.{PgBackendMessage, StatusMessage, UnknownBackendMessage}
 
-import scala.concurrent.Promise
+import scala.concurrent.{Future, Promise}
 import scala.util.control.NonFatal
 
 object State {
   sealed trait Outcome
 
-  case class Goto(next: State, afterTransition: Option[() => Unit]) extends Outcome {
-    def andThen(block: => Unit): Goto = {
+  case class Goto(next: State, afterTransition: Option[() => Future[Unit]]) extends Outcome {
+    def andThen(block: => Future[Unit]): Goto = {
       Goto(next, Some(() => block))
+    }
+    def andThenF(block: => Unit): Goto = {
+      andThen(Future.successful(block))
     }
   }
 
   case object Stay extends Outcome
 
-  case class Fatal(ex: Throwable, afterTransition: Option[() => Unit]) extends Outcome {
-    def andThen(block: => Unit): Fatal = {
+  case class Fatal(ex: Throwable, afterTransition: Option[() => Future[Unit]]) extends Outcome {
+    def andThen(block: => Future[Unit]): Fatal = {
       Fatal(ex, Some(() => block))
     }
 
+    def andThenF(block: => Unit): Fatal = {
+      andThenF(Future.successful(block))
+    }
+
     def andThenFailPromise[A](promise: Promise[A]): Fatal = {
-      andThen(promise.failure(ex))
+      andThen(Future.successful(promise.failure(ex)))
     }
   }
 }
@@ -57,7 +64,7 @@ trait State extends StrictLogging {
 
         case err: StatusMessage.Error =>
           val ex = PgStatusDataException(err.statusData)
-          Some(fatal(ex) andThen onFatalError(ex))
+          Some(fatal(ex) andThen onFatalErrorF(ex))
 
         case any => msgHandler.lift.apply(any)
       }
@@ -75,19 +82,19 @@ trait State extends StrictLogging {
           case unknownMsg: UnknownBackendMessage =>
             val msg = s"Unknown message received: '$unknownMsg'"
             val ex = new RuntimeException(msg) //TODO internal error
-            fatal(ex) andThen onFatalError(ex)
+            fatal(ex) andThen onFatalErrorF(ex)
 
           case unhandledMsg =>
             val msg = s"Unhandled message '$unhandledMsg' in state '$name'"
             val ex = new RuntimeException(msg) //TODO internal error
-            fatal(ex) andThen onFatalError(ex)
+            fatal(ex) andThen onFatalErrorF(ex)
         }
 
         case Some(handled) => handled
       }
 
     } catch {
-      case NonFatal(ex) => fatal(ex) andThen onFatalError(ex)
+      case NonFatal(ex) => fatal(ex) andThen onFatalErrorF(ex)
     }
   }
 
@@ -97,6 +104,7 @@ trait State extends StrictLogging {
   protected def onFatalError(ex: Throwable): Unit
   protected def onNonFatalError(ex: Throwable): Outcome
 
+  protected def onFatalErrorF(ex: Throwable): Future[Unit] = Future.successful(onFatalError(ex))
   protected def stay = Stay
   protected def fatal(ex: Throwable) = Fatal(ex, None)
   protected def goto(next: State) = Goto(next, None)
@@ -113,6 +121,6 @@ trait NonFatalErrorsAreFatal {
 
   protected def onNonFatalError(ex: Throwable): Outcome = {
     logger.debug(s"State '$name' does not override non-fatal error handler, treating error as fatal")
-    fatal(ex) andThen onFatalError(ex)
+    fatal(ex) andThen onFatalErrorF(ex)
   }
 }

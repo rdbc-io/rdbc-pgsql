@@ -23,13 +23,16 @@ import io.rdbc.pgsql.core.fsm.{Idle, State, WaitingForReady}
 import io.rdbc.pgsql.core.messages.backend.ReadyForQuery
 import io.rdbc.pgsql.core.messages.frontend.Query
 
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
+
 object Failed {
-  def apply(txMgmt: Boolean)(onIdle: => Unit)(implicit out: ChannelWriter): Failed = {
+  def apply(txMgmt: Boolean)(onIdle: => Unit)(implicit out: ChannelWriter, ec: ExecutionContext): Failed = {
     new Failed(txMgmt, onIdle)
   }
 }
 
-class Failed protected(txMgmt: Boolean, sendFailureCause: => Unit)(implicit out: ChannelWriter)
+class Failed protected(txMgmt: Boolean, sendFailureCause: => Unit)(implicit out: ChannelWriter, ec: ExecutionContext)
   extends State
     with StrictLogging {
 
@@ -37,10 +40,14 @@ class Failed protected(txMgmt: Boolean, sendFailureCause: => Unit)(implicit out:
     case ReadyForQuery(txStatus) =>
       if (txMgmt) {
         goto(new WaitingForRollbackCompletion(sendFailureCause)) andThen {
-          out.writeAndFlush(Query("ROLLBACK"))
+          out.writeAndFlush(Query("ROLLBACK")).recoverWith {
+            case NonFatal(ex) =>
+              sendFailureToClient(ex)
+              Future.failed(ex)
+          }
         }
       } else {
-        goto(Idle(txStatus)) andThen sendFailureCause
+        goto(Idle(txStatus)) andThenF sendFailureCause
       }
   }
 

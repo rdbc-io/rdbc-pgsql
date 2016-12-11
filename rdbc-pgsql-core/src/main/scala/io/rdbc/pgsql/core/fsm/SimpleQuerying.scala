@@ -53,7 +53,7 @@ object SimpleQuerying {
     with NonFatalErrorsAreFatal {
 
     def msgHandler = {
-      case ReadyForQuery(txStatus) => goto(Idle(txStatus)) andThen promise.success(())
+      case ReadyForQuery(txStatus) => goto(Idle(txStatus)) andThenF promise.success(())
     }
 
     protected def onFatalError(ex: Throwable): Unit = {
@@ -67,7 +67,7 @@ object SimpleQuerying {
     with NonFatalErrorsAreFatal {
 
     def msgHandler = {
-      case ReadyForQuery(txStatus) => goto(Idle(txStatus)) andThen promise.failure(ex)
+      case ReadyForQuery(txStatus) => goto(Idle(txStatus)) andThenF promise.failure(ex)
     }
 
     protected def onFatalError(ex: Throwable): Unit = {

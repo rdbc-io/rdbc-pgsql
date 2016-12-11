@@ -22,7 +22,8 @@ import io.rdbc.pgsql.core.messages.backend.{ReadyForQuery, TxStatus}
 import io.rdbc.pgsql.core.messages.frontend.Query
 import io.rdbc.pgsql.core.{ChannelWriter, PgRowPublisher}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
 
 class CompletedPendingCommit(publisher: PgRowPublisher)(implicit out: ChannelWriter, ec: ExecutionContext)
   extends State {
@@ -30,7 +31,11 @@ class CompletedPendingCommit(publisher: PgRowPublisher)(implicit out: ChannelWri
   def msgHandler = {
     case ReadyForQuery(TxStatus.Active) =>
       goto(new WaitingForCommitCompletion(publisher)) andThen {
-        out.writeAndFlush(Query("COMMIT"))
+        out.writeAndFlush(Query("COMMIT")).recoverWith {
+          case NonFatal(ex) =>
+            sendFailureToClient(ex)
+            Future.failed(ex)
+        }
       }
   }
 

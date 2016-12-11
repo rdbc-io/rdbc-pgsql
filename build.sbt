@@ -16,7 +16,8 @@ lazy val commonSettings = Seq(
   bintrayOrganization := Some("rdbc"),
   headers := Map(
     "scala" -> Apache2_0("2016", "Krzysztof Pado")
-  )
+  ),
+  resolvers += Resolver.bintrayRepo("rdbc", "maven")
 )
 
 lazy val rdbcPgsql = (project in file("."))

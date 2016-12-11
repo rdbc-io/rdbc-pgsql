@@ -28,6 +28,7 @@ package object backend {
 
 
   def pgBackendMessage(implicit charset: Charset): Codec[PgBackendMessage] = {
+    //TODO creating this discriminator list for each backend msg is a major bottleneck, cache for each charset?
     discriminatorFallback(
       left = unknown,
       right = discriminated[PgBackendMessage].by(byte)
