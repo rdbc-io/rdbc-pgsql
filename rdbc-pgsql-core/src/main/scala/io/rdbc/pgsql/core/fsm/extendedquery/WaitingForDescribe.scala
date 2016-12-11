@@ -22,7 +22,7 @@ import io.rdbc.pgsql.core.fsm.State.Outcome
 import io.rdbc.pgsql.core.messages.backend._
 import io.rdbc.pgsql.core.scheduler.TimeoutScheduler
 import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.core.{ChannelWriter, PgResultStream, PgRowPublisher, SessionParams}
+import io.rdbc.pgsql.core.{ChannelWriter, FatalErrorNotifier, PgResultStream, PgRowPublisher, SessionParams}
 import io.rdbc.sapi.TypeConverterRegistry
 
 import scala.concurrent.{ExecutionContext, Promise}
@@ -34,10 +34,11 @@ object WaitingForDescribe {
                  sessionParams: SessionParams,
                  timeoutScheduler: TimeoutScheduler,
                  rdbcTypeConvRegistry: TypeConverterRegistry,
-                 pgTypeConvRegistry: PgTypeRegistry)
+                 pgTypeConvRegistry: PgTypeRegistry,
+                 fatalErrorNotifier: FatalErrorNotifier)
                 (implicit out: ChannelWriter,
                  ec: ExecutionContext): WaitingForDescribe = {
-    new WaitingForDescribe(txMgmt = true, portalName, streamPromise, parsePromise, pgTypeConvRegistry, rdbcTypeConvRegistry, sessionParams, timeoutScheduler)
+    new WaitingForDescribe(txMgmt = true, portalName, streamPromise, parsePromise, pgTypeConvRegistry, rdbcTypeConvRegistry, sessionParams, timeoutScheduler, fatalErrorNotifier)
   }
 
   def withoutTxMgmt(portalName: Option[String],
@@ -46,10 +47,11 @@ object WaitingForDescribe {
                     sessionParams: SessionParams,
                     timeoutScheduler: TimeoutScheduler,
                     rdbcTypeConvRegistry: TypeConverterRegistry,
-                    pgTypeConvRegistry: PgTypeRegistry)
+                    pgTypeConvRegistry: PgTypeRegistry,
+                    fatalErrorNotifier: FatalErrorNotifier)
                    (implicit out: ChannelWriter,
                     ec: ExecutionContext): WaitingForDescribe = {
-    new WaitingForDescribe(txMgmt = false, portalName, streamPromise, parsePromise, pgTypeConvRegistry, rdbcTypeConvRegistry, sessionParams, timeoutScheduler)
+    new WaitingForDescribe(txMgmt = false, portalName, streamPromise, parsePromise, pgTypeConvRegistry, rdbcTypeConvRegistry, sessionParams, timeoutScheduler, fatalErrorNotifier)
   }
 }
 
@@ -60,7 +62,8 @@ class WaitingForDescribe protected(txMgmt: Boolean,
                                    pgTypeConvRegistry: PgTypeRegistry,
                                    rdbcTypeConvRegistry: TypeConverterRegistry,
                                    sessionParams: SessionParams,
-                                   timeoutScheduler: TimeoutScheduler
+                                   timeoutScheduler: TimeoutScheduler,
+                                   fatalErrorNotifier: FatalErrorNotifier
                                   )(implicit out: ChannelWriter, ec: ExecutionContext)
   extends State {
 
@@ -79,7 +82,7 @@ class WaitingForDescribe protected(txMgmt: Boolean,
     case _: ReadyForQuery => maybeAfterDescData match {
       case None => onNonFatalError(new ProtocolViolationException("ready for query received without prior row desc"))
       case Some(afterDescData@AfterDescData(publisher, _, _)) =>
-        goto(new PullingRows(txMgmt, afterDescData)) andThen {
+        goto(new PullingRows(txMgmt, afterDescData)) andThenF {
           publisher.resume()
         }
     }
@@ -88,7 +91,7 @@ class WaitingForDescribe protected(txMgmt: Boolean,
   private def onRowDescription(rowDesc: RowDescription): Outcome = maybeAfterDescData match {
     case Some(_) => onNonFatalError(new ProtocolViolationException("already received row description"))
     case None =>
-      val publisher = new PgRowPublisher(out, rowDesc, portalName, pgTypeConvRegistry, rdbcTypeConvRegistry, sessionParams, timeoutScheduler)
+      val publisher = new PgRowPublisher(rowDesc, portalName, pgTypeConvRegistry, rdbcTypeConvRegistry, sessionParams, timeoutScheduler, fatalErrorNotifier)
       val warningsPromise = Promise[Vector[StatusMessage.Notice]]
       val rowsAffectedPromise = Promise[Long]
 

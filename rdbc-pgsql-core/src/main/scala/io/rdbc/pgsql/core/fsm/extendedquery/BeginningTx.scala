@@ -22,17 +22,19 @@ import io.rdbc.pgsql.core.messages.backend.{CommandComplete, ReadyForQuery}
 import io.rdbc.pgsql.core.messages.frontend._
 import io.rdbc.pgsql.core.scheduler.TimeoutScheduler
 import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.core.{ChannelWriter, PgResultStream, SessionParams}
+import io.rdbc.pgsql.core.{ChannelWriter, FatalErrorNotifier, PgResultStream, SessionParams}
 import io.rdbc.sapi.TypeConverterRegistry
 
-import scala.concurrent.{ExecutionContext, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.control.NonFatal
 
 object BeginningTx {
   def apply(parse: Option[Parse], bind: Bind, streamPromise: Promise[PgResultStream], parsePromise: Promise[Unit],
             sessionParams: SessionParams, timeoutScheduler: TimeoutScheduler,
-            rdbcTypeConvRegistry: TypeConverterRegistry, pgTypeConvRegistry: PgTypeRegistry)
+            rdbcTypeConvRegistry: TypeConverterRegistry, pgTypeConvRegistry: PgTypeRegistry,
+            fatalErrorNotifier: FatalErrorNotifier)
            (implicit out: ChannelWriter, ec: ExecutionContext): BeginningTx = {
-    new BeginningTx(parse, bind, streamPromise, parsePromise, sessionParams, timeoutScheduler, rdbcTypeConvRegistry, pgTypeConvRegistry)
+    new BeginningTx(parse, bind, streamPromise, parsePromise, sessionParams, timeoutScheduler, rdbcTypeConvRegistry, pgTypeConvRegistry, fatalErrorNotifier)
   }
 }
 
@@ -43,7 +45,8 @@ class BeginningTx protected(maybeParse: Option[Parse],
                             sessionParams: SessionParams,
                             timeoutScheduler: TimeoutScheduler,
                             rdbcTypeConvRegistry: TypeConverterRegistry,
-                            pgTypeConvRegistry: PgTypeRegistry)
+                            pgTypeConvRegistry: PgTypeRegistry,
+                            fatalErrorNotifier: FatalErrorNotifier)
                            (implicit out: ChannelWriter,
                             ec: ExecutionContext)
   extends State {
@@ -57,8 +60,12 @@ class BeginningTx protected(maybeParse: Option[Parse],
 
     case ReadyForQuery(_) if beginComplete =>
       maybeParse.foreach(out.write(_))
-      goto(WaitingForDescribe.withTxMgmt(bind.portal, streamPromise, parsePromise, sessionParams: SessionParams, timeoutScheduler, rdbcTypeConvRegistry, pgTypeConvRegistry)) andThen {
-        out.writeAndFlush(bind, Describe(PortalType, bind.portal), Sync)
+      goto(WaitingForDescribe.withTxMgmt(bind.portal, streamPromise, parsePromise, sessionParams: SessionParams, timeoutScheduler, rdbcTypeConvRegistry, pgTypeConvRegistry, fatalErrorNotifier)) andThen {
+        out.writeAndFlush(bind, Describe(PortalType, bind.portal), Sync).recoverWith {
+          case NonFatal(ex) =>
+            sendFailureToClient(ex)
+            Future.failed(ex)
+        }
       }
   }
 
@@ -74,7 +81,7 @@ class BeginningTx protected(maybeParse: Option[Parse],
   }
 
   protected def onFatalError(ex: Throwable): Unit = {
-
+    sendFailureToClient(ex)
   }
 
   val name = "extended_querying.beginning_tx"

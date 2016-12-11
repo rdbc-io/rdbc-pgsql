@@ -14,14 +14,8 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql
+package io.rdbc.pgsql.core.exception
 
-package object core {
+import io.rdbc.api.exceptions.RdbcException
 
-  implicit class ArrayToHex(array: Array[Byte]) {
-    def toHex: String = array.map("%02X" format _).mkString
-  }
-
-  type FatalErrorNotifier = (String, Throwable) => Unit
-
-}
+case class ChannelException(cause: Throwable) extends RdbcException(cause.getMessage, cause)

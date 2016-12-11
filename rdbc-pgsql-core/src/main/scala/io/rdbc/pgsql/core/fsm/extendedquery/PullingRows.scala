@@ -24,11 +24,18 @@ import scala.concurrent.ExecutionContext
 
 class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: ChannelWriter, ec: ExecutionContext)
   extends State
-    with WarningCollection { //TODO warnings should be collected in all extended query states
+    with WarningCollection {
+  //TODO warnings should be collected in all extended query states
 
-  val publisher = afterDescData.publisher
-  val warningsPromise = afterDescData.warningsPromise
-  val rowsAffectedPromise = afterDescData.rowsAffectedPromise
+  private val publisher = afterDescData.publisher
+
+  publisher.fatalErrNotifier = (msg, ex) => {
+    logger.error(s"Fatal error occured in the publisher: $msg")
+    onFatalError(ex)
+  }
+
+  private val warningsPromise = afterDescData.warningsPromise
+  private val rowsAffectedPromise = afterDescData.rowsAffectedPromise
 
   def msgHandler = {
     case PortalSuspended =>

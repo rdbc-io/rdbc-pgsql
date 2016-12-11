@@ -19,22 +19,27 @@ package io.rdbc.pgsql.core
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import io.rdbc.pgsql.core.messages.backend.{DataRow, RowDescription}
-import io.rdbc.pgsql.core.messages.frontend.{ClosePortal, Execute, Sync}
+import io.rdbc.pgsql.core.messages.frontend.{ClosePortal, Sync}
 import io.rdbc.pgsql.core.scheduler.{ScheduledTask, TimeoutScheduler}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.util.SleepLock
 import io.rdbc.sapi.{Row, TypeConverterRegistry}
 import org.reactivestreams.{Publisher, Subscriber, Subscription}
 
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
-class PgRowPublisher(out: ChannelWriter,
-                     rowDesc: RowDescription,
+
+class PgRowPublisher(rowDesc: RowDescription,
                      portalName: Option[String],
                      pgTypeConvRegistry: PgTypeRegistry,
                      rdbcTypeConvRegistry: TypeConverterRegistry,
                      sessionParams: SessionParams,
-                     timeoutScheduler: TimeoutScheduler
-                    ) extends Publisher[Row] {
+                     timeoutScheduler: TimeoutScheduler,
+                     @volatile private var _fatalErrNotifier: FatalErrorNotifier
+                    )(implicit out: ChannelWriter, ec: ExecutionContext)
+  extends Publisher[Row] {
 
   private val subscriber = new AtomicReference(Option.empty[Subscriber[_ >: Row]])
   @volatile private var cancelRequested = false
@@ -95,18 +100,19 @@ class PgRowPublisher(out: ChannelWriter,
   private[core] def resume(): Unit = {
     state.setReady()
     if (cancelRequested) {
-      println("resume try cancelling")
       state.ifCanCancel {
         doCancel()
       }
     } else {
-      println("resume tryQuerying")
       tryQuerying()
     }
   }
 
   private def doCancel(): Unit = {
-    out.writeAndFlush(ClosePortal(portalName), Sync) //TODO should the portal be closed on complete as well?
+    out.writeAndFlush(ClosePortal(portalName), Sync).recover {
+      case NonFatal(ex) =>
+        fatalErrNotifier("Write error when closing portal", ex)
+    } //TODO should the portal be closed on complete as well?
   }
 
   private[core] def complete(): Unit = {
@@ -121,9 +127,15 @@ class PgRowPublisher(out: ChannelWriter,
 
   private def tryQuerying(): Unit = {
     state.ifCanQuery { demand =>
-      out.writeAndFlush(Execute(portalName, demand), Sync)
-      if (neverExecuted.compareAndSet(true, false)) {
-        timeoutScheduledTask = Some(timeoutScheduler.scheduleTimeout())
+      //out.writeAndFlush(Execute(portalName, demand), Sync)
+      Future.failed(new RuntimeException("write error")).onComplete {
+        case Success(_) =>
+          if (neverExecuted.compareAndSet(true, false)) {
+            timeoutScheduledTask = Some(timeoutScheduler.scheduleTimeout())
+          }
+
+        case Failure(NonFatal(ex)) =>
+          fatalErrNotifier("Write error occurred when quering", ex)
       }
     }
   }
@@ -193,4 +205,6 @@ class PgRowPublisher(out: ChannelWriter,
     }
   }
 
+  def fatalErrNotifier_=(fen: FatalErrorNotifier): Unit = _fatalErrNotifier = fen
+  def fatalErrNotifier: FatalErrorNotifier = _fatalErrNotifier
 }
