@@ -17,25 +17,30 @@
 package io.rdbc.pgsql.transport.netty
 
 import java.net.{InetSocketAddress, SocketAddress}
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
+import com.typesafe.scalalogging.StrictLogging
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.ChannelOption.SO_KEEPALIVE
 import io.netty.channel._
 import io.netty.channel.epoll.{Epoll, EpollEventLoopGroup, EpollSocketChannel}
+import io.netty.channel.group.DefaultChannelGroup
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder
 import io.netty.handler.timeout.WriteTimeoutHandler
+import io.netty.util.concurrent.GlobalEventExecutor
 import io.rdbc.ImmutSeq
 import io.rdbc.api.exceptions.{RdbcException, UncategorizedRdbcException}
 import io.rdbc.pgsql.core.PgConnection
 import io.rdbc.pgsql.core.auth.{Authenticator, UsernamePasswordAuthenticator}
 import io.rdbc.pgsql.core.codec.{DecoderFactory, EncoderFactory}
 import io.rdbc.pgsql.core.messages.backend.BackendKeyData
-import io.rdbc.pgsql.core.messages.frontend.CancelRequest
+import io.rdbc.pgsql.core.messages.frontend.{CancelRequest, Terminate}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.scodec.types.ScodecBuiltInTypes
 import io.rdbc.pgsql.scodec.{ScodecDecoderFactory, ScodecEncoderFactory}
@@ -90,57 +95,63 @@ class NettyPgConnectionFactory protected(remoteAddr: SocketAddress,
                                          eventLoopGroup: EventLoopGroup,
                                          channelOptions: ImmutSeq[ChannelOptionValue[_]],
                                          fallbackExecutionContext: ExecutionContext)
-  extends ConnectionFactory {
+  extends ConnectionFactory with StrictLogging {
 
   thisFactory =>
 
   val typeConverterRegistry = rdbcTypeConvRegistry
   private val scheduler = new EventLoopGroupScheduler(eventLoopGroup)
-  private implicit val ec = new EventLoopGroupExecutionContext(eventLoopGroup, fallbackExecutionContext) //TODO are you sure?
+  private implicit val ec = new EventLoopGroupExecutionContext(eventLoopGroup, fallbackExecutionContext)
+  //TODO are you sure?
+  private val openChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE) //TODO really global?
 
-
-  private implicit val actorSystem = ActorSystem("RdbcPgSystem") //TODO unique system name?, TODO configurable system
+  private implicit val actorSystem = ActorSystem("RdbcPgSystem")
+  //TODO unique system name?, TODO configurable system
   private implicit val streamMaterializer = ActorMaterializer()
+  private val shutDown = new AtomicBoolean(false)
 
   def connection(): Future[PgConnection] = {
+    if (!shutDown.get()) {
+      var conn: NettyPgConnection = null
+      val bootstrap = new Bootstrap()
+        .group(eventLoopGroup)
+        .channelFactory(channelFactory)
+        .remoteAddress(remoteAddr)
+        .handler(new ChannelInitializer[Channel] {
+          def initChannel(ch: Channel): Unit = {
+            openChannels.add(ch)
+            val decoderHandler = new PgMsgDecoderHandler(msgDecoderFactory.decoder)
+            val encoderHandler = new PgMsgEncoderHandler(msgEncoderFactory.encoder)
+            conn = new NettyPgConnection(
+              pgTypeConvRegistry,
+              rdbcTypeConvRegistry,
+              new NettyChannelWriter(ch),
+              decoderHandler, encoderHandler, ec, scheduler, thisFactory.abortRequest, streamMaterializer
+            )
 
-    var conn: NettyPgConnection = null
-    //TODO bossGroup, workerGroup - familarize yourself
-    val bootstrap = new Bootstrap()
-      .group(eventLoopGroup)
-      .channelFactory(channelFactory)
-      .remoteAddress(remoteAddr)
-      .handler(new ChannelInitializer[Channel] {
-        def initChannel(ch: Channel): Unit = {
-          val decoderHandler = new PgMsgDecoderHandler(msgDecoderFactory.decoder)
-          val encoderHandler = new PgMsgEncoderHandler(msgEncoderFactory.encoder)
-          conn = new NettyPgConnection(
-            pgTypeConvRegistry,
-            rdbcTypeConvRegistry,
-            new NettyChannelWriter(ch),
-            decoderHandler, encoderHandler, ec, scheduler, thisFactory.abortRequest, streamMaterializer
-          )
+            ch.pipeline().addLast(framingHandler)
+            ch.pipeline().addLast(decoderHandler)
+            ch.pipeline().addLast(encoderHandler)
+            ch.pipeline().addLast(new WriteTimeoutHandler(writeTimeout.toSeconds.toInt))
+            ch.pipeline().addLast(conn.handler)
+          }
+        })
 
-          ch.pipeline().addLast(framingHandler)
-          ch.pipeline().addLast(decoderHandler)
-          ch.pipeline().addLast(encoderHandler)
-          ch.pipeline().addLast(new WriteTimeoutHandler(writeTimeout.toSeconds.toInt))
-          ch.pipeline().addLast(conn.handler)
-        }
-      })
+      channelOptions.foreach(opt => bootstrap.option(opt.option.asInstanceOf[ChannelOption[Any]], opt.value))
 
-    channelOptions.foreach(opt => bootstrap.option(opt.option.asInstanceOf[ChannelOption[Any]], opt.value))
+      val connectionFut = bootstrap.connect().scalaFut.flatMap { _ =>
+        conn.init(dbUser, dbName, authenticator).map(_ => conn)
+      }.recoverWith {
+        case ex: RdbcException => Future.failed(ex)
+        case NonFatal(ex) => Future.failed(new UncategorizedRdbcException(ex.getMessage)) //TODO cause
+      }
 
-    val connectionFut = bootstrap.connect().scalaFut.flatMap { _ =>
-      conn.init(dbUser, dbName, authenticator).map(_ => conn)
-    }.recoverWith {
-      case ex: RdbcException => Future.failed(ex)
-      case NonFatal(ex) => Future.failed(new UncategorizedRdbcException(ex.getMessage)) //TODO cause
+      connectionFut.failed.foreach(_ => conn.release())
+
+      connectionFut
+    } else {
+      Future.failed(new RuntimeException("The factory is shut down")) //TODO ex type
     }
-
-    connectionFut.failed.foreach(_ => conn.release())
-
-    connectionFut
   }
 
   private def abortRequest(bkd: BackendKeyData): Future[Unit] = {
@@ -179,9 +190,19 @@ class NettyPgConnectionFactory protected(remoteAddr: SocketAddress,
   }
 
   def shutdown(): Future[Unit] = {
-    //TODO shutdown gracefully?
-    //TODO cancel all connections?
-    val x = eventLoopGroup.shutdownGracefully().scalaFut
-    x.map(_ => ())(ec)
+    if (shutDown.compareAndSet(false, true)) {
+      val warn: PartialFunction[Throwable, Unit] = {
+        case NonFatal(ex) => logger.warn("Error occurred during connection factory shutdown", ex)
+      }
+
+      for {
+        _ <- openChannels.writeAndFlush(Terminate).scalaFut.recover(warn)
+        _ <- openChannels.close().scalaFut.recover(warn)
+        _ <- eventLoopGroup.shutdownGracefully(0L, 0L, TimeUnit.SECONDS).scalaFut.recover(warn)
+        _ <- actorSystem.terminate().recover(warn)
+      } yield ()
+    } else {
+      Future.successful(())
+    }
   }
 }
