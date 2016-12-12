@@ -16,6 +16,8 @@
 
 package io.rdbc.pgsql.transport.netty
 
+import java.util.concurrent.RejectedExecutionException
+
 import io.netty.channel.EventLoopGroup
 
 import scala.concurrent.ExecutionContext
@@ -23,8 +25,15 @@ import scala.concurrent.ExecutionContext
 class EventLoopGroupExecutionContext(eventLoopGroup: EventLoopGroup, fallbackEc: ExecutionContext) extends ExecutionContext {
 
   def execute(runnable: Runnable): Unit = {
-    if (!eventLoopGroup.isShutdown) eventLoopGroup.execute(runnable) //TODO not thread safe?
-    else fallbackEc.execute(runnable)
+    if (eventLoopGroup.isShuttingDown) {
+      fallbackEc.execute(runnable)
+    } else {
+      try {
+        eventLoopGroup.execute(runnable)
+      } catch {
+        case _: RejectedExecutionException => fallbackEc.execute(runnable)
+      }
+    }
   }
 
   def reportFailure(cause: Throwable): Unit = throw cause

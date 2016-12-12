@@ -57,13 +57,17 @@ object Tst extends App {
       stmt.deallocate()
     }.map { _ =>
       conn.release()
-      fact.shutdown()
     }
 
   }.recover {
     case ex =>
       println("ERROR")
       ex.printStackTrace()
+  }.flatMap { _ =>
+    println("hai shutdown")
+    fact.shutdown()
+  }.map { _ =>
+    println("SHUT DOWN")
   }
 
 }
