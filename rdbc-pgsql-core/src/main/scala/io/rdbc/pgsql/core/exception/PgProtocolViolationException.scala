@@ -14,17 +14,8 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.types
+package io.rdbc.pgsql.core.exception
 
-import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.messages.data.Oid
+import io.rdbc.api.exceptions.RdbcException
 
-trait PgType[T] {
-  def typeOid: Oid
-  def cls: Class[T]
-  def otherClasses: Vector[Class[_]] = Vector.empty
-
-  def toObj(binaryVal: Array[Byte])(implicit sessionParams: SessionParams): T
-
-  def toPgBinary(obj: T)(implicit sessionParams: SessionParams): Array[Byte]
-}
+class PgProtocolViolationException(msg: String) extends RdbcException(msg)

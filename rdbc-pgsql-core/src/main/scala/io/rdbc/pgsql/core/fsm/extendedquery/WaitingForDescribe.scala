@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.fsm.extendedquery
 
-import io.rdbc.pgsql.core.exception.ProtocolViolationException
+import io.rdbc.pgsql.core.exception.PgProtocolViolationException
 import io.rdbc.pgsql.core.fsm.State
 import io.rdbc.pgsql.core.fsm.State.Outcome
 import io.rdbc.pgsql.core.messages.backend._
@@ -80,7 +80,7 @@ class WaitingForDescribe protected(txMgmt: Boolean,
     case rowDesc: RowDescription => onRowDescription(rowDesc)
 
     case _: ReadyForQuery => maybeAfterDescData match {
-      case None => onNonFatalError(new ProtocolViolationException("ready for query received without prior row desc"))
+      case None => onNonFatalError(new PgProtocolViolationException("ready for query received without prior row desc"))
       case Some(afterDescData@AfterDescData(publisher, _, _)) =>
         goto(new PullingRows(txMgmt, afterDescData)) andThenF {
           publisher.resume()
@@ -89,7 +89,7 @@ class WaitingForDescribe protected(txMgmt: Boolean,
   }
 
   private def onRowDescription(rowDesc: RowDescription): Outcome = maybeAfterDescData match {
-    case Some(_) => onNonFatalError(new ProtocolViolationException("already received row description"))
+    case Some(_) => onNonFatalError(new PgProtocolViolationException("already received row description"))
     case None =>
       val publisher = new PgRowPublisher(rowDesc, portalName, pgTypeConvRegistry, rdbcTypeConvRegistry, sessionParams, timeoutScheduler, fatalErrorNotifier)
       val warningsPromise = Promise[Vector[StatusMessage.Notice]]

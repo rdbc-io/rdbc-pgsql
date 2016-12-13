@@ -19,7 +19,7 @@ package io.rdbc.pgsql.transport.netty
 import com.typesafe.scalalogging.StrictLogging
 import io.netty.channel.Channel
 import io.rdbc.pgsql.core.ChannelWriter
-import io.rdbc.pgsql.core.exception.ChannelException
+import io.rdbc.pgsql.core.exception.PgChannelException
 import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -32,14 +32,14 @@ class NettyChannelWriter(ch: Channel)(implicit ec: ExecutionContext) extends Cha
       logger.trace(s"Writing message '$msg' to channel ${ch.id()}")
       ch.write(msg).scalaFut
     }.recoverWith {
-      case NonFatal(ex) => Future.failed(ChannelException(ex))
+      case NonFatal(ex) => Future.failed(PgChannelException(ex))
     }
   }
 
   def close(): Future[Unit] = {
     logger.trace(s"Closing channel ${ch.id()}")
     ch.close().scalaFut.recoverWith {
-      case NonFatal(ex) => Future.failed(ChannelException(ex))
+      case NonFatal(ex) => Future.failed(PgChannelException(ex))
     }
   }
 
@@ -48,7 +48,7 @@ class NettyChannelWriter(ch: Channel)(implicit ec: ExecutionContext) extends Cha
     try {
       ch.flush()
     } catch {
-      case NonFatal(ex) => throw ChannelException(ex)
+      case NonFatal(ex) => throw PgChannelException(ex)
     }
   }
 }

@@ -95,9 +95,8 @@ class PgAnyStatement(stmtExecutor: PgStatementExecutor,
   }
 
   private def convertNotNullParam(value: Any): DbValue = {
-    //TODO make it configurable whether use textual or binary
     withPgType(value.getClass) { pgType =>
-      val binVal = pgType.asInstanceOf[PgType[Any]].toPgBinary(value)(sessionParams) //TODO textual vs binary
+      val binVal = pgType.asInstanceOf[PgType[Any]].toPgBinary(value)(sessionParams)
       BinaryDbValue(binVal, pgType.typeOid)
     }
   }

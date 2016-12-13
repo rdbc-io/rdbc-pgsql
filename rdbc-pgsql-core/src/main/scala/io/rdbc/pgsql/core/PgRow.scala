@@ -18,6 +18,7 @@ package io.rdbc.pgsql.core
 
 import io.rdbc.api.exceptions.MissingColumnException
 import io.rdbc.implbase.RowPartialImpl
+import io.rdbc.pgsql.core.exception.PgInternalErrorException
 import io.rdbc.pgsql.core.messages.backend.RowDescription
 import io.rdbc.pgsql.core.messages.data.DbValFormat.{BinaryDbValFormat, TextualDbValFormat}
 import io.rdbc.pgsql.core.messages.data.{DataType, FieldValue, NotNullFieldValue, NullFieldValue}
@@ -52,15 +53,10 @@ class PgRow(rowDesc: RowDescription,
       case NullFieldValue => null
       case NotNullFieldValue(rawFieldVal) =>
         fieldDesc.fieldFormat match {
-          case TextualDbValFormat => textualToObj(fieldDesc.dataType, new String(rawFieldVal)) //TODO charset
           case BinaryDbValFormat => binaryToObj(fieldDesc.dataType, rawFieldVal)
+          case TextualDbValFormat => throw PgInternalErrorException(s"Value '$fieldVal' of field '$fieldDesc' is in textual format, which is unsupported")
         }
     }
-  }
-
-  private def textualToObj(pgType: DataType, textualVal: String): Any = {
-    pgTypeConvRegistry.byTypeOid(pgType.oid).map(_.toObj(textualVal))
-      .getOrElse(throw new Exception(s"unsupported type $pgType")) //TODO
   }
 
   private def binaryToObj(pgType: DataType, binaryVal: Array[Byte]): Any = {

@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.core.fsm
 
 import io.rdbc.pgsql.core.ChannelWriter
-import io.rdbc.pgsql.core.exception.ProtocolViolationException
+import io.rdbc.pgsql.core.exception.PgProtocolViolationException
 import io.rdbc.pgsql.core.messages.backend.{BackendKeyData, ReadyForQuery}
 
 import scala.concurrent.{ExecutionContext, Promise}
@@ -36,7 +36,7 @@ class Initializing(initPromise: Promise[BackendKeyData])(implicit out: ChannelWr
       backendKeyData match {
         case Some(bkd) => goto(Idle(txStatus)) andThenF initPromise.success(bkd)
         case None =>
-          val ex = new ProtocolViolationException("Ready for query received in initializing state without prior backend key data message")
+          val ex = new PgProtocolViolationException("Ready for query received in initializing state without prior backend key data message")
           fatal(ex) andThenF initPromise.failure(ex)
       }
   }
