@@ -16,14 +16,9 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.messages.data.Oid
 
 trait Varchar extends PgType[String] {
   val typeOid = Oid(1043)
   val cls = classOf[String]
-
-  def toObj(textualVal: String)(implicit sessionParams: SessionParams): String = textualVal
-
-  def toPgTextual(obj: String)(implicit sessionParams: SessionParams): String = obj.toString
 }

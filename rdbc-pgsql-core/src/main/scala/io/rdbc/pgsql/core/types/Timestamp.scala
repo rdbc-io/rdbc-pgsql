@@ -26,14 +26,4 @@ import io.rdbc.pgsql.core.messages.data.Oid
 trait Timestamp extends PgType[LocalDateTime] {
   val typeOid = Oid(1114)
   val cls = classOf[LocalDateTime]
-
-  //TODO pattern is dependent on some settings I guess
-  val Pattern = new DateTimeFormatterBuilder()
-    .appendPattern("yyyy-MM-dd HH:mm:ss")
-    .appendFraction(ChronoField.MICRO_OF_SECOND, 0, 6, true)
-    .toFormatter()
-
-  def toObj(textualVal: String)(implicit sessionParams: SessionParams): LocalDateTime = LocalDateTime.parse(textualVal, Pattern)
-
-  def toPgTextual(obj: LocalDateTime)(implicit sessionParams: SessionParams): String = obj.format(Pattern)
 }

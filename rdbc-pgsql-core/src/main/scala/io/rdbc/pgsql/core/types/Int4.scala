@@ -16,15 +16,10 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.messages.data.Oid
 
 trait Int4 extends PgType[Int] {
   val typeOid = Oid(23)
   val cls = classOf[Int]
   override val otherClasses = Vector(classOf[Integer])
-
-  def toObj(textualVal: String)(implicit sessionParams: SessionParams): Int = textualVal.toInt
-
-  def toPgTextual(obj: Int)(implicit sessionParams: SessionParams): String = obj.toString
 }

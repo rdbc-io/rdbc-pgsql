@@ -55,7 +55,7 @@ lazy val scodec = (project in file("rdbc-pgsql-scodec"))
 lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
   .settings(commonSettings: _*)
   .settings(
-    name := "rdbc-pgsql-transport-netty",
+    name := "pgsql-transport-netty",
     libraryDependencies ++= Vector(
       Library.nettyHandler,
       Library.nettyEpoll,
