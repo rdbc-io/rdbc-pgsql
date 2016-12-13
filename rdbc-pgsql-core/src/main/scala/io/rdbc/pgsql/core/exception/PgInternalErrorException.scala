@@ -18,4 +18,4 @@ package io.rdbc.pgsql.core.exception
 
 import io.rdbc.api.exceptions.RdbcException
 
-class ProtocolViolationException(msg: String) extends RdbcException(msg)
+case class PgInternalErrorException(msg: String) extends RdbcException(msg)

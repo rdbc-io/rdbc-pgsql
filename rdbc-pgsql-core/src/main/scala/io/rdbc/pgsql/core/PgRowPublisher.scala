@@ -19,7 +19,7 @@ package io.rdbc.pgsql.core
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import io.rdbc.pgsql.core.messages.backend.{DataRow, RowDescription}
-import io.rdbc.pgsql.core.messages.frontend.{ClosePortal, Sync}
+import io.rdbc.pgsql.core.messages.frontend.{ClosePortal, Execute, Sync}
 import io.rdbc.pgsql.core.scheduler.{ScheduledTask, TimeoutScheduler}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.util.SleepLock
@@ -127,8 +127,7 @@ class PgRowPublisher(rowDesc: RowDescription,
 
   private def tryQuerying(): Unit = {
     state.ifCanQuery { demand =>
-      //out.writeAndFlush(Execute(portalName, demand), Sync)
-      Future.failed(new RuntimeException("write error")).onComplete {
+      out.writeAndFlush(Execute(portalName, demand), Sync).onComplete {
         case Success(_) =>
           if (neverExecuted.compareAndSet(true, false)) {
             timeoutScheduledTask = Some(timeoutScheduler.scheduleTimeout())
