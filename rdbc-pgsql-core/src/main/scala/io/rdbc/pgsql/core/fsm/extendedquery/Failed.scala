@@ -20,23 +20,29 @@ import com.typesafe.scalalogging.StrictLogging
 import io.rdbc.pgsql.core.ChannelWriter
 import io.rdbc.pgsql.core.fsm.State.Outcome
 import io.rdbc.pgsql.core.fsm.{Idle, State, WaitingForReady}
-import io.rdbc.pgsql.core.messages.backend.ReadyForQuery
-import io.rdbc.pgsql.core.messages.frontend.Query
+import io.rdbc.pgsql.core.messages.backend.{CloseComplete, ReadyForQuery}
+import io.rdbc.pgsql.core.messages.frontend.{ClosePortal, Query, Sync}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
 object Failed {
-  def apply(txMgmt: Boolean)(onIdle: => Unit)(implicit out: ChannelWriter, ec: ExecutionContext): Failed = {
-    new Failed(txMgmt, onIdle)
+  def apply(txMgmt: Boolean, portalName: Option[String])(onIdle: => Unit)(implicit out: ChannelWriter, ec: ExecutionContext): Failed = {
+    new Failed(txMgmt, portalName, onIdle)
   }
 }
 
-class Failed protected(txMgmt: Boolean, sendFailureCause: => Unit)(implicit out: ChannelWriter, ec: ExecutionContext)
+class Failed protected(txMgmt: Boolean, portalName: Option[String], sendFailureCause: => Unit)(implicit out: ChannelWriter, ec: ExecutionContext)
   extends State
     with StrictLogging {
 
+  var portalClosed = false
+
   def msgHandler = {
+    case CloseComplete if !portalClosed =>
+      portalClosed = true
+      stay
+
     case ReadyForQuery(txStatus) =>
       if (txMgmt) {
         goto(new WaitingForRollbackCompletion(sendFailureCause)) andThen {
@@ -47,7 +53,16 @@ class Failed protected(txMgmt: Boolean, sendFailureCause: => Unit)(implicit out:
           }
         }
       } else {
-        goto(Idle(txStatus)) andThenF sendFailureCause
+        if (!portalClosed) {
+          out.writeAndFlush(ClosePortal(portalName), Sync).recoverWith {
+            case NonFatal(ex) =>
+              sendFailureToClient(ex)
+              Future.failed(ex)
+          }
+          stay //TODO should be stay andThen
+        } else {
+          goto(Idle(txStatus)) andThenF sendFailureCause
+        }
       }
   }
 

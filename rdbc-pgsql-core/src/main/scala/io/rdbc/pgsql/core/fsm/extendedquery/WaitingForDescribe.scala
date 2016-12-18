@@ -127,7 +127,7 @@ class WaitingForDescribe protected(txMgmt: Boolean,
   }
 
   protected def onNonFatalError(ex: Throwable): Outcome = {
-    goto(Failed(txMgmt) {
+    goto(Failed(txMgmt, portalName) {
       sendFailureToClient(ex)
     })
   }

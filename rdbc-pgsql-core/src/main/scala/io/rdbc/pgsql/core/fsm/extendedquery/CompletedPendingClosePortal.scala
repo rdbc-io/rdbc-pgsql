@@ -17,21 +17,26 @@
 package io.rdbc.pgsql.core.fsm.extendedquery
 
 import io.rdbc.pgsql.core.fsm.State.Outcome
-import io.rdbc.pgsql.core.fsm._
-import io.rdbc.pgsql.core.messages.backend.CommandComplete
+import io.rdbc.pgsql.core.fsm.{State, WaitingForReady}
+import io.rdbc.pgsql.core.messages.backend.ReadyForQuery
+import io.rdbc.pgsql.core.messages.frontend.{ClosePortal, Sync}
 import io.rdbc.pgsql.core.{ChannelWriter, PgRowPublisher}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
 
-class WaitingForCommitCompletion(publisher: PgRowPublisher)(implicit out: ChannelWriter, ec: ExecutionContext)
+class CompletedPendingClosePortal(publisher: PgRowPublisher, onIdle: => Unit)(implicit out: ChannelWriter, ec: ExecutionContext)
   extends State {
 
   def msgHandler = {
-    case CommandComplete("COMMIT", _) =>
-      goto(new WaitingForReady(
-        onIdle = publisher.complete(),
-        onFailure = publisher.failure
-      ))
+    case ReadyForQuery(_) =>
+      goto(new WaitingForCloseCompletion(onIdle, publisher)) andThen {
+        out.writeAndFlush(ClosePortal(publisher.portalName), Sync).recoverWith {
+          case NonFatal(ex) =>
+            sendFailureToClient(ex)
+            Future.failed(ex)
+        }
+      }
   }
 
   def sendFailureToClient(ex: Throwable): Unit = {
@@ -39,14 +44,16 @@ class WaitingForCommitCompletion(publisher: PgRowPublisher)(implicit out: Channe
   }
 
   protected def onNonFatalError(ex: Throwable): Outcome = {
-    goto(Failed(txMgmt = true, publisher.portalName) {
+    goto(new WaitingForReady(onIdle = sendFailureToClient(ex), onFailure = { exWhenWaiting =>
+      logger.error("Error occurred when closing portal", exWhenWaiting)
       sendFailureToClient(ex)
-    })
+    })) //TODO this pattern repeats
   }
 
   protected def onFatalError(ex: Throwable): Unit = {
     sendFailureToClient(ex)
   }
 
-  val name = "extended_querying.waiting_for_ready_after_commit"
+  val name = "extended_querying.pending_close"
+
 }

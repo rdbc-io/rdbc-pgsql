@@ -75,7 +75,7 @@ class BeginningTx protected(maybeParse: Option[Parse],
   }
 
   protected def onNonFatalError(ex: Throwable): Outcome = {
-    goto(Failed(txMgmt = true) {
+    goto(Failed(txMgmt = true, bind.portal) {
       sendFailureToClient(ex)
     })
   }
