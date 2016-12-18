@@ -18,18 +18,18 @@ package io.rdbc.pgsql.core.fsm.extendedquery
 
 import io.rdbc.pgsql.core.fsm.State.Outcome
 import io.rdbc.pgsql.core.fsm._
-import io.rdbc.pgsql.core.messages.backend.CommandComplete
+import io.rdbc.pgsql.core.messages.backend.CloseComplete
 import io.rdbc.pgsql.core.{ChannelWriter, PgRowPublisher}
 
 import scala.concurrent.ExecutionContext
 
-class WaitingForCommitCompletion(publisher: PgRowPublisher)(implicit out: ChannelWriter, ec: ExecutionContext)
+class WaitingForCloseCompletion(onIdle: => Unit, publisher: PgRowPublisher)(implicit out: ChannelWriter, ec: ExecutionContext)
   extends State {
 
   def msgHandler = {
-    case CommandComplete("COMMIT", _) =>
+    case CloseComplete =>
       goto(new WaitingForReady(
-        onIdle = publisher.complete(),
+        onIdle = onIdle,
         onFailure = publisher.failure
       ))
   }
@@ -48,5 +48,5 @@ class WaitingForCommitCompletion(publisher: PgRowPublisher)(implicit out: Channe
     sendFailureToClient(ex)
   }
 
-  val name = "extended_querying.waiting_for_ready_after_commit"
+  val name = "extended_querying.close_complete"
 }
