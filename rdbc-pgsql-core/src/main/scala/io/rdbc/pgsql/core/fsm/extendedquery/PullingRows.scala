@@ -17,6 +17,7 @@
 package io.rdbc.pgsql.core.fsm.extendedquery
 
 import io.rdbc.pgsql.core.ChannelWriter
+import io.rdbc.pgsql.core.fsm.State.{Goto, Outcome}
 import io.rdbc.pgsql.core.fsm.{State, WaitingForReady}
 import io.rdbc.pgsql.core.messages.backend._
 
@@ -27,15 +28,15 @@ class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: C
     with WarningCollection {
   //TODO warnings should be collected in all extended query states
 
-  private val publisher = afterDescData.publisher
+  private[this] val publisher = afterDescData.publisher
 
   publisher.fatalErrNotifier = (msg, ex) => {
     logger.error(s"Fatal error occured in the publisher: $msg")
     onFatalError(ex)
   }
 
-  private val warningsPromise = afterDescData.warningsPromise
-  private val rowsAffectedPromise = afterDescData.rowsAffectedPromise
+  private[this] val warningsPromise = afterDescData.warningsPromise
+  private[this] val rowsAffectedPromise = afterDescData.rowsAffectedPromise
 
   def msgHandler = {
     case PortalSuspended =>
@@ -53,30 +54,32 @@ class PullingRows(txMgmt: Boolean, afterDescData: AfterDescData)(implicit out: C
       rowsAffectedPromise.success(0L)
       warningsPromise.success(warnings)
       if (txMgmt) goto(new CompletedPendingCommit(publisher))
-      else goto(new WaitingForReady(onIdle = publisher.complete(), onFailure = publisher.failure))
+      else goto(new CompletedPendingClosePortal(publisher, onIdle = publisher.complete()))
 
     case CommandComplete(_, rowsAffected) =>
       rowsAffectedPromise.success(rowsAffected.map(_.toLong).getOrElse(0L))
       warningsPromise.success(warnings)
       if (txMgmt) goto(new CompletedPendingCommit(publisher))
-      else goto(new WaitingForReady(onIdle = publisher.complete(), onFailure = publisher.failure))
+      else goto(new CompletedPendingClosePortal(publisher, onIdle = publisher.complete()))
+
+    //TODO portal needs to be closed on error
 
     case CloseComplete =>
       if (txMgmt) goto(new CompletedPendingCommit(publisher))
       else goto(new WaitingForReady(onIdle = publisher.complete(), onFailure = publisher.failure))
   }
 
-  protected def onNonFatalError(ex: Throwable) = {
-    goto(Failed(txMgmt) {
+  protected def onNonFatalError(ex: Throwable): Outcome = {
+    goto(Failed(txMgmt, afterDescData.publisher.portalName) {
       sendFailureToClient(ex)
     })
   }
 
-  protected def onFatalError(ex: Throwable) = {
+  protected def onFatalError(ex: Throwable): Unit = {
     sendFailureToClient(ex)
   }
 
-  def sendFailureToClient(ex: Throwable) = {
+  private[this] def sendFailureToClient(ex: Throwable): Unit = {
     publisher.failure(ex)
     warningsPromise.failure(ex)
     rowsAffectedPromise.failure(ex)
