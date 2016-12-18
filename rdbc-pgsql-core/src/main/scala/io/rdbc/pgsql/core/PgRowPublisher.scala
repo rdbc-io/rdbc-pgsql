@@ -18,6 +18,7 @@ package io.rdbc.pgsql.core
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
+import io.rdbc.pgsql.core.exception.PgSubscriptionRejectedException
 import io.rdbc.pgsql.core.messages.backend.{DataRow, RowDescription}
 import io.rdbc.pgsql.core.messages.frontend.{ClosePortal, Execute, Sync}
 import io.rdbc.pgsql.core.scheduler.{ScheduledTask, TimeoutScheduler}
@@ -26,13 +27,13 @@ import io.rdbc.pgsql.core.util.SleepLock
 import io.rdbc.sapi.{Row, TypeConverterRegistry}
 import org.reactivestreams.{Publisher, Subscriber, Subscription}
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
-
+//TODO in the future tests, use reactive streams TCK to test this publisher & subscription
 class PgRowPublisher(rowDesc: RowDescription,
-                     portalName: Option[String],
+                     val portalName: Option[String],
                      pgTypeConvRegistry: PgTypeRegistry,
                      rdbcTypeConvRegistry: TypeConverterRegistry,
                      sessionParams: SessionParams,
@@ -53,10 +54,16 @@ class PgRowPublisher(rowDesc: RowDescription,
     }: _*)
   }
 
+  object DummySubscription extends Subscription {
+    def cancel(): Unit = ()
+
+    def request(n: Long): Unit = ()
+  }
+
   object RowSubscription extends Subscription {
     def cancel(): Unit = {
       state.ifCanCancel {
-        doCancel()
+        closePortal()
       }
       cancelRequested = true
     }
@@ -72,10 +79,15 @@ class PgRowPublisher(rowDesc: RowDescription,
   }
 
   def subscribe(s: Subscriber[_ >: Row]): Unit = {
-    if (subscriber.compareAndSet(None, Some(s))) {
-      s.onSubscribe(RowSubscription)
+    if (s == null) {
+      throw new NullPointerException("Subscriber cannot be null") //spec 1.9
     } else {
-      s.onError(new RuntimeException("max 1 subscriber/can subscribe only once")) //TODO
+      if (subscriber.compareAndSet(None, Some(s))) {
+        s.onSubscribe(RowSubscription)
+      } else {
+        s.onSubscribe(DummySubscription) //spec 1.9
+        s.onError(PgSubscriptionRejectedException("This publisher can be subscribed only once, it has already been subscribed by other subscriber."))
+      }
     }
   }
 
@@ -101,18 +113,18 @@ class PgRowPublisher(rowDesc: RowDescription,
     state.setReady()
     if (cancelRequested) {
       state.ifCanCancel {
-        doCancel()
+        closePortal()
       }
     } else {
       tryQuerying()
     }
   }
 
-  private def doCancel(): Unit = {
+  private def closePortal(): Unit = {
     out.writeAndFlush(ClosePortal(portalName), Sync).recover {
       case NonFatal(ex) =>
         fatalErrNotifier("Write error when closing portal", ex)
-    } //TODO should the portal be closed on complete as well?
+    }
   }
 
   private[core] def complete(): Unit = {
@@ -134,7 +146,7 @@ class PgRowPublisher(rowDesc: RowDescription,
           }
 
         case Failure(NonFatal(ex)) =>
-          fatalErrNotifier("Write error occurred when quering", ex)
+          fatalErrNotifier("Write error occurred when querying", ex)
       }
     }
   }
@@ -179,7 +191,11 @@ class PgRowPublisher(rowDesc: RowDescription,
 
     def increaseDemand(n: Long): Unit = {
       lock.withLock {
-        demand = demand + n //TODO handle overflows
+        try {
+          demand = Math.addExact(demand, n)
+        } catch {
+          case _: ArithmeticException => unboundedDemand = true
+        }
       }
     }
 
@@ -204,6 +220,7 @@ class PgRowPublisher(rowDesc: RowDescription,
     }
   }
 
-  def fatalErrNotifier_=(fen: FatalErrorNotifier): Unit = _fatalErrNotifier = fen
-  def fatalErrNotifier: FatalErrorNotifier = _fatalErrNotifier
+  private[core] def fatalErrNotifier_=(fen: FatalErrorNotifier): Unit = _fatalErrNotifier = fen
+
+  private[core] def fatalErrNotifier: FatalErrorNotifier = _fatalErrNotifier
 }

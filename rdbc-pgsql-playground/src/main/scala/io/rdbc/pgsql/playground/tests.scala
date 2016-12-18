@@ -25,6 +25,7 @@ import scodec.bits.BitVector
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Random, Success}
+import io.rdbc.sapi.Interpolators._
 
 object Tst extends App {
 
@@ -38,10 +39,11 @@ object Tst extends App {
     //Thread.sleep(20000L)
     val start = System.nanoTime()
 
+    val x = -100
+
     val rsFut = for {
-      stmt <- conn.statement("select * from test where x > :x")
-      parametrized <- stmt.bindF("x" -> -100)
-      rs <- parametrized.executeForSet()
+      stmt <- conn.statement(sql"select * from test where x > $x")
+      rs <- stmt.executeForSet()
     //TODO when i ctrl-c postgresql during pulling rows nothing happens
     } yield (stmt, rs)
 
@@ -329,6 +331,33 @@ object ErrTest extends App {
       stmt <- conn.statement("select * from tes5")
       parametrized <- stmt.noParamsF
       rs <- parametrized.executeForSet()
+    } yield rs
+
+    rsFut.map { rs =>
+      println(s"rs = $rs")
+      println("DONE")
+    }
+
+  }.recover {
+    case ex => ex.printStackTrace()
+  }
+
+}
+
+object ErrTestTx extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
+    println("hai\n\n\n")
+
+    val rsFut = for {
+      _ <- conn.beginTx()
+      stmt <- conn.statement("select * from tes5")
+      parametrized <- stmt.noParamsF
+      rs <- parametrized.executeForSet()
+      _ <- conn.commitTx()
     } yield rs
 
     rsFut.map { rs =>
