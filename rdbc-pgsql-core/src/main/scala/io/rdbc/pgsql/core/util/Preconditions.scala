@@ -14,8 +14,16 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.exception
+package io.rdbc.pgsql.core.util
 
-import io.rdbc.api.exceptions.RdbcException
+object Preconditions {
 
-case class PgDriverInternalErrorException(msg: String) extends RdbcException(s"THIS IS A RDBC DRIVER BUG: $msg")
+  def notNull[A](param: sourcecode.Text[A]): Unit = {
+    if (param == null) throw new NullPointerException(s"Parameter '${param.source}' cannot be null")
+  }
+
+  def check[A](param: sourcecode.Text[A], f: A => Boolean, msg: => String): Unit = {
+    require(f(param.value), s"Requirement failed for parameter '${param.source}': $msg")
+  }
+
+}
