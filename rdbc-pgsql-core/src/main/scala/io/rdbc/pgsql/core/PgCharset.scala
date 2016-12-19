@@ -31,7 +31,7 @@ object PgCharset {
     "BIG5" -> "Big5",
     "EUC_CN" -> "EUC_CN",
     "EUC_JP" -> "EUC-JP",
-    "EUC_JIS_2004" -> "x-SJIS_0213", //TODO is this the same as SHIFT_JIS_2004?
+    "EUC_JIS_2004" -> "EUC-JP",
     "EUC_KR" -> "EUC-KR",
     "EUC_TW" -> "x-EUC-TW",
     "GB18030" -> "GB18030",
@@ -52,14 +52,13 @@ object PgCharset {
     "LATIN7" -> "ISO-8859-7",
     "LATIN8" -> "ISO-8859-8",
     "LATIN9" -> "ISO-8859-9",
-    "LATIN10" -> "ISO-8859-10",
     "SJIS" -> "Shift_JIS",
-    "SHIFT_JIS_2004" -> "", //TODO
+    "SHIFT_JIS_2004" -> "x-SJIS_0213",
     "SQL_ASCII" -> "US-ASCII",
-    "UHC" -> "MS949",
+    "UHC" -> "x-windows-949",
     "UTF8" -> "UTF-8",
-    "WIN866" -> "IBM866", //TODO verify
-    "WIN874" -> "x-windows-874",
+    "WIN866" -> "IBM866",
+    "WIN874" -> "x-IBM874",
     "WIN1250" -> "windows-1250",
     "WIN1251" -> "windows-1251",
     "WIN1252" -> "windows-1252",
