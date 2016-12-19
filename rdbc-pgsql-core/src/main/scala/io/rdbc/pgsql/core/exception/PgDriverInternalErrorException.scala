@@ -18,4 +18,4 @@ package io.rdbc.pgsql.core.exception
 
 import io.rdbc.api.exceptions.RdbcException
 
-case class PgInternalErrorException(msg: String) extends RdbcException(msg)
+case class PgDriverInternalErrorException(msg: String) extends RdbcException(msg)
