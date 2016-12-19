@@ -18,7 +18,7 @@ package io.rdbc.pgsql.core
 
 import io.rdbc.api.exceptions.MissingColumnException
 import io.rdbc.implbase.RowPartialImpl
-import io.rdbc.pgsql.core.exception.PgDriverInternalErrorException
+import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgUnsupportedType}
 import io.rdbc.pgsql.core.messages.backend.RowDescription
 import io.rdbc.pgsql.core.messages.data.DbValFormat.{BinaryDbValFormat, TextualDbValFormat}
 import io.rdbc.pgsql.core.messages.data.{DataType, FieldValue, NotNullFieldValue, NullFieldValue}
@@ -43,15 +43,11 @@ class PgRow(rowDesc: RowDescription,
   }
 
   protected def notConverted(idx: Int): Any = {
-    //TODO preconditions fucking everywhere
-    //TODO for returning inserts this is 0 based, for selects not, fix this
-    val fieldDesc = rowDesc.fieldDescriptions(idx)
-    //TODO this must be indexed seq, not List
     val fieldVal = cols(idx)
-
     fieldVal match {
       case NullFieldValue => null
       case NotNullFieldValue(rawFieldVal) =>
+        val fieldDesc = rowDesc.fieldDescriptions(idx)
         fieldDesc.fieldFormat match {
           case BinaryDbValFormat => binaryToObj(fieldDesc.dataType, rawFieldVal)
           case TextualDbValFormat => throw PgDriverInternalErrorException(s"Value '$fieldVal' of field '$fieldDesc' is in textual format, which is unsupported")
@@ -61,6 +57,6 @@ class PgRow(rowDesc: RowDescription,
 
   private def binaryToObj(pgType: DataType, binaryVal: Array[Byte]): Any = {
     pgTypeConvRegistry.byTypeOid(pgType.oid).map(_.toObj(binaryVal))
-      .getOrElse(throw new Exception(s"unsupported type $pgType")) //TODO
+      .getOrElse(throw new PgUnsupportedType(pgType))
   }
 }

@@ -435,6 +435,38 @@ object DecodeTst extends App {
 
 }
 
+object KeyGenTest extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+
+  fact.connection().flatMap { conn =>
+    println("hai\n\n\n")
+
+    val rsFut = for {
+      stmt <- conn.returningInsert("insert into serial_test(x) values (:x)")
+      parametrized <- stmt.bindF("x" -> 10)
+      keys <- parametrized.executeForKeysSet()
+    } yield keys
+
+    rsFut.map { keys =>
+      println("KEYS")
+      keys.rows.foreach { row =>
+        println(" id = " + row.int("id"))
+      }
+      println("DONE")
+      conn.release()
+      fact.shutdown()
+    }
+
+  }.recover {
+    case ex => ex.printStackTrace()
+  }
+
+}
+
 object TimeoutTest extends App {
 
   implicit val ec = ExecutionContext.global
