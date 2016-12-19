@@ -18,4 +18,5 @@ object Library {
   val nettyEpoll = "io.netty" % "netty-transport-native-epoll" % Version.netty classifier "linux-x86_64"
   val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0"
   val logback = "ch.qos.logback" % "logback-classic" % "1.1.8"
+  val sourcecode = "com.lihaoyi" %% "sourcecode" % "0.1.3"
 }

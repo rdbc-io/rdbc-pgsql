@@ -17,5 +17,6 @@
 package io.rdbc.pgsql.core.exception
 
 import io.rdbc.api.exceptions.RdbcException
+import io.rdbc.pgsql.core.messages.data.DataType
 
-case class PgDriverInternalErrorException(msg: String) extends RdbcException(s"THIS IS A RDBC DRIVER BUG: $msg")
+class PgUnsupportedType(dataType: DataType) extends RdbcException(s"Could not find type converted for PostgreSQL type with OID ${dataType.oid}")
