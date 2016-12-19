@@ -18,4 +18,7 @@ package io.rdbc.pgsql.core.exception
 
 import io.rdbc.api.exceptions.RdbcException
 
-class PgProtocolViolationException(msg: String) extends RdbcException(msg)
+class PgProtocolViolationException(msg: String, cause: Option[Throwable]) extends RdbcException(msg, cause) {
+  def this(msg: String) =  this(msg, None)
+  def this(msg: String, cause: Throwable) =  this(msg, Some(cause))
+}
