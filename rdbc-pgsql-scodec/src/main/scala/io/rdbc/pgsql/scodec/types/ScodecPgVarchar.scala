@@ -14,16 +14,8 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.types
+package io.rdbc.pgsql.scodec.types
 
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatterBuilder
-import java.time.temporal.ChronoField
+import io.rdbc.pgsql.core.types.PgVarchar
 
-import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.messages.data.Oid
-
-trait Timestamp extends PgType[LocalDateTime] {
-  val typeOid = Oid(1114)
-  val cls = classOf[LocalDateTime]
-}
+object ScodecPgVarchar extends PgVarchar with ScodecStringLike

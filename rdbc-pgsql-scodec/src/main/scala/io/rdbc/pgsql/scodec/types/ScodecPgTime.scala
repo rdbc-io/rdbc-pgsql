@@ -16,32 +16,31 @@
 
 package io.rdbc.pgsql.scodec.types
 
+import java.time._
 import java.time.temporal.ChronoUnit.MICROS
-import java.time.{ZonedDateTime, _}
 
 import _root_.scodec.Codec
 import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.types.Timestamp
+import io.rdbc.pgsql.core.types.PgTime
 import io.rdbc.pgsql.scodec._
 
-object ScodecTimestamp extends Timestamp with ScodecPgType[LocalDateTime] with CommonCodec[LocalDateTime] {
-  def codec(implicit sessionParams: SessionParams): Codec[LocalDateTime] = {
+object ScodecPgTime extends PgTime with ScodecPgType[LocalTime] with CommonCodec[LocalTime] {
+  def codec(implicit sessionParams: SessionParams): Codec[LocalTime] = {
     pgInt64.xmap(
-      long2LocalDateTime,
-      localDateTime2Long
+      long2LocalTime,
+      localTime2Long
     )
   }
 
-  private val pgZero: ZonedDateTime = LocalDate.of(2000, Month.JANUARY, 1).atStartOfDay(ZoneId.of("UTC"))
+  private val PgZero: LocalTime = LocalTime.MIDNIGHT
 
-  private def long2LocalDateTime(l: Long): LocalDateTime = {
-    pgZero.plus(l, MICROS).toLocalDateTime
+  private def long2LocalTime(l: Long): LocalTime = {
+    PgZero.plus(l, MICROS)
   }
 
-  private def localDateTime2Long(ldt: LocalDateTime): Long = {
-    val zdt = ZonedDateTime.of(ldt, ZoneId.of("UTC"))
-    val dur = Duration.between(pgZero, zdt)
-    val micros = (dur.getSeconds * 1000L * 1000L) + (dur.getNano / 1000L)
+  private def localTime2Long(ldt: LocalTime): Long = {
+    val dur = Duration.between(PgZero, ldt)
+    val micros = (dur.getSeconds * 1000L * 1000L) + (dur.getNano / 1000L) //TODO this repeats
     micros
   }
 }

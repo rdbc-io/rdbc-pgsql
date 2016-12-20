@@ -14,18 +14,13 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.scodec
+package io.rdbc.pgsql.scodec.types
 
-import io.rdbc.pgsql.core.types.PgTypeRegistry
+import _root_.scodec.Codec
+import io.rdbc.pgsql.core.SessionParams
+import io.rdbc.pgsql.scodec._
 
-package object types {
-  val ScodecBuiltInTypes = PgTypeRegistry(
-    ScodecPgBool,
-    ScodecPgInt2, ScodecPgInt4, ScodecPgInt8,
-    ScodecPgFloat4, ScodecPgFloat8,
-    ScodecPgDecimal,
-    ScodecPgTime, ScodecPgDate, ScodecPgTimestamp, ScodecPgTimestampTz,
-    ScodecPgChar, ScodecPgVarchar, ScodecPgText,
-    ScodecPgUuid,
-    ScodecPgBytea)
+trait ScodecStringLike extends ScodecPgType[String] {
+  def decodeCodec(implicit sessionParams: SessionParams): Codec[String] = pgStringNonTerminated(sessionParams.serverCharset)
+  def encodeCodec(implicit sessionParams: SessionParams): Codec[String] = pgStringNonTerminated(sessionParams.clientCharset)
 }

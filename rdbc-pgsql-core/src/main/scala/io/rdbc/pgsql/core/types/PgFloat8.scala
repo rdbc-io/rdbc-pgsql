@@ -14,18 +14,12 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.scodec
+package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.types.PgTypeRegistry
+import io.rdbc.pgsql.core.messages.data.Oid
 
-package object types {
-  val ScodecBuiltInTypes = PgTypeRegistry(
-    ScodecPgBool,
-    ScodecPgInt2, ScodecPgInt4, ScodecPgInt8,
-    ScodecPgFloat4, ScodecPgFloat8,
-    ScodecPgDecimal,
-    ScodecPgTime, ScodecPgDate, ScodecPgTimestamp, ScodecPgTimestampTz,
-    ScodecPgChar, ScodecPgVarchar, ScodecPgText,
-    ScodecPgUuid,
-    ScodecPgBytea)
+trait PgFloat8 extends PgType[Double] {
+  val typeOid = Oid(701)
+  val cls = classOf[Double]
+  override val otherClasses = Vector(classOf[java.lang.Double])
 }

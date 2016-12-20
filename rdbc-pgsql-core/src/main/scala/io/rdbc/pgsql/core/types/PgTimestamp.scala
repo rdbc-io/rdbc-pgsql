@@ -14,18 +14,16 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.scodec
+package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.types.PgTypeRegistry
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatterBuilder
+import java.time.temporal.ChronoField
 
-package object types {
-  val ScodecBuiltInTypes = PgTypeRegistry(
-    ScodecPgBool,
-    ScodecPgInt2, ScodecPgInt4, ScodecPgInt8,
-    ScodecPgFloat4, ScodecPgFloat8,
-    ScodecPgDecimal,
-    ScodecPgTime, ScodecPgDate, ScodecPgTimestamp, ScodecPgTimestampTz,
-    ScodecPgChar, ScodecPgVarchar, ScodecPgText,
-    ScodecPgUuid,
-    ScodecPgBytea)
+import io.rdbc.pgsql.core.SessionParams
+import io.rdbc.pgsql.core.messages.data.Oid
+
+trait PgTimestamp extends PgType[LocalDateTime] {
+  val typeOid = Oid(1114)
+  val cls = classOf[LocalDateTime]
 }

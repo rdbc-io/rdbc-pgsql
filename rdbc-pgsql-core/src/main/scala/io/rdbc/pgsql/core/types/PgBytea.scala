@@ -14,18 +14,11 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.scodec
+package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.types.PgTypeRegistry
+import io.rdbc.pgsql.core.messages.data.Oid
 
-package object types {
-  val ScodecBuiltInTypes = PgTypeRegistry(
-    ScodecPgBool,
-    ScodecPgInt2, ScodecPgInt4, ScodecPgInt8,
-    ScodecPgFloat4, ScodecPgFloat8,
-    ScodecPgDecimal,
-    ScodecPgTime, ScodecPgDate, ScodecPgTimestamp, ScodecPgTimestampTz,
-    ScodecPgChar, ScodecPgVarchar, ScodecPgText,
-    ScodecPgUuid,
-    ScodecPgBytea)
+trait PgBytea extends PgType[Array[Byte]] {
+  val typeOid = Oid(17)
+  val cls = classOf[Array[Byte]]
 }

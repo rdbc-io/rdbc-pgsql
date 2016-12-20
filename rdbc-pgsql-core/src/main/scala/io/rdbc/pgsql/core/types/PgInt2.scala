@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.scodec.types
+package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.types.Int4
-import io.rdbc.pgsql.scodec._
-import scodec.Codec
+import io.rdbc.pgsql.core.messages.data.Oid
 
-object ScodecInt4 extends Int4 with ScodecPgType[Int] with CommonCodec[Int] {
-  def codec(implicit sessionParams: SessionParams): Codec[Int] = pgInt32
+trait PgInt2 extends PgType[Short] {
+  val typeOid = Oid(21)
+  val cls = classOf[Short]
+  override val otherClasses = Vector(classOf[java.lang.Short])
 }

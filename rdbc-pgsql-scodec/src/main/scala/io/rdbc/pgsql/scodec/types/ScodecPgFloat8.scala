@@ -14,18 +14,13 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.scodec
+package io.rdbc.pgsql.scodec.types
 
-import io.rdbc.pgsql.core.types.PgTypeRegistry
+import io.rdbc.pgsql.core.SessionParams
+import io.rdbc.pgsql.core.types.{PgFloat4, PgFloat8}
+import scodec.Codec
+import scodec.codecs.double
 
-package object types {
-  val ScodecBuiltInTypes = PgTypeRegistry(
-    ScodecPgBool,
-    ScodecPgInt2, ScodecPgInt4, ScodecPgInt8,
-    ScodecPgFloat4, ScodecPgFloat8,
-    ScodecPgDecimal,
-    ScodecPgTime, ScodecPgDate, ScodecPgTimestamp, ScodecPgTimestampTz,
-    ScodecPgChar, ScodecPgVarchar, ScodecPgText,
-    ScodecPgUuid,
-    ScodecPgBytea)
+object ScodecPgFloat8 extends PgFloat8 with ScodecPgType[Double] with CommonCodec[Double] {
+  def codec(implicit sessionParams: SessionParams): Codec[Double] = double
 }
