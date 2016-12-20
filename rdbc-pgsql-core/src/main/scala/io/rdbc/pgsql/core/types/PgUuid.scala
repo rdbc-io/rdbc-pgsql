@@ -16,9 +16,11 @@
 
 package io.rdbc.pgsql.core.types
 
+import java.util.UUID
+
 import io.rdbc.pgsql.core.messages.data.Oid
 
-trait Varchar extends PgType[String] {
-  val typeOid = Oid(1043)
-  val cls = classOf[String]
+trait PgUuid extends PgType[UUID] {
+  val typeOid = Oid(2950)
+  val cls = classOf[UUID]
 }

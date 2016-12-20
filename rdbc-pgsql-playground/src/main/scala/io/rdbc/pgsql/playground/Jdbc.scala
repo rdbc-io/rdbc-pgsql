@@ -44,3 +44,23 @@ object JdbcSelect extends App {
 
 
 }
+
+object JdbcTypeTest extends App {
+
+  val props = new Properties()
+  props.setProperty("user", "povder")
+  props.setProperty("password", "povder")
+  val conn = DriverManager.getConnection("jdbc:postgresql://localhost/povder?binaryTransferEnable=bool", props)
+  try {
+    val stmt = conn.prepareStatement("select x from decimal_test")
+    val rs = stmt.executeQuery()
+    while (rs.next()) {
+      println(rs.getObject(1))
+    }
+
+  } finally {
+    conn.close()
+  }
+
+
+}

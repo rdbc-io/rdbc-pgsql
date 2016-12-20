@@ -18,6 +18,7 @@ package io.rdbc.pgsql.playground
 
 import akka.stream.scaladsl.{Sink, Source}
 import io.rdbc.pgsql.transport.netty.NettyPgConnectionFactory
+import io.rdbc.sapi.Interpolators._
 import io.rdbc.sapi.Row
 import org.reactivestreams.{Subscriber, Subscription}
 import scodec.bits.BitVector
@@ -25,7 +26,6 @@ import scodec.bits.BitVector
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Random, Success}
-import io.rdbc.sapi.Interpolators._
 
 object Tst extends App {
 
@@ -42,7 +42,7 @@ object Tst extends App {
     val x = -100
 
     val rsFut = for {
-      stmt <- conn.statement(sql"select * from test where x > $x")
+      stmt <- conn.statement(sql"SELECT * FROM test WHERE x > $x")
       rs <- stmt.executeForSet()
     //TODO when i ctrl-c postgresql during pulling rows nothing happens
     } yield (stmt, rs)
@@ -854,4 +854,49 @@ object MultiConnTst extends App {
   val f = (1 to 10).map(_ => fact.connection()).reduce((f1, f2) => f1.flatMap(_ => f2))
   Await.ready(f, Duration.Inf)
   println("conns open")
+}
+
+object TypeTst extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+
+  fact.connection().flatMap { conn =>
+    println("hai\n\n\n")
+    //Thread.sleep(20000L)
+    val start = System.nanoTime()
+
+    val x = -100
+
+    val rsFut = for {
+      stmt <- conn.statement(sql"SELECT x FROM interval_test")
+      rs <- stmt.executeForSet()
+    //TODO when i ctrl-c postgresql during pulling rows nothing happens
+    } yield (stmt, rs)
+
+    rsFut.flatMap { case (stmt, rs) =>
+
+      rs.rows.foreach { row =>
+        println("x = " + row.bytes("x"))
+      }
+
+      println("DONE")
+      stmt.deallocate()
+    }.map { _ =>
+      conn.release()
+    }
+
+  }.recover {
+    case ex =>
+      println("ERROR")
+      ex.printStackTrace()
+  }.flatMap { _ =>
+    println("hai shutdown")
+    fact.shutdown()
+  }.map { _ =>
+    println("SHUT DOWN")
+  }
+
 }
