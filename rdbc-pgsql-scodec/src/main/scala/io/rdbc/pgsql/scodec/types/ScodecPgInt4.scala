@@ -16,12 +16,11 @@
 
 package io.rdbc.pgsql.scodec.types
 
-import _root_.scodec.Codec
 import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.types.Varchar
+import io.rdbc.pgsql.core.types.PgInt4
 import io.rdbc.pgsql.scodec._
+import scodec.Codec
 
-object ScodecVarchar extends Varchar with ScodecPgType[String] {
-  def decodeCodec(implicit sessionParams: SessionParams): Codec[String] = pgStringNonTerminated(sessionParams.serverCharset)
-  def encodeCodec(implicit sessionParams: SessionParams): Codec[String] = pgStringNonTerminated(sessionParams.clientCharset)
+object ScodecPgInt4 extends PgInt4 with ScodecPgType[Int] with CommonCodec[Int] {
+  def codec(implicit sessionParams: SessionParams): Codec[Int] = pgInt32
 }
