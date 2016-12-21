@@ -16,7 +16,10 @@
 
 package io.rdbc.pgsql.playground
 
+import java.nio.charset.Charset
+
 import akka.stream.scaladsl.{Sink, Source}
+import io.rdbc.pgsql.scodec.ScodecDecoderFactory
 import io.rdbc.pgsql.transport.netty.NettyPgConnectionFactory
 import io.rdbc.sapi.Interpolators._
 import io.rdbc.sapi.Row
@@ -32,45 +35,50 @@ object Tst extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
-  fact.connection().flatMap { conn =>
-    println("hai\n\n\n")
-    //Thread.sleep(20000L)
-    val start = System.nanoTime()
+  fact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
+      //Thread.sleep(20000L)
+      val start = System.nanoTime()
 
-    val x = -100
+      val x = -100
 
-    val rsFut = for {
-      stmt <- conn.statement(sql"SELECT * FROM test WHERE x > $x")
-      rs <- stmt.executeForSet()
-    //TODO when i ctrl-c postgresql during pulling rows nothing happens
-    } yield (stmt, rs)
+      val rsFut = for {
+        stmt <- conn.statement(sql"SELECT * FROM test WHERE x > $x")
+        rs <- stmt.executeForSet()
+      //TODO when i ctrl-c postgresql during pulling rows nothing happens
+      } yield (stmt, rs)
 
+      rsFut.flatMap {
+        case (stmt, rs) =>
+          val time = System.nanoTime() - start
+          println(s"time = ${time / 1000000}")
 
-    rsFut.flatMap { case (stmt, rs) =>
-      val time = System.nanoTime() - start
-      println(s"time = ${time / 1000000}")
-
-      rs.foreach { row =>
-        println(s"x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
+          rs.foreach { row =>
+            println(s"x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
+          }
+          println("DONE")
+          stmt.deallocate()
+      }.map { _ =>
+        conn.release()
       }
-      println("DONE")
-      stmt.deallocate()
-    }.map { _ =>
-      conn.release()
-    }
 
-  }.recover {
-    case ex =>
-      println("ERROR")
-      ex.printStackTrace()
-  }.flatMap { _ =>
-    println("hai shutdown")
-    fact.shutdown()
-  }.map { _ =>
-    println("SHUT DOWN")
-  }
+    }
+    .recover {
+      case ex =>
+        println("ERROR")
+        ex.printStackTrace()
+    }
+    .flatMap { _ =>
+      println("hai shutdown")
+      fact.shutdown()
+    }
+    .map { _ =>
+      println("SHUT DOWN")
+    }
 
 }
 
@@ -79,60 +87,67 @@ object InsertTst extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
-  fact.connection().flatMap { conn =>
-    println("hai\n\n\n")
+  fact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      stmt <- conn.statement("insert into test(x) (select x from test)")
-      parametrized <- stmt.noParamsF
-      count <- parametrized.executeForRowsAffected()
-    } yield (stmt, count)
+      val rsFut = for {
+        stmt <- conn.statement("insert into test(x) (select x from test)")
+        parametrized <- stmt.noParamsF
+        count <- parametrized.executeForRowsAffected()
+      } yield (stmt, count)
 
-    rsFut.map { case (stmt, count) =>
-      println(s"inserted $count")
-      println("DONE")
-      conn.release()
-      fact.shutdown()
+      rsFut.map {
+        case (stmt, count) =>
+          println(s"inserted $count")
+          println("DONE")
+          conn.release()
+          fact.shutdown()
+      }
+
+    }
+    .recover {
+      case ex => ex.printStackTrace()
     }
 
-  }.recover {
-    case ex => ex.printStackTrace()
-  }
-
 }
-
 
 object NoDataTest extends App {
 
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
-  fact.connection().flatMap { conn =>
-    println("hai\n\n\n")
+  fact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      stmt <- conn.statement("create table if not exists dupa (x varchar)")
-      parametrized <- stmt.noParamsF
-      rs <- parametrized.executeForSet()
-    } yield rs
+      val rsFut = for {
+        stmt <- conn.statement("create table if not exists dupa (x varchar)")
+        parametrized <- stmt.noParamsF
+        rs <- parametrized.executeForSet()
+      } yield rs
 
-    val result = rsFut.map { rs =>
-      rs.foreach { row =>
-        println(s"x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
+      val result = rsFut.map { rs =>
+        rs.foreach { row =>
+          println(s"x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
+        }
+        println("DONE")
       }
-      println("DONE")
+
+      result.onComplete(_ => conn.release())
+      result
+
     }
-
-    result.onComplete(_ => conn.release())
-    result
-
-  }.recover {
-    case ex => ex.printStackTrace()
-  }.onComplete(_ => fact.shutdown())
+    .recover {
+      case ex => ex.printStackTrace()
+    }
+    .onComplete(_ => fact.shutdown())
 
 }
 
@@ -141,30 +156,34 @@ object EmptyQueryTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
-  fact.connection().flatMap { conn =>
-    println("hai\n\n\n")
+  fact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      stmt <- conn.statement("")
-      parametrized <- stmt.noParamsF
-      rs <- parametrized.executeForSet()
-    } yield rs
+      val rsFut = for {
+        stmt <- conn.statement("")
+        parametrized <- stmt.noParamsF
+        rs <- parametrized.executeForSet()
+      } yield rs
 
-    val result = rsFut.map { rs =>
-      rs.foreach { row =>
-        println(s"x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
+      val result = rsFut.map { rs =>
+        rs.foreach { row =>
+          println(s"x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
+        }
+        println("DONE")
       }
-      println("DONE")
+
+      result.onComplete(_ => conn.release())
+      result
+
     }
-
-    result.onComplete(_ => conn.release())
-    result
-
-  }.recover {
-    case ex => ex.printStackTrace()
-  }.onComplete(_ => fact.shutdown())
+    .recover {
+      case ex => ex.printStackTrace()
+    }
+    .onComplete(_ => fact.shutdown())
 
 }
 
@@ -173,29 +192,33 @@ object BindByIdxTst extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
-  fact.connection().flatMap { conn =>
-    println("hai\n\n\n")
+  fact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      stmt <- conn.statement("select * from test where x > :x and x > :y and x > :z")
-      parametrized <- stmt.bindByIdxF(-100, -200, -300)
-      rs <- parametrized.executeForSet()
-    } yield rs
+      val rsFut = for {
+        stmt <- conn.statement("select * from test where x > :x and x > :y and x > :z")
+        parametrized <- stmt.bindByIdxF(-100, -200, -300)
+        rs <- parametrized.executeForSet()
+      } yield rs
 
-    rsFut.map { rs =>
-      rs.foreach { row =>
-        println(s"x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
+      rsFut.map { rs =>
+        rs.foreach { row =>
+          println(s"x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
+        }
+        println("DONE")
+      }.map { _ =>
+        conn.release()
       }
-      println("DONE")
-    }.map { _ =>
-      conn.release()
-    }
 
-  }.recover {
-    case ex => ex.printStackTrace()
-  }.onComplete(_ => fact.shutdown())
+    }
+    .recover {
+      case ex => ex.printStackTrace()
+    }
+    .onComplete(_ => fact.shutdown())
 
 }
 
@@ -204,44 +227,69 @@ object IdleTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().map { conn =>
-    println("hai\n\n\n")
+  NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
+    .connection()
+    .map { conn =>
+      println("hai\n\n\n")
 
-
-  }.recover {
-    case ex => ex.printStackTrace()
-  }
+    }
+    .recover {
+      case ex => ex.printStackTrace()
+    }
 
 }
 
+object BeginTwiceTst extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
+    .connection()
+    .map { conn =>
+      println("hai\n\n\n")
+
+      for (i <- 1 to 100) {
+        Await.result(conn.beginTx().flatMap(_ => conn.commitTx()), Duration.Inf)
+      }
+
+
+    }
+    .recover {
+      case ex => ex.printStackTrace()
+    }
+
+}
 
 object TstFloat extends App {
 
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
-    println("hai\n\n\n")
+  NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      stmt <- conn.statement("select * from test3")
-      parametrized <- stmt.noParamsF
-      rs <- parametrized.executeForSet()
-    } yield rs
+      val rsFut = for {
+        stmt <- conn.statement("select * from test3")
+        parametrized <- stmt.noParamsF
+        rs <- parametrized.executeForSet()
+      } yield rs
 
-    rsFut.map { rs =>
-      rs.foreach { row =>
-        println(s"f = ${row.float("f")}, x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
-      }
-      println("DONE")
-    }.map(_ => conn.release())
+      rsFut.map { rs =>
+        rs.foreach { row =>
+          println(s"f = ${row.float("f")}, x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
+        }
+        println("DONE")
+      }.map(_ => conn.release())
 
-  }.recover {
-    case ex => ex.printStackTrace()
-  }
+    }
+    .recover {
+      case ex => ex.printStackTrace()
+    }
 
 }
-
 
 class SlowSubscriber extends Subscriber[Row] {
   override def onError(t: Throwable): Unit = t.printStackTrace()
@@ -269,28 +317,30 @@ class SlowSubscriber extends Subscriber[Row] {
   override def onNext(t: Row): Unit = println(s"next $t")
 }
 
-
 object StreamTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
-    println("hai\n\n\n")
+  NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val streamFut = conn.statement("select * from test").flatMap { stmt =>
-      stmt.noParamsF.flatMap { parametrized =>
-        parametrized.executeForStream()
+      val streamFut = conn.statement("select * from test").flatMap { stmt =>
+        stmt.noParamsF.flatMap { parametrized =>
+          parametrized.executeForStream()
+        }
       }
-    }
 
-    streamFut.map { stream =>
-      stream.rows.subscribe(new SlowSubscriber())
-      println("DONE")
-    }
+      streamFut.map { stream =>
+        stream.rows.subscribe(new SlowSubscriber())
+        println("DONE")
+      }
 
-  }.recover {
-    case ex => ex.printStackTrace()
-  }
+    }
+    .recover {
+      case ex => ex.printStackTrace()
+    }
 }
 
 object TxTest extends App {
@@ -298,25 +348,28 @@ object TxTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
-    println("hai\n\n\n")
+  NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      _ <- conn.beginTx()
-      stmt <- conn.statement("select * from test where x = :x")
-      parametrized <- stmt.bindF("x" -> 421)
-      rs <- parametrized.executeForSet()
-      _ <- conn.rollbackTx()
-    } yield rs
+      val rsFut = for {
+        _ <- conn.beginTx()
+        stmt <- conn.statement("select * from test where x = :x")
+        parametrized <- stmt.bindF("x" -> 421)
+        rs <- parametrized.executeForSet()
+        _ <- conn.rollbackTx()
+      } yield rs
 
-    rsFut.map { rs =>
-      println(s"rs = $rs")
-      println("DONE")
+      rsFut.map { rs =>
+        println(s"rs = $rs")
+        println("DONE")
+      }
+
     }
-
-  }.recover {
-    case ex => ex.printStackTrace()
-  }
+    .recover {
+      case ex => ex.printStackTrace()
+    }
 }
 
 object ErrTest extends App {
@@ -324,23 +377,26 @@ object ErrTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
-    println("hai\n\n\n")
+  NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      stmt <- conn.statement("select * from tes5")
-      parametrized <- stmt.noParamsF
-      rs <- parametrized.executeForSet()
-    } yield rs
+      val rsFut = for {
+        stmt <- conn.statement("select * from tes5")
+        parametrized <- stmt.noParamsF
+        rs <- parametrized.executeForSet()
+      } yield rs
 
-    rsFut.map { rs =>
-      println(s"rs = $rs")
-      println("DONE")
+      rsFut.map { rs =>
+        println(s"rs = $rs")
+        println("DONE")
+      }
+
     }
-
-  }.recover {
-    case ex => ex.printStackTrace()
-  }
+    .recover {
+      case ex => ex.printStackTrace()
+    }
 
 }
 
@@ -349,25 +405,28 @@ object ErrTestTx extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
-    println("hai\n\n\n")
+  NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      _ <- conn.beginTx()
-      stmt <- conn.statement("select * from tes5")
-      parametrized <- stmt.noParamsF
-      rs <- parametrized.executeForSet()
-      _ <- conn.commitTx()
-    } yield rs
+      val rsFut = for {
+        _ <- conn.beginTx()
+        stmt <- conn.statement("select * from tes5")
+        parametrized <- stmt.noParamsF
+        rs <- parametrized.executeForSet()
+        _ <- conn.commitTx()
+      } yield rs
 
-    rsFut.map { rs =>
-      println(s"rs = $rs")
-      println("DONE")
+      rsFut.map { rs =>
+        println(s"rs = $rs")
+        println("DONE")
+      }
+
     }
-
-  }.recover {
-    case ex => ex.printStackTrace()
-  }
+    .recover {
+      case ex => ex.printStackTrace()
+    }
 
 }
 
@@ -376,37 +435,40 @@ object PerfTst extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val connFact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val connFact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
-  connFact.connection().flatMap { conn =>
-    println("hai\n\n\n")
+  connFact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    (1 to 100).foreach { i =>
+      (1 to 100).foreach { i =>
+        val start = System.nanoTime()
 
-      val start = System.nanoTime()
+        val rsFut = for {
+          stmt <- conn.statement("select x from test")
+          parametrized <- stmt.noParamsF
+          rs <- parametrized.executeForSet()
+        } yield rs
 
-      val rsFut = for {
-        stmt <- conn.statement("select * from test")
-        parametrized <- stmt.noParamsF
-        rs <- parametrized.executeForSet()
-      } yield rs
+        /*rsFut.map { rs =>
 
-      rsFut.map { rs =>
+        }*/
+        Await.ready(rsFut, Duration.Inf)
         val time = System.nanoTime() - start
-        println("time = " + (time / 1000000.0) + "ms")
+        println(s"$i time = " + (time / 1000000.0) + "ms")
       }
-      Await.ready(rsFut, Duration.Inf)
+
+      conn.release()
+
     }
+    .onComplete {
+      case Success(_) =>
+        connFact.shutdown()
+        println("ok")
 
-    conn.release()
-
-  }.onComplete {
-    case Success(_) =>
-      connFact.shutdown()
-      println("ok")
-
-    case Failure(ex) => ex.printStackTrace()
-  }
+      case Failure(ex) => ex.printStackTrace()
+    }
 
 }
 
@@ -440,30 +502,33 @@ object KeyGenTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
-  fact.connection().flatMap { conn =>
-    println("hai\n\n\n")
+  fact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      stmt <- conn.returningInsert("insert into serial_test(x) values (:x)")
-      parametrized <- stmt.bindF("x" -> 10)
-      keys <- parametrized.executeForKeysSet()
-    } yield keys
+      val rsFut = for {
+        stmt <- conn.returningInsert("insert into serial_test(x) values (:x)")
+        parametrized <- stmt.bindF("x" -> 10)
+        keys <- parametrized.executeForKeysSet()
+      } yield keys
 
-    rsFut.map { keys =>
-      println("KEYS")
-      keys.rows.foreach { row =>
-        println(" id = " + row.int("id"))
+      rsFut.map { keys =>
+        println("KEYS")
+        keys.rows.foreach { row =>
+          println(" id = " + row.int("id"))
+        }
+        println("DONE")
+        conn.release()
+        fact.shutdown()
       }
-      println("DONE")
-      conn.release()
-      fact.shutdown()
-    }
 
-  }.recover {
-    case ex => ex.printStackTrace()
-  }
+    }
+    .recover {
+      case ex => ex.printStackTrace()
+    }
 
 }
 
@@ -472,23 +537,26 @@ object TimeoutTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(5, "seconds")
 
-  NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
-    println("hai\n\n\n")
+  NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      stmt <- conn.statement("select pg_sleep(5)")
-      parametrized <- stmt.noParamsF
-      rs <- parametrized.executeForSet()
-    } yield rs
+      val rsFut = for {
+        stmt <- conn.statement("select pg_sleep(5)")
+        parametrized <- stmt.noParamsF
+        rs <- parametrized.executeForSet()
+      } yield rs
 
-    rsFut.map { rs =>
-      println(s"rs = $rs")
-      println("DONE")
+      rsFut.map { rs =>
+        println(s"rs = $rs")
+        println("DONE")
+      }
+
     }
-
-  }.recover {
-    case ex => ex.printStackTrace()
-  }
+    .recover {
+      case ex => ex.printStackTrace()
+    }
 
 }
 
@@ -497,42 +565,45 @@ object ConnClosedTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().flatMap { conn =>
-    println("hai\n\n\n")
+  NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      stmt <- conn.statement("select pg_sleep(60)")
-      parametrized <- stmt.noParamsF
-      rs <- parametrized.executeForSet()
-    } yield rs
-
-    rsFut.map { rs =>
-      println(s"rs = $rs")
-      println("DONE")
-    }.recover {
-      case ex => println(ex.getMessage)
-    }
-
-    rsFut.andThen { case _ =>
-      val rsFut2 = for {
-        stmt <- conn.statement("select 1")
+      val rsFut = for {
+        stmt <- conn.statement("select pg_sleep(60)")
         parametrized <- stmt.noParamsF
         rs <- parametrized.executeForSet()
       } yield rs
 
-      rsFut2.map { rs =>
-        println("RS2 done")
+      rsFut.map { rs =>
+        println(s"rs = $rs")
+        println("DONE")
       }.recover {
-        case ex =>
-          println("RS2 failed")
-          ex.printStackTrace()
+        case ex => println(ex.getMessage)
       }
+
+      rsFut.andThen {
+        case _ =>
+          val rsFut2 = for {
+            stmt <- conn.statement("select 1")
+            parametrized <- stmt.noParamsF
+            rs <- parametrized.executeForSet()
+          } yield rs
+
+          rsFut2.map { rs =>
+            println("RS2 done")
+          }.recover {
+            case ex =>
+              println("RS2 failed")
+              ex.printStackTrace()
+          }
+      }
+
     }
-
-
-  }.recover {
-    case ex => ex.printStackTrace()
-  }
+    .recover {
+      case ex => ex.printStackTrace()
+    }
 
 }
 
@@ -540,31 +611,33 @@ object IfIdleTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder").connection().map { conn =>
-    println("hai\n\n\n")
+  NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
+    .connection()
+    .map { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      stmt <- conn.statement("select pg_sleep(60)")
-      parametrized <- stmt.noParamsF
-      rs <- parametrized.executeForSet() //TODO executeForSet may use a different thread internally - should I allow this?
-    } yield rs
+      val rsFut = for {
+        stmt <- conn.statement("select pg_sleep(60)")
+        parametrized <- stmt.noParamsF
+        rs <- parametrized
+          .executeForSet() //TODO executeForSet may use a different thread internally - should I allow this?
+      } yield rs
 
+      rsFut.onComplete(r => println("fut1 = " + r))
 
-    rsFut.onComplete(r => println("fut1 = " + r))
+      val rsFut2 =
+        for {//TODO will this work without synchronization? Client can execute from multiple threads - should I allow this?
+          stmt <- conn.statement("select pg_sleep(60)")
+          parametrized <- stmt.noParamsF
+          rs <- parametrized.executeForSet() //this should fail because of illegal state
+        } yield rs
 
-    val rsFut2 = for {//TODO will this work without synchronization? Client can execute from multiple threads - should I allow this?
-      stmt <- conn.statement("select pg_sleep(60)")
-      parametrized <- stmt.noParamsF
-      rs <- parametrized.executeForSet() //this should fail because of illegal state
-    } yield rs
+      rsFut2.onComplete(r => println("fut2 = " + r))
 
-
-    rsFut2.onComplete(r => println("fut2 = " + r))
-
-
-  }.recover {
-    case ex => ex.printStackTrace()
-  }
+    }
+    .recover {
+      case ex => ex.printStackTrace()
+    }
 }
 
 object ParallelTest extends App {
@@ -572,47 +645,50 @@ object ParallelTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val connFact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val connFact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
-  connFact.connection().flatMap { conn =>
-    println("hai\n\n\n")
+  connFact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    var f = Future.successful(())
+      var f = Future.successful(())
 
-    (1 to 10).foreach { i =>
-      println(s"starting $i")
+      (1 to 10).foreach { i =>
+        println(s"starting $i")
 
-      val start = System.nanoTime()
+        val start = System.nanoTime()
 
-      val rsFut = for {
-        stmt <- conn.statement(s"select pg_sleep(${Random.nextInt(2)}) from test")
-        parametrized <- stmt.noParamsF
-        rs <- parametrized.executeForSet()
-      } yield rs
+        val rsFut = for {
+          stmt <- conn.statement(s"select pg_sleep(${Random.nextInt(2)}) from test")
+          parametrized <- stmt.noParamsF
+          rs <- parametrized.executeForSet()
+        } yield rs
 
-      val fut = rsFut.map { rs =>
-        val time = System.nanoTime() - start
-        println(s"$i time = ${time / 1000000.0}ms")
-      }.recover {
-        case ex => println(s"$i err ${ex.getMessage}")
+        val fut = rsFut.map { rs =>
+          val time = System.nanoTime() - start
+          println(s"$i time = ${time / 1000000.0}ms")
+        }.recover {
+          case ex => println(s"$i err ${ex.getMessage}")
+        }
+        Thread.sleep(Random.nextInt(700))
+        f = fut
       }
-      Thread.sleep(Random.nextInt(700))
-      f = fut
+
+      f.flatMap { _ =>
+        conn.release()
+      }.recover {
+        case _ => conn.release()
+      }
+
     }
+    .onComplete {
+      case Success(_) =>
+        connFact.shutdown()
+        println("ok")
 
-    f.flatMap { _ =>
-      conn.release()
-    }.recover {
-      case _ => conn.release()
+      case Failure(ex) => ex.printStackTrace()
     }
-
-  }.onComplete {
-    case Success(_) =>
-      connFact.shutdown()
-      println("ok")
-
-    case Failure(ex) => ex.printStackTrace()
-  }
 
 }
 
@@ -621,27 +697,31 @@ object SmallintTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
-  fact.connection().flatMap { conn =>
-    println("hai\n\n\n")
+  fact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      stmt <- conn.insert("insert into test_smallint(x) values (:x)")
-      parametrized <- stmt.bindF("x" -> Int.MaxValue)
-      rs <- parametrized.execute()
-    } yield rs
+      val rsFut = for {
+        stmt <- conn.insert("insert into test_smallint(x) values (:x)")
+        parametrized <- stmt.bindF("x" -> Int.MaxValue)
+        rs <- parametrized.execute()
+      } yield rs
 
-    val result = rsFut.map { _ =>
-      println("DONE")
+      val result = rsFut.map { _ =>
+        println("DONE")
+      }
+
+      result.onComplete(_ => conn.release())
+      result
+
     }
-
-    result.onComplete(_ => conn.release())
-    result
-
-  }.recover {
-    case ex => ex.printStackTrace()
-  }.onComplete(_ => fact.shutdown())
+    .recover {
+      case ex => ex.printStackTrace()
+    }
+    .onComplete(_ => fact.shutdown())
 
 }
 
@@ -652,33 +732,37 @@ object NullTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
-  fact.connection().flatMap { conn =>
-    println("hai\n\n\n")
+  fact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val intOpt = Option.empty[Int]
-    val yOpt = Some(10)
+      val intOpt = Option.empty[Int]
+      val yOpt = Some(10)
 
-    val rsFut = for {
-      stmt <- conn.select("select :x as x, :y as y, :z as z")
-      parametrized <- stmt.bindF("x" -> intOpt.toSqlParam, "y" -> yOpt.toSqlParam, "z" -> Some(1))
-      rs <- parametrized.executeForSet()
-    } yield rs
+      val rsFut = for {
+        stmt <- conn.select("select :x as x, :y as y, :z as z")
+        parametrized <- stmt.bindF("x" -> intOpt.toSqlParam, "y" -> yOpt.toSqlParam, "z" -> Some(1))
+        rs <- parametrized.executeForSet()
+      } yield rs
 
-    val result = rsFut.map { rs =>
-      rs.foreach { row =>
-        println(s"x = ${row.col[String]("x")}, y = ${row.col[Int]("y")}, z = ${row.col[Int]("z")}")
+      val result = rsFut.map { rs =>
+        rs.foreach { row =>
+          println(s"x = ${row.col[String]("x")}, y = ${row.col[Int]("y")}, z = ${row.col[Int]("z")}")
+        }
+        println("DONE")
       }
-      println("DONE")
+
+      result.onComplete(_ => conn.release())
+      result
+
     }
-
-    result.onComplete(_ => conn.release())
-    result
-
-  }.recover {
-    case ex => ex.printStackTrace()
-  }.onComplete(_ => fact.shutdown())
+    .recover {
+      case ex => ex.printStackTrace()
+    }
+    .onComplete(_ => fact.shutdown())
 
 }
 
@@ -687,27 +771,31 @@ object NullTest2 extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
-  fact.connection().flatMap { conn =>
-    println("hai\n\n\n")
+  fact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
 
-    val rsFut = for {
-      stmt <- conn.insert("insert into test(x, s) values(:x, 'dupa')")
-      parametrized <- stmt.bindF("x" -> Some(1))
-      rs <- parametrized.execute()
-    } yield rs
+      val rsFut = for {
+        stmt <- conn.insert("insert into test(x, s) values(:x, 'dupa')")
+        parametrized <- stmt.bindF("x" -> Some(1))
+        rs <- parametrized.execute()
+      } yield rs
 
-    val result = rsFut.map { _ =>
-      println("DONE")
+      val result = rsFut.map { _ =>
+        println("DONE")
+      }
+
+      result.onComplete(_ => conn.release())
+      result
+
     }
-
-    result.onComplete(_ => conn.release())
-    result
-
-  }.recover {
-    case ex => ex.printStackTrace()
-  }.onComplete(_ => fact.shutdown())
+    .recover {
+      case ex => ex.printStackTrace()
+    }
+    .onComplete(_ => fact.shutdown())
 
 }
 
@@ -753,22 +841,20 @@ object StmTest extends App {
   println("immutable = " + immutable.single())
 
 }
-*/
-
+ */
 
 object StreamParamsTst extends App {
 
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
   import akka.actor.ActorSystem
   import akka.stream._
 
   implicit val system = ActorSystem("tst")
   implicit val materializer = ActorMaterializer()
-
 
   fact.connection().foreach { conn =>
     println("hai\n\n\n")
@@ -784,19 +870,18 @@ object StreamParamsTst extends App {
         _ <- stmt.streamParams(params)
       } yield stmt
 
-      val c = stmtFut.map(_ => conn.commitTx())
+      val c = stmtFut.flatMap(_ => conn.commitTx())
 
       val fut = c.map { _ =>
         val time = System.nanoTime() - start
-        println(s"DONE: ${time / 1000000}ms")
+        println(s"$i DONE: ${time / 1000000}ms")
       }
 
-      Await.ready(fut, Duration.Inf)
+      Await.result(fut, Duration.Inf)
 
       i += 1
     }
   }
-
 
 }
 
@@ -805,13 +890,12 @@ object ManyInsertTest extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
   fact.connection().foreach { conn =>
     println("hai\n\n\n")
 
     var i = 0
-
 
     while (i < 100) {
       var j = 0
@@ -839,7 +923,6 @@ object ManyInsertTest extends App {
       i += 1
     }
 
-
   }
 
 }
@@ -849,7 +932,7 @@ object MultiConnTst extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
   val f = (1 to 10).map(_ => fact.connection()).reduce((f1, f2) => f1.flatMap(_ => f2))
   Await.ready(f, Duration.Inf)
@@ -861,42 +944,92 @@ object TypeTst extends App {
   implicit val ec = ExecutionContext.global
   implicit val timeout = FiniteDuration.apply(10, "seconds")
 
-  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder", "povder")
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
-  fact.connection().flatMap { conn =>
-    println("hai\n\n\n")
-    //Thread.sleep(20000L)
-    val start = System.nanoTime()
+  fact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
+      //Thread.sleep(20000L)
+      val start = System.nanoTime()
 
-    val x = -100
+      val x = -100
 
-    val rsFut = for {
-      stmt <- conn.statement(sql"SELECT x FROM interval_test")
-      rs <- stmt.executeForSet()
-    //TODO when i ctrl-c postgresql during pulling rows nothing happens
-    } yield (stmt, rs)
+      val rsFut = for {
+        stmt <- conn.statement(sql"SELECT x FROM interval_test")
+        rs <- stmt.executeForSet()
+      //TODO when i ctrl-c postgresql during pulling rows nothing happens
+      } yield (stmt, rs)
 
-    rsFut.flatMap { case (stmt, rs) =>
+      rsFut.flatMap {
+        case (stmt, rs) =>
+          rs.rows.foreach { row =>
+            println("x = " + row.bytes("x"))
+          }
 
-      rs.rows.foreach { row =>
-        println("x = " + row.bytes("x"))
+          println("DONE")
+          stmt.deallocate()
+      }.map { _ =>
+        conn.release()
       }
 
-      println("DONE")
-      stmt.deallocate()
-    }.map { _ =>
-      conn.release()
+    }
+    .recover {
+      case ex =>
+        println("ERROR")
+        ex.printStackTrace()
+    }
+    .flatMap { _ =>
+      println("hai shutdown")
+      fact.shutdown()
+    }
+    .map { _ =>
+      println("SHUT DOWN")
     }
 
-  }.recover {
-    case ex =>
-      println("ERROR")
-      ex.printStackTrace()
-  }.flatMap { _ =>
-    println("hai shutdown")
-    fact.shutdown()
-  }.map { _ =>
-    println("SHUT DOWN")
+}
+object DataRowTst extends App {
+
+  import scodec.bits._
+  import scodec.codecs._
+
+  val decoder = new ScodecDecoderFactory().decoder(Charset.forName("UTF-8"))
+
+
+  var drs = new Array[ByteVector](100 * 10000)
+  var i = 0
+  var j = 0
+  while (i < 100) {
+    //println(i)
+    while (j < 10000) {
+      val x = int32.encode(j).require.bytes
+      drs(i * 10000 + j) = (hex"440000000e000100000004" ++ x)
+      j += 1
+    }
+    j = 0
+    i += 1
   }
+
+  println("no czesc")
+
+  var x = 0
+  while (x < 100) {
+    val start = System.nanoTime()
+
+    i = 0
+    j = 0
+    while (i < 100) {
+      while (j < 10000) {
+        decoder.decodeMsg(drs(i * 10000 + j))
+        j += 1
+      }
+      j = 0
+      i += 1
+    }
+    x += 1
+    val time = System.nanoTime() - start
+    println(s"$x: time = ${time / 1000000.0}")
+  }
+
 
 }

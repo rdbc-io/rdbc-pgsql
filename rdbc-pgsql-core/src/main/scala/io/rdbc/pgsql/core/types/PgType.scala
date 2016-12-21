@@ -17,14 +17,16 @@
 package io.rdbc.pgsql.core.types
 
 import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.messages.data.Oid
+import io.rdbc.pgsql.core.pgstruct.Oid
+import scodec.bits.ByteVector
 
 trait PgType[T] {
   def typeOid: Oid
   def cls: Class[T]
   def otherClasses: Vector[Class[_]] = Vector.empty
+  def name: String
 
-  def toObj(binaryVal: Array[Byte])(implicit sessionParams: SessionParams): T
+  def toObj(binaryVal: ByteVector)(implicit sessionParams: SessionParams): T
 
-  def toPgBinary(obj: T)(implicit sessionParams: SessionParams): Array[Byte]
+  def toPgBinary(obj: T)(implicit sessionParams: SessionParams): ByteVector
 }

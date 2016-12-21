@@ -17,19 +17,24 @@
 package io.rdbc.pgsql.core.exception
 
 import io.rdbc.api.exceptions.RdbcException
-import io.rdbc.pgsql.core.messages.backend.StatusData
+import io.rdbc.pgsql.core.pgstruct.StatusData
 
-trait PgStatusDataException {
+trait PgStatusDataException extends Throwable {
   def pgStatusData: StatusData
 }
 
 object PgStatusDataException {
   def apply(statusData: StatusData): RdbcException with PgStatusDataException = {
-    if (statusData.sqlState == "42501") new PgUnauthorizedException(statusData)
-    else if (statusData.sqlState == "57014") new PgTimeoutException(statusData)
-    else if (statusData.sqlState.startsWith("28")) new PgAuthFailureException(statusData)
-    else if (statusData.sqlState.startsWith("42")) new PgInvalidQueryException(statusData)
-    else if (statusData.sqlState.startsWith("23")) new PgConstraintViolationException(statusData)
-    else new PgUncategorizedException(statusData)
+    if (statusData.sqlState == "42501")
+      new PgUnauthorizedException(statusData)
+    else if (statusData.sqlState == "57014")
+      new PgTimeoutException(statusData)
+    else if (statusData.sqlState.startsWith("28"))
+      new PgAuthFailureException(statusData)
+    else if (statusData.sqlState.startsWith("42"))
+      new PgInvalidQueryException(statusData)
+    else if (statusData.sqlState.startsWith("23"))
+      new PgConstraintViolationException(statusData)
+    else new PgUncategorizedStatusDataException(statusData)
   }
 }

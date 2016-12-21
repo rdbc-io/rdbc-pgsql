@@ -21,9 +21,10 @@ import java.time.format.DateTimeFormatterBuilder
 import java.time.temporal.ChronoField
 
 import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.messages.data.Oid
+import io.rdbc.pgsql.core.pgstruct.Oid
 
 trait PgTimestamp extends PgType[LocalDateTime] {
   val typeOid = Oid(1114)
   val cls = classOf[LocalDateTime]
+  val name = "timestamp"
 }

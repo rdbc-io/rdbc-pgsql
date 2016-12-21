@@ -17,6 +17,9 @@
 package io.rdbc.pgsql.core.exception
 
 import io.rdbc.api.exceptions.RdbcException
-import io.rdbc.pgsql.core.messages.data.DataType
+import io.rdbc.pgsql.core.pgstruct.DataType
 
-class PgUnsupportedType(dataType: DataType) extends RdbcException(s"Could not find type converted for PostgreSQL type with OID ${dataType.oid}")
+class PgUnsupportedType(dataType: DataType)
+  extends RdbcException(
+    s"Could not find type converted for PostgreSQL type with OID ${dataType.oid}"
+  )

@@ -17,31 +17,34 @@
 package io.rdbc.pgsql.transport.netty
 
 import java.nio.charset.Charset
-import java.util
+import java.{util => ju}
 
 import com.typesafe.scalalogging.StrictLogging
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.ByteToMessageDecoder
 import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.codec.Decoder
+import io.rdbc.pgsql.core.codec.{Decoder, DecoderFactory}
+import scodec.bits.ByteVector
 
-protected[netty] class PgMsgDecoderHandler(decoder: Decoder)
+private[netty] class PgMsgDecoderHandler(decoderFactory: DecoderFactory)
   extends ByteToMessageDecoder
     with StrictLogging {
 
-  @volatile private var _charset = SessionParams.default.serverCharset
-
-  def charset = _charset
-
-  def charset_=(charset: Charset): Unit = {
-    logger.debug(s"Server charset changed to '$charset'")
-    _charset = charset
+  @volatile private[this] var decoder: Decoder = {
+    decoderFactory.decoder(SessionParams.default.serverCharset)
   }
 
-  override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]): Unit = {
+  def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: ju.List[AnyRef]): Unit = {
     val bytes = new Array[Byte](in.readableBytes())
     in.readBytes(bytes)
-    out.add(decoder.decodeMsg(bytes)(charset).msg)
+    out.add(decoder.decodeMsg(ByteVector.view(bytes)).msg)
   }
+
+  def changeCharset(charset: Charset): Unit = {
+    logger.debug(s"Message decoder charset changed to '$charset'")
+    decoder = decoderFactory.decoder(charset)
+  }
+
+  //TODO should this override exceptionCaught?
 }
