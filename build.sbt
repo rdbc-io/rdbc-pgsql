@@ -1,8 +1,8 @@
 import de.heikoseeberger.sbtheader.license.Apache2_0
+import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
 
 lazy val commonSettings = Seq(
   organization := "io.rdbc.pgsql",
-  version := "0.0.1",
   scalaVersion := "2.12.1",
   crossScalaVersions := Vector("2.11.8"),
   scalacOptions ++= Vector(
@@ -17,7 +17,18 @@ lazy val commonSettings = Seq(
   headers := Map(
     "scala" -> Apache2_0("2016", "Krzysztof Pado")
   ),
-  resolvers += Resolver.bintrayRepo("rdbc", "maven")
+  resolvers += Resolver.bintrayRepo("rdbc", "maven"),
+  releaseProcess := Seq[ReleaseStep](
+    checkSnapshotDependencies,
+    inquireVersions,
+    runTest,
+    setReleaseVersion,
+    commitReleaseVersion,
+    tagRelease,
+    setNextVersion,
+    commitNextVersion,
+    pushChanges
+  )
 )
 
 lazy val rdbcPgsql = (project in file("."))
