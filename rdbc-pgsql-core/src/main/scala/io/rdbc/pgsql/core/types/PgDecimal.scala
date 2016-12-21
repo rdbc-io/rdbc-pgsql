@@ -16,10 +16,11 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.messages.data.Oid
+import io.rdbc.pgsql.core.pgstruct.Oid
 import io.rdbc.sapi.SqlNumeric
 
 trait PgDecimal extends PgType[SqlNumeric] {
   val typeOid = Oid(1700)
   val cls = classOf[SqlNumeric]
+  val name = "decimal"
 }

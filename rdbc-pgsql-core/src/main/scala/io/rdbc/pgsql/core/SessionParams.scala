@@ -19,10 +19,12 @@ package io.rdbc.pgsql.core
 import java.nio.charset.Charset
 
 object SessionParams {
+  private val DefaultCharset = Charset.forName("US-ASCII")
+
   val default = SessionParams(
-    clientCharset = Charset.forName("US-ASCII"),
-    serverCharset = Charset.forName("US-ASCII")
+    clientCharset = DefaultCharset,
+    serverCharset = DefaultCharset
   )
 }
 
-case class SessionParams(clientCharset: Charset, serverCharset: Charset)
+final case class SessionParams(clientCharset: Charset, serverCharset: Charset)

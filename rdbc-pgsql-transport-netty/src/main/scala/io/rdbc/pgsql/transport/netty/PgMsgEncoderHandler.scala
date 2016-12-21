@@ -18,28 +18,30 @@ package io.rdbc.pgsql.transport.netty
 
 import java.nio.charset.Charset
 
-import com.typesafe.scalalogging.StrictLogging
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.MessageToByteEncoder
 import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.codec.Encoder
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
+import io.rdbc.pgsql.core.codec.{Encoder, EncoderFactory}
+import io.rdbc.pgsql.core.pgstruct.messages.frontend.PgFrontendMessage
+import io.rdbc.util.Logging
 
-protected[netty] class PgMsgEncoderHandler(encoder: Encoder)
-  extends MessageToByteEncoder[PgFrontendMessage]
-    with StrictLogging {
+private[netty] class PgMsgEncoderHandler(encoderFactory: EncoderFactory)
+    extends MessageToByteEncoder[PgFrontendMessage]
+    with Logging {
 
-  @volatile private var _charset = SessionParams.default.clientCharset
-
-  def charset = _charset
-
-  def charset_=(charset: Charset): Unit = {
-    logger.debug(s"Client charset changed to '$charset'")
-    _charset = charset
+  @volatile private[this] var encoder: Encoder = {
+    encoderFactory.encoder(SessionParams.default.clientCharset)
   }
 
-  override def encode(ctx: ChannelHandlerContext, msg: PgFrontendMessage, out: ByteBuf): Unit = {
-    out.writeBytes(encoder.encode(msg)(charset))
+  def encode(ctx: ChannelHandlerContext, msg: PgFrontendMessage, out: ByteBuf): Unit = {
+    out.writeBytes(encoder.encode(msg).toArray)
   }
+
+  def changeCharset(charset: Charset): Unit = {
+    logger.debug(s"Message encoder charset changed to '$charset'")
+    encoder = encoderFactory.encoder(charset)
+  }
+
+  //TODO should this override exceptionCaught?
 }

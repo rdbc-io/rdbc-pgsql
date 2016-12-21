@@ -16,30 +16,35 @@
 
 package io.rdbc.pgsql.transport.netty
 
-import com.typesafe.scalalogging.StrictLogging
 import io.netty.channel.Channel
 import io.rdbc.pgsql.core.ChannelWriter
 import io.rdbc.pgsql.core.exception.PgChannelException
-import io.rdbc.pgsql.core.messages.frontend.PgFrontendMessage
+import io.rdbc.pgsql.core.pgstruct.messages.frontend.PgFrontendMessage
+import io.rdbc.util.Logging
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
-class NettyChannelWriter(ch: Channel)(implicit ec: ExecutionContext) extends ChannelWriter with StrictLogging {
+private[netty] class NettyChannelWriter(ch: Channel)
+                                       (implicit ec: ExecutionContext)
+  extends ChannelWriter
+    with Logging {
 
   def write(msgs: PgFrontendMessage*): Future[Unit] = {
-    msgs.foldLeft(Future.successful(())) { (_, msg) =>
-      logger.trace(s"Writing message '$msg' to channel ${ch.id()}")
-      ch.write(msg).scalaFut
-    }.recoverWith {
-      case NonFatal(ex) => Future.failed(PgChannelException(ex))
-    }
+    msgs
+      .foldLeft(Future.successful(())) { (_, msg) =>
+        logger.trace(s"Writing message '$msg' to channel ${ch.id()}")
+        ch.write(msg).scalaFut.map(_ => ())
+      }
+      .recoverWith {
+        case NonFatal(ex) => Future.failed(new PgChannelException(ex))
+      }
   }
 
   def close(): Future[Unit] = {
-    logger.trace(s"Closing channel ${ch.id()}")
-    ch.close().scalaFut.recoverWith {
-      case NonFatal(ex) => Future.failed(PgChannelException(ex))
+    logger.debug(s"Closing channel ${ch.id()}")
+    ch.close().scalaFut.map(_ => ()).recoverWith {
+      case NonFatal(ex) => Future.failed(new PgChannelException(ex))
     }
   }
 
@@ -48,7 +53,7 @@ class NettyChannelWriter(ch: Channel)(implicit ec: ExecutionContext) extends Cha
     try {
       ch.flush()
     } catch {
-      case NonFatal(ex) => throw PgChannelException(ex)
+      case NonFatal(ex) => throw new PgChannelException(ex)
     }
   }
 }

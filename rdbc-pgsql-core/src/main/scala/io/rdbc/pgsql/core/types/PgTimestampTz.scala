@@ -18,9 +18,10 @@ package io.rdbc.pgsql.core.types
 
 import java.time.Instant
 
-import io.rdbc.pgsql.core.messages.data.Oid
+import io.rdbc.pgsql.core.pgstruct.Oid
 
 trait PgTimestampTz extends PgType[Instant] {
   val typeOid = Oid(1184)
   val cls = classOf[Instant]
+  val name = "timestamptz"
 }

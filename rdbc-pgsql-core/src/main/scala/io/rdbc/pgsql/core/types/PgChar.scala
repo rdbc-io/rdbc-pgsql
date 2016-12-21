@@ -16,9 +16,10 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.messages.data.Oid
+import io.rdbc.pgsql.core.pgstruct.Oid
 
 trait PgChar extends PgType[String] { //TODO both Varchar and Char map to String, this is problematic when binding
   val typeOid = Oid(1042)
   val cls = classOf[String]
+  val name = "char"
 }

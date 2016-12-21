@@ -18,4 +18,5 @@ package io.rdbc.pgsql.core.exception
 
 import io.rdbc.api.exceptions.RdbcException
 
-case class PgDriverInternalErrorException(msg: String) extends RdbcException(s"THIS IS A RDBC DRIVER BUG: $msg")
+class PgDriverInternalErrorException(msg: String)
+  extends RdbcException(s"THIS MOST LIKELY IS A BUG OF THE DRIVER: $msg")

@@ -16,29 +16,43 @@
 
 package io.rdbc.pgsql.transport
 
+import io.netty.channel.{Channel, ChannelFuture}
 import io.netty.util.concurrent.{GenericFutureListener, Future => NettyFuture}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 package object netty {
 
-  implicit class NettyFut2Scala[T](nettyFut: NettyFuture[T]) {
+  private[netty] implicit class NettyFut2Scala[T](nettyFut: NettyFuture[T]) {
 
     def scalaFut: Future[T] = {
       val promise = Promise[T]
-      nettyFut.addListener(new GenericFutureListener[NettyFuture[T]] {
-        def operationComplete(future: NettyFuture[T]) = {
-          if (future.isSuccess) promise.success(future.get())
-          else promise.failure(future.cause())
-        }
+      nettyFut.addListener(genericFutureListener { future =>
+        if (future.isSuccess) promise.success(future.get())
+        else promise.failure(future.cause())
       })
       promise.future
     }
+
+    /* Scala 2.11 compat */
+    private def genericFutureListener(callback: NettyFuture[T] => Unit): GenericFutureListener[NettyFuture[T]] = {
+      new GenericFutureListener[NettyFuture[T]] {
+        def operationComplete(future: NettyFuture[T]): Unit = {
+          callback(future)
+        }
+      }
+    }
   }
 
-  implicit class NettyVoidFut2Scala(nettyFut: NettyFuture[Void]) {
+  private[netty] implicit class NettyVoidFut2Scala(nettyFut: NettyFuture[Void]) {
     def scalaFut(implicit ec: ExecutionContext): Future[Unit] = {
       new NettyFut2Scala(nettyFut).scalaFut.map(_ => ())
+    }
+  }
+
+  private[netty] implicit class NettyChannelFut2Scala(channelFut: ChannelFuture) {
+    def scalaFut(implicit ec: ExecutionContext): Future[Channel] = {
+      new NettyFut2Scala(channelFut).scalaFut.map(_ => channelFut.channel())
     }
   }
 }

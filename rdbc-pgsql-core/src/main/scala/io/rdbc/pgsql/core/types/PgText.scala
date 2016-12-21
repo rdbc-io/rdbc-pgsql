@@ -16,9 +16,10 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.messages.data.Oid
+import io.rdbc.pgsql.core.pgstruct.Oid
 
 trait PgText extends PgType[String] {
   val typeOid = Oid(25)
   val cls = classOf[String]
+  val name = "text"
 }

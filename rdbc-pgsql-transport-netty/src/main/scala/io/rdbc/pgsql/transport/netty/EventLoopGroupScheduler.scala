@@ -17,15 +17,21 @@
 package io.rdbc.pgsql.transport.netty
 
 import io.netty.channel.EventLoopGroup
-import io.rdbc.pgsql.core.scheduler.{ScheduledTask, TaskScheduler}
+import io.rdbc.pgsql.core.internal.scheduler.{ScheduledTask, TaskScheduler}
 
 import scala.concurrent.duration.FiniteDuration
 
-class EventLoopGroupScheduler(eventLoopGroup: EventLoopGroup) extends TaskScheduler {
+private[netty] class EventLoopGroupScheduler(eventLoopGroup: EventLoopGroup) extends TaskScheduler {
+
   def schedule(delay: FiniteDuration)(action: => Unit): ScheduledTask = {
-    val fut = eventLoopGroup.schedule(new Runnable() {
-      def run() = action
-    }, delay.length, delay.unit)
-    new FutureScheduledTask(fut)
+    val fut = eventLoopGroup.schedule(runnable(action), delay.length, delay.unit)
+    new NettyScheduledTask(fut)
+  }
+
+  /* Scala 2.11 compat */
+  private def runnable(action: => Unit): Runnable = {
+    new Runnable() {
+      def run(): Unit = action
+    }
   }
 }

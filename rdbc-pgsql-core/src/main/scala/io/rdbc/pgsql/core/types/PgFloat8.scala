@@ -16,10 +16,11 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.messages.data.Oid
+import io.rdbc.pgsql.core.pgstruct.Oid
 
 trait PgFloat8 extends PgType[Double] {
   val typeOid = Oid(701)
   val cls = classOf[Double]
+  val name = "float8"
   override val otherClasses = Vector(classOf[java.lang.Double])
 }

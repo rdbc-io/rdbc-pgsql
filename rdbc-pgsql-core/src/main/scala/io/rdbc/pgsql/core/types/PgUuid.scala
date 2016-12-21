@@ -18,9 +18,10 @@ package io.rdbc.pgsql.core.types
 
 import java.util.UUID
 
-import io.rdbc.pgsql.core.messages.data.Oid
+import io.rdbc.pgsql.core.pgstruct.Oid
 
 trait PgUuid extends PgType[UUID] {
   val typeOid = Oid(2950)
   val cls = classOf[UUID]
+  val name = "uuid"
 }

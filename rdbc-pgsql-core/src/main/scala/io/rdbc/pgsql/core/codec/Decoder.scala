@@ -18,10 +18,13 @@ package io.rdbc.pgsql.core.codec
 
 import java.nio.charset.Charset
 
-import io.rdbc.pgsql.core.messages.backend.{Header, PgBackendMessage}
+import io.rdbc.pgsql.core.pgstruct.messages.backend.{MsgHeader, PgBackendMessage}
+import scodec.bits.ByteVector
 
 trait Decoder {
-  def decodeMsg(bytes: Array[Byte])(implicit charset: Charset): Decoded[PgBackendMessage]
+  protected def charset: Charset
 
-  def decodeHeader(bytes: Array[Byte]): Decoded[Header]
+  def decodeMsg(bytes: ByteVector): Decoded[PgBackendMessage]
+
+  def decodeHeader(bytes: ByteVector): Decoded[MsgHeader]
 }

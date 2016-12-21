@@ -19,44 +19,44 @@ package io.rdbc.pgsql.transport.netty
 import java.nio.charset.Charset
 
 import akka.stream.Materializer
-import com.typesafe.scalalogging.StrictLogging
 import io.netty.channel.{ChannelHandlerContext, SimpleChannelInboundHandler}
 import io.rdbc.pgsql.core._
-import io.rdbc.pgsql.core.messages.backend._
-import io.rdbc.pgsql.core.scheduler.TaskScheduler
-import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.sapi._
+import io.rdbc.pgsql.core.internal.scheduler.TaskScheduler
+import io.rdbc.pgsql.core.pgstruct.messages.backend._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
-class NettyPgConnection(pgTypeRegistry: PgTypeRegistry,
-                        rdbcTypeConvRegistry: TypeConverterRegistry,
-                        out: ChannelWriter,
-                        decoder: PgMsgDecoderHandler,
-                        encoder: PgMsgEncoderHandler,
-                        ec: ExecutionContext,
-                        scheduler: TaskScheduler,
-                        requestCanceler: (BackendKeyData) => Future[Unit],
-                        streamMaterializer: Materializer)
-  extends PgConnection(pgTypeRegistry, rdbcTypeConvRegistry, out, ec, scheduler, requestCanceler, streamMaterializer)
-    with StrictLogging {
+private[netty] class NettyPgConnection(config: PgConnectionConfig,
+                                       out: ChannelWriter,
+                                       decoder: PgMsgDecoderHandler,
+                                       encoder: PgMsgEncoderHandler,
+                                       ec: ExecutionContext,
+                                       scheduler: TaskScheduler,
+                                       requestCanceler: RequestCanceler,
+                                       streamMaterializer: Materializer)
+  extends AbstractPgConnection(
+    config = config,
+    out = out,
+    ec = ec,
+    scheduler = scheduler,
+    requestCanceler = requestCanceler,
+    streamMaterializer = streamMaterializer) {
 
   val handler = new SimpleChannelInboundHandler[PgBackendMessage] {
-    override def channelRead0(ctx: ChannelHandlerContext, msg: PgBackendMessage): Unit = {
-      onMessage(msg)
+    def channelRead0(ctx: ChannelHandlerContext, msg: PgBackendMessage): Unit = {
+      handleBackendMessage(msg)
     }
 
     override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = {
-      logger.error("Unhandled exception occurred", cause)
-      doRelease(cause)
+      handleFatalError("Unhandled exception occurred in channel handler", cause)
     }
   }
 
-  protected def clientCharsetChanged(charset: Charset): Unit = {
-    encoder.charset = charset
+  protected def handleClientCharsetChange(charset: Charset): Unit = {
+    encoder.changeCharset(charset)
   }
 
-  protected def serverCharsetChanged(charset: Charset): Unit = {
-    decoder.charset = charset
+  protected def handleServerCharsetChange(charset: Charset): Unit = {
+    decoder.changeCharset(charset)
   }
 }

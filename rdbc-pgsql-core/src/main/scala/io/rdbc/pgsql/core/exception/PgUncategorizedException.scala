@@ -16,7 +16,11 @@
 
 package io.rdbc.pgsql.core.exception
 
-import io.rdbc.api.exceptions._
-import io.rdbc.pgsql.core.messages.backend.StatusData
+import io.rdbc.api.exceptions.UncategorizedRdbcException
 
-class PgUncategorizedException(val pgStatusData: StatusData) extends UncategorizedRdbcException(pgStatusData.shortInfo) with PgStatusDataException
+class PgUncategorizedException(msg: String, cause: Option[Throwable])
+  extends UncategorizedRdbcException(msg, cause) {
+
+  def this(msg: String) = this(msg, None)
+  def this(msg: String, cause: Throwable) = this(msg, Some(cause))
+}

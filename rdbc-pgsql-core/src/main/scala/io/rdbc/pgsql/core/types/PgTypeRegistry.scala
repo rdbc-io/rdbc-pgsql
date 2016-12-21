@@ -16,32 +16,39 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.messages.data.Oid
+import io.rdbc.ImmutSeq
+import io.rdbc.pgsql.core.pgstruct.Oid
 
 object PgTypeRegistry {
 
+  def apply(types: ImmutSeq[PgType[_]]): PgTypeRegistry = {
+    val oidTypePairs = types.map(t => (t.typeOid, t))
+    val classTypePairs = types.flatMap { t =>
+      val allClasses = t.cls +: t.otherClasses
+      allClasses.map(cls => (cls, t))
+    }
+
+    new PgTypeRegistry(
+      oid2type = Map(oidTypePairs: _*),
+      cls2type = Map(classTypePairs: _*)
+    )
+  }
+
   def apply(types: PgType[_]*): PgTypeRegistry = {
-    val oid2type = Map(
-      types.map(t => t.typeOid -> t): _*
-    )
-
-    val cls2type: Map[Class[_], PgType[_]] = Map(
-      types.flatMap { t =>
-        t.otherClasses.map(oc => oc -> t) :+ (t.cls -> t)
-      }: _*
-    )
-
-    new PgTypeRegistry(oid2type, cls2type)
+    apply(ImmutSeq(types))
   }
 }
 
-class PgTypeRegistry(val oid2type: Map[Oid, PgType[_]], val cls2type: Map[Class[_], PgType[_]]) {
+class PgTypeRegistry protected (
+    oid2type: Map[Oid, PgType[_]],
+    cls2type: Map[Class[_], PgType[_]]
+) {
 
-  def byClass[T](cls: Class[T]): Option[PgType[T]] = {
+  def typeByClass[T](cls: Class[T]): Option[PgType[T]] = {
     cls2type.get(cls).map(_.asInstanceOf[PgType[T]])
   }
 
-  def byTypeOid(oid: Oid): Option[PgType[_]] = {
+  def typeByOid(oid: Oid): Option[PgType[_]] = {
     oid2type.get(oid)
   }
 
