@@ -23,4 +23,5 @@ import io.rdbc.sapi.TypeConverterRegistry
 case class PgConnectionConfig(pgTypes: PgTypeRegistry,
                               typeConverters: TypeConverterRegistry,
                               lockFactory: LockFactory,
-                              maxBatchSize: Long)
+                              maxBatchSize: Long,
+                              stmtCacheCapacity: Int)
