@@ -16,6 +16,8 @@
 
 package io.rdbc.pgsql.core.codec
 
+import java.nio.charset.Charset
+
 trait EncoderFactory {
-  def encoder: Encoder
+  def encoder(charset: Charset): Encoder
 }

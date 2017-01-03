@@ -21,9 +21,7 @@ object Jdbc extends App {
     conn.close()
   }
 
-
 }
-
 
 object JdbcSelect extends App {
 
@@ -32,16 +30,19 @@ object JdbcSelect extends App {
   props.setProperty("password", "povder")
   val conn = DriverManager.getConnection("jdbc:postgresql://localhost/povder", props)
   try {
-    val stmt = conn.prepareStatement("select * from test")
-    val rs = stmt.executeQuery()
-    while (rs.next()) {
-      println(rs.getInt(1))
+    (1 to 100).foreach { i =>
+      val start = System.nanoTime()
+      val stmt = conn.prepareStatement("select x from test")
+      val rs = stmt.executeQuery()
+      while (rs.next()) {
+        rs.getInt("x")
+      }
+      val time = System.nanoTime() - start
+      println(s"$i time = ${time / 1000000.0}ms")
     }
-
   } finally {
     conn.close()
   }
-
 
 }
 
@@ -61,6 +62,5 @@ object JdbcTypeTest extends App {
   } finally {
     conn.close()
   }
-
 
 }

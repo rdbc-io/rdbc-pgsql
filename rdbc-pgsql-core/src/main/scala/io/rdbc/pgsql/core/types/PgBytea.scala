@@ -16,9 +16,10 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.messages.data.Oid
+import io.rdbc.pgsql.core.pgstruct.Oid
 
 trait PgBytea extends PgType[Array[Byte]] {
   val typeOid = Oid(17)
   val cls = classOf[Array[Byte]]
+  val name = "bytea"
 }

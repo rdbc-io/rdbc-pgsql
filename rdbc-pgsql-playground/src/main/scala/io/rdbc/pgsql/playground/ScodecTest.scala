@@ -1,8 +1,7 @@
 package io.rdbc.pgsql.playground
 
-
 object ScodecTest extends App {
-/*
+  /*
   implicit val serverCharset = ServerCharset(Charset.forName("UTF-8"))
   implicit val clientCharset = ClientCharset(Charset.forName("UTF-8"))
 
@@ -29,5 +28,5 @@ object ScodecTest extends App {
   ))).require
 
   PgBackendMessage.codec.decode(hex"0x440000004a00020000001e1234567890123456789012345678901234567890123456789012345678900000001e123456789012345678901234567890123456789012345678901234567890".bits)
-*/
+ */
 }

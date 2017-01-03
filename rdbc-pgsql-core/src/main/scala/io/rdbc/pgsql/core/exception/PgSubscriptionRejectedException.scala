@@ -18,4 +18,5 @@ package io.rdbc.pgsql.core.exception
 
 import io.rdbc.api.exceptions.RdbcException
 
-case class PgSubscriptionRejectedException(msg: String) extends RdbcException(msg)
+class PgSubscriptionRejectedException(msg: String)
+  extends RdbcException(msg)

@@ -28,7 +28,11 @@ lazy val commonSettings = Seq(
     setNextVersion,
     commitNextVersion,
     pushChanges
-  )
+  ),
+  buildInfoKeys := Vector(version, scalaVersion, git.gitHeadCommit, BuildInfoKey.action("buildTime") {
+    java.time.Instant.now()
+  }),
+  scalastyleFailOnError := true
 )
 
 lazy val rdbcPgsql = (project in file("."))
@@ -40,6 +44,7 @@ lazy val rdbcPgsql = (project in file("."))
   .aggregate(core, scodec, nettyTransport)
 
 lazy val core = (project in file("rdbc-pgsql-core"))
+  .enablePlugins(BuildInfoPlugin)
   .settings(commonSettings: _*)
   .settings(
     name := "pgsql-core",
@@ -47,24 +52,31 @@ lazy val core = (project in file("rdbc-pgsql-core"))
       Library.rdbcScalaApi,
       Library.rdbcTypeconv,
       Library.rdbcImplbase,
+      Library.rdbcUtil,
       Library.typesafeConfig,
       Library.scalaLogging,
       Library.akkaStream,
-      Library.sourcecode
-    )
+      Library.sourcecode,
+      Library.scodecBits
+    ),
+    buildInfoPackage := "io.rdbc.pgsql.core"
   )
 
-lazy val scodec = (project in file("rdbc-pgsql-scodec"))
+lazy val scodec = (project in file("rdbc-pgsql-codec-scodec"))
+  .enablePlugins(BuildInfoPlugin)
   .settings(commonSettings: _*)
   .settings(
     name := "pgsql-codec-scodec",
     libraryDependencies ++= Vector(
       Library.scodecBits,
       Library.scodecCore
-    )
-  ).dependsOn(core)
+    ),
+    buildInfoPackage := "io.rdbc.pgsql.scodec"
+  )
+  .dependsOn(core)
 
 lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
+  .enablePlugins(BuildInfoPlugin)
   .settings(commonSettings: _*)
   .settings(
     name := "pgsql-transport-netty",
@@ -72,10 +84,13 @@ lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
       Library.nettyHandler,
       Library.nettyEpoll,
       Library.rdbcTypeconv,
+      Library.rdbcUtil,
       Library.scalaLogging,
       Library.logback
-    )
-  ).dependsOn(core, scodec)
+    ),
+    buildInfoPackage := "io.rdbc.pgsql.transport.netty"
+  )
+  .dependsOn(core, scodec)
 
 lazy val playground = (project in file("rdbc-pgsql-playground"))
   .settings(commonSettings: _*)
@@ -84,6 +99,8 @@ lazy val playground = (project in file("rdbc-pgsql-playground"))
     publishArtifact := false,
     bintrayReleaseOnPublish := false,
     libraryDependencies ++= Vector(
-      "org.postgresql" % "postgresql" % "9.4.1211"
+      "org.postgresql" % "postgresql" % "9.4.1212",
+      "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
     )
-  ).dependsOn(core, scodec, nettyTransport)
+  )
+  .dependsOn(core, scodec, nettyTransport)

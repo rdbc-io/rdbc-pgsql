@@ -16,9 +16,10 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.messages.data.Oid
+import io.rdbc.pgsql.core.pgstruct.Oid
 
 trait PgVarchar extends PgType[String] {
   val typeOid = Oid(1043)
   val cls = classOf[String]
+  val name = "varchar"
 }

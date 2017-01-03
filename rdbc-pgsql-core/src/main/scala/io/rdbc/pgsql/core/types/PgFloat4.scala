@@ -16,10 +16,11 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.messages.data.Oid
+import io.rdbc.pgsql.core.pgstruct.Oid
 
 trait PgFloat4 extends PgType[Float] {
   val typeOid = Oid(700)
   val cls = classOf[Float]
+  val name = "float4"
   override val otherClasses = Vector(classOf[java.lang.Float])
 }

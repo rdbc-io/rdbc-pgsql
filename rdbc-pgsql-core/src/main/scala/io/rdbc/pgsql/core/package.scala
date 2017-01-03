@@ -16,12 +16,31 @@
 
 package io.rdbc.pgsql
 
+import akka.NotUsed
+import akka.stream.scaladsl.Source
+import io.rdbc.pgsql.core.internal.fsm.StateAction
+import io.rdbc.pgsql.core.pgstruct.{ParamValue, TxStatus}
+import io.rdbc.pgsql.core.pgstruct.messages.backend.{BackendKeyData, PgBackendMessage}
+
+import scala.concurrent.Future
+
 package object core {
 
-  implicit class ArrayToHex(array: Array[Byte]) {
-    def toHex: String = array.map("%02X" format _).mkString
-  }
+  type RequestCanceler = BackendKeyData => Future[Unit]
 
-  type FatalErrorNotifier = (String, Throwable) => Unit
+  private[core] type FatalErrorNotifier = (String, Throwable) => Unit
 
+  private[core] case class RequestId(value: Long) extends AnyVal
+
+  private[core] case class RdbcSql(value: String) extends AnyVal
+
+  private[core] case class StmtParamName(value: String) extends AnyVal
+
+  private[core] type ClientRequest[A] = (RequestId, TxStatus) => Future[A]
+
+  private[core] type PgMsgHandler = PartialFunction[PgBackendMessage, StateAction]
+
+  private[core] type ParamsSource = Source[Vector[ParamValue], NotUsed]
+
+  private[core] val unitFuture = Future.successful(())
 }

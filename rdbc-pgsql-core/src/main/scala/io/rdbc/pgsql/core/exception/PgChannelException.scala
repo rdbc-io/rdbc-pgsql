@@ -18,4 +18,5 @@ package io.rdbc.pgsql.core.exception
 
 import io.rdbc.api.exceptions.RdbcException
 
-case class PgChannelException(cause: Throwable) extends RdbcException(cause.getMessage, cause)
+class PgChannelException(cause: Throwable)
+  extends RdbcException(cause.getMessage, cause)
