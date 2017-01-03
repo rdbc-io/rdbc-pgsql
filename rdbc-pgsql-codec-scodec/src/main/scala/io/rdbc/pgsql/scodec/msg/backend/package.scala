@@ -68,6 +68,7 @@ package object backend {
         .typecase('s', "portal_suspended_msg"     | portalSuspended)
         .typecase('n', "no_data_msg"              | noData)
         .typecase('t', "param_desc_msg"           | parameterDescription)
+        .typecase('A', "notification_respo_msg"   | notificationResponse)
     )
   }
 
@@ -193,6 +194,16 @@ package object backend {
         map => Attempt.successful(creator(map)),
         _   => Attempt.failure(Err("encoding not supported"))
       ).withContext("status_msg_params")
+    }
+  }
+
+  private def notificationResponse(implicit charset: Charset): Codec[NotificationResponse] = {
+    pgHeadlessMsg {
+      {
+        ("pid"     | int32).as[PgPid] ::
+        ("channel" | stringNul) ::
+        ("payload" | maybeStringNul)
+      }.as[NotificationResponse]
     }
   }
 }

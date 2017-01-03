@@ -23,8 +23,7 @@ import io.rdbc.pgsql.core.internal.fsm.streaming._
 import io.rdbc.pgsql.core.internal.scheduler.TimeoutHandler
 import io.rdbc.pgsql.core.internal.{PgResultStream, PgRowPublisher}
 import io.rdbc.pgsql.core.pgstruct.TxStatus
-import io.rdbc.pgsql.core.pgstruct.messages.backend.{BackendKeyData, PgBackendMessage, StatusMessage,
-                                                     UnknownBackendMessage}
+import io.rdbc.pgsql.core.pgstruct.messages.backend._
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{Bind, Parse, PortalName}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.util.concurrent.LockFactory
@@ -61,6 +60,13 @@ private[core] trait State extends Logging {
       } else {
         logger.debug(s"Notice received: ${noticeMsg.statusData.shortInfo}")
       }
+      stay
+
+    case NotificationResponse(pid, channel, payload) =>
+      logger.info(
+        s"Asynchronous notification in channel '$channel' " +
+        s"received from pid ${pid.value} " + payload.fold("with no payload")(s => s"with payload '$s'")
+      )
       stay
 
     case unknownMsg: UnknownBackendMessage =>

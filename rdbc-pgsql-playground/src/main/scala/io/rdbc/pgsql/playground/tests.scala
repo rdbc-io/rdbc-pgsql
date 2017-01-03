@@ -1033,3 +1033,44 @@ object DataRowTst extends App {
 
 
 }
+
+
+object ListenNotify extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
+
+  fact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
+      val start = System.nanoTime()
+
+      val rsFut = for {
+        stmt <- conn.statement(sql"LISTEN ch1")
+        rs <- stmt.executeIgnoringResult()
+      } yield (stmt, rs)
+
+      rsFut.map { _ =>
+        println("SLEEPING")
+        Thread.sleep(10000L)
+        conn.release()
+      }
+
+    }
+    .recover {
+      case ex =>
+        println("ERROR")
+        ex.printStackTrace()
+    }
+    .flatMap { _ =>
+      println("hai shutdown")
+      fact.shutdown()
+    }
+    .map { _ =>
+      println("SHUT DOWN")
+    }
+
+}
