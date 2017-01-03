@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Krzysztof Pado
+ * Copyright 2016-2017 Krzysztof Pado
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -171,7 +171,8 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
       pgTypes = pgTypes,
       typeConverters = typeConverters,
       lockFactory = config.lockFactory,
-      maxBatchSize = config.maxBatchSize
+      maxBatchSize = config.maxBatchSize,
+      stmtCacheCapacity = config.stmtCacheCapacity
     )
 
     new NettyPgConnection(

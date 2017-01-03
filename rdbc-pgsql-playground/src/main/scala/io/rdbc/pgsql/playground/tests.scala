@@ -82,6 +82,62 @@ object Tst extends App {
 
 }
 
+object CacheTst extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = FiniteDuration.apply(10, "seconds")
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
+
+  fact
+    .connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
+      //Thread.sleep(20000L)
+      val start = System.nanoTime()
+
+      val x = -100
+
+      val rsFut = for {
+        stmt1 <- conn.statement(sql"SELECT * FROM test WHERE x > $x")
+        rs1 <- stmt1.executeForSet()
+        stmt2 <- conn.statement(sql"SELECT * FROM test WHERE x > $x")
+        rs2 <- stmt2.executeForSet()
+        stmt3 <- conn.statement(sql"SELECT * FROM test WHERE x > $x")
+        rs3 <- stmt3.executeForSet()
+      //TODO when i ctrl-c postgresql during pulling rows nothing happens
+      } yield (stmt3, rs3)
+
+      rsFut.flatMap {
+        case (stmt, rs) =>
+          val time = System.nanoTime() - start
+          println(s"time = ${time / 1000000}")
+
+          rs.foreach { row =>
+            println(s"x = ${row.int("x")}, t = ${row.localDateTime("t")}, s = ${row.str("s")}")
+          }
+          println("DONE")
+          stmt.deallocate()
+      }.map { _ =>
+        conn.release()
+      }
+
+    }
+    .recover {
+      case ex =>
+        println("ERROR")
+        ex.printStackTrace()
+    }
+    .flatMap { _ =>
+      println("hai shutdown")
+      fact.shutdown()
+    }
+    .map { _ =>
+      println("SHUT DOWN")
+    }
+
+}
+
 object InsertTst extends App {
 
   implicit val ec = ExecutionContext.global

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Krzysztof Pado
+ * Copyright 2016-2017 Krzysztof Pado
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,6 +59,7 @@ object NettyPgConnFactoryConfig {
       dbName = dbName,
       authenticator = authenticator,
       maxBatchSize = 100L,
+      stmtCacheCapacity = 100,
       typeConvertersProviders = Vector(new StandardTypeConvertersProvider),
       pgTypesProviders = Vector(new ScodecPgTypesProvider),
       msgDecoderFactory = new ScodecDecoderFactory,
@@ -90,6 +91,7 @@ case class NettyPgConnFactoryConfig(address: InetSocketAddress,
                                     dbName: String,
                                     authenticator: Authenticator,
                                     maxBatchSize: Long,
+                                    stmtCacheCapacity: Int,
                                     typeConvertersProviders: ImmutSeq[TypeConvertersProvider],
                                     pgTypesProviders: ImmutSeq[PgTypesProvider],
                                     msgDecoderFactory: DecoderFactory,

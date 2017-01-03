@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Krzysztof Pado
+ * Copyright 2016-2017 Krzysztof Pado
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,23 +14,13 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.internal
+package io.rdbc.pgsql.core.internal.cache
 
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{NativeSql, StmtName}
 
-private[core] object PreparedStmtCache {
-  val empty = new PreparedStmtCache(Map.empty)
-}
-
-private[core] class PreparedStmtCache(cache: Map[NativeSql, StmtName]) {
-  //TODO should I cache using NativeSql or RdbcSql?
-
-  //TODO replace with LRU or sth
-  //TODO when element is evicted from the cache CloseStatement needs to be sent to the backend
-
-  def get(sql: NativeSql): Option[StmtName] = cache.get(sql)
-
-  def updated(sql: NativeSql, stmtName: StmtName): PreparedStmtCache = {
-    new PreparedStmtCache(cache + (sql -> stmtName))
-  }
+trait StmtCache {
+  type Cache <: StmtCache
+  def get(sql: NativeSql): (Cache, Option[StmtName])
+  def put(sql: NativeSql, stmtName: StmtName): (Cache, Set[StmtName])
+  def evict(sql: NativeSql): Option[(Cache, StmtName)]
 }

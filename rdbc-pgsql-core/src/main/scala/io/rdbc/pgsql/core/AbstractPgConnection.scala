@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Krzysztof Pado
+ * Copyright 2016-2017 Krzysztof Pado
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import io.rdbc.implbase.{ConnectionPartialImpl, ReturningInsertImpl}
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.exception.PgUnsupportedCharsetException
 import io.rdbc.pgsql.core.internal._
+import io.rdbc.pgsql.core.internal.cache.LruStmtCache
 import io.rdbc.pgsql.core.internal.fsm.StateAction.{Fatal, Goto, Stay}
 import io.rdbc.pgsql.core.internal.fsm._
 import io.rdbc.pgsql.core.internal.fsm.streaming.{StrmBeginningTx, StrmWaitingForDescribe}
@@ -57,7 +58,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
 
   private[this] val fsmManager = new PgSessionFsmManager(config.lockFactory, this)
   @volatile private[this] var sessionParams = SessionParams.default
-  @volatile private[this] var stmtCache = PreparedStmtCache.empty
+  @volatile private[this] var stmtCache = LruStmtCache.empty(config.stmtCacheCapacity)
   @volatile private[this] var maybeBackendKeyData = Option.empty[BackendKeyData]
   private[this] val stmtCounter = new AtomicInteger(0)
 
@@ -184,7 +185,11 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
                                       parseFut: Future[Unit],
                                       nativeSql: NativeSql): Future[Unit] = {
     maybeParse.flatMap(_.optionalName) match {
-      case Some(stmtName) => parseFut.map(_ => stmtCache = stmtCache.updated(nativeSql, stmtName))
+      case Some(stmtName) => parseFut.map { _ =>
+        val (newCache, evicted) = stmtCache.put(nativeSql, stmtName)
+        //TODO close evicted
+        stmtCache = newCache
+      }
       case None => unitFuture
     }
   }
@@ -257,8 +262,12 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
 
   private def determineStmtStatus(nativeSql: NativeSql): StatementStatus = {
     stmtCache.get(nativeSql) match {
-      case Some(stmtName) => StatementStatus.Cached(stmtName)
-      case None =>
+      case (newCache, Some(stmtName)) =>
+        stmtCache = newCache
+        StatementStatus.Cached(stmtName)
+
+      case (newCache, None) =>
+        stmtCache = newCache
         if (shouldCache(nativeSql)) StatementStatus.NotCachedDoCache(nextStmtName())
         else StatementStatus.NotCachedDontCache
     }
@@ -287,8 +296,8 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
     }
   }
 
-  private def shouldCache(nativeSql: NativeSql): Boolean = traced {
-    //will be implemented as part of resolving https://github.com/rdbc-io/rdbc-pgsql/issues/42
+  private def shouldCache(nativeSql: NativeSql): Boolean = {
+    //for now, all statements are cached
     true
   }
 
@@ -451,8 +460,11 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
 
   private[core] def deallocateStatement(nativeSql: NativeSql): Future[Unit] = traced {
     fsmManager.ifReady { (_, txStatus) =>
-      stmtCache.get(nativeSql) match {
-        case Some(stmtName) => deallocateCached(stmtName)
+      stmtCache.evict(nativeSql) match {
+        case Some((newCache, evictedName)) =>
+          stmtCache = newCache
+          deallocateCached(evictedName)
+
         case None =>
           fsmManager.triggerTransition(Idle(txStatus))
           unitFuture
