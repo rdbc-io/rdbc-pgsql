@@ -1,7 +1,7 @@
 import sbt._
 
 object Version {
-  val rdbc = "0.0.37"
+  val rdbc = "0.0.38"
 }
 
 object Library {
