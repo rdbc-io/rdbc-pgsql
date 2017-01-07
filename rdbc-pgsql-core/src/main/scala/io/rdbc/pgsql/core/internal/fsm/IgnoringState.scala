@@ -16,8 +16,12 @@
 
 package io.rdbc.pgsql.core.internal.fsm
 
-import io.rdbc.api.exceptions.ConnectionClosedException
+import io.rdbc.pgsql.core.PgMsgHandler
 
-private[core]
-final case class ConnectionClosed private[fsm](cause: ConnectionClosedException)
-  extends IgnoringState
+private[core] trait IgnoringState extends State with DefaultErrorHandling {
+  protected val msgHandler: PgMsgHandler = {
+    case msg =>
+      logger.debug(s"Message $msg ignored in state $this")
+      stay
+  }
+}
