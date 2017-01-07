@@ -118,7 +118,11 @@ class StrmWaitingForDescribe private[fsm](txMgmt: Boolean,
         rowsAffectedPromise.failure(ex)
         parsePromise.failure(ex)
 
-      case None => streamPromise.failure(ex)
+      case None =>
+        if (!parsePromise.isCompleted) {
+          parsePromise.failure(ex)
+        }
+        streamPromise.failure(ex)
     }
   }
 
