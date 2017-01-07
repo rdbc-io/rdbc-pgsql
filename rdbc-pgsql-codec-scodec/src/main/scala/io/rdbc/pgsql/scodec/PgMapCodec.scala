@@ -32,7 +32,30 @@ class PgMapCodec[K](codec: Codec[(K, String)]) extends Codec[Map[K, String]] {
     Encoder.encodeSeq(codec)(options.toList).map(_ ++ nul)
   }
 
-  def decode(buffer: BitVector): Attempt[DecodeResult[Map[K, String]]] = {
-    Attempt.failure(Err("decoding not supported"))
+  def decode(bits: BitVector): Attempt[DecodeResult[Map[K, String]]] = {
+    val listBuffer = ListBuffer.empty[(K, String)]
+    var remaining = bits
+    var count = 0
+    var error: Option[Err] = None
+    /* iterate until map key is nul */
+    while (remaining.sizeGreaterThanOrEqual(8) && remaining.slice(0, 8) != nul) {
+      codec.decode(remaining) match {
+        case Attempt.Successful(DecodeResult(value, rest)) =>
+          listBuffer += value
+          count += 1
+          remaining = rest
+        case Attempt.Failure(err) =>
+          error = Some(err.pushContext(s"element-$count"))
+          remaining = BitVector.empty
+      }
+    }
+    error match {
+      case None =>
+        constant(nul).decode(remaining).map {
+          dr => DecodeResult(Map(listBuffer: _*), dr.remainder)
+        }
+
+      case Some(err) => Attempt.failure(err)
+    }
   }
 }
