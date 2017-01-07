@@ -54,7 +54,7 @@ class StrmQueryFailed private[fsm](txMgmt: Boolean,
   }
 
   private def rollback(): StateAction.Goto = {
-    goto(new StrmWaitingAfterRollback(sendFailureCause)) andThen {
+    goto(State.Streaming.waitingAfterRollback(sendFailureCause)) andThen {
       out.writeAndFlush(Query(NativeSql("ROLLBACK"))).recoverWith { //TODO interpolator nsql?
         case NonFatal(ex) =>
           sendFailureToClient(ex)
