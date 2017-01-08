@@ -20,12 +20,10 @@ import java.net.InetSocketAddress
 
 import akka.stream.ActorMaterializerSettings
 import com.typesafe.config.{Config, ConfigFactory}
-import io.netty.bootstrap.ChannelFactory
 import io.netty.channel._
-import io.netty.channel.epoll.{Epoll, EpollEventLoopGroup, EpollSocketChannel}
+import io.netty.channel.epoll.{Epoll, EpollEventLoopGroup}
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
-import io.netty.channel.socket.nio.NioSocketChannel
 import io.rdbc.ImmutSeq
 import io.rdbc.pgsql.core.auth.{Authenticator, UsernamePasswordAuthenticator}
 import io.rdbc.pgsql.core.codec.{DecoderFactory, EncoderFactory}

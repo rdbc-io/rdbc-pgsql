@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.transport.netty
 
-import io.netty.bootstrap.ChannelFactory
+import io.netty.channel.ChannelFactory
 import io.netty.channel.socket.nio.NioSocketChannel
 
 class NioChannelFactory extends ChannelFactory[NioSocketChannel] {
