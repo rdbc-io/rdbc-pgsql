@@ -112,7 +112,7 @@ private[core] class PgRowPublisher(rowDesc: RowDescription,
                                    pgTypes: PgTypeRegistry,
                                    typeConverters: TypeConverterRegistry,
                                    sessionParams: SessionParams,
-                                   timeoutHandler: TimeoutHandler,
+                                   maybeTimeoutHandler: Option[TimeoutHandler],
                                    lockFactory: LockFactory,
                                    @volatile private[this] var fatalErrorNotifier: FatalErrorNotifier)
                                   (implicit out: ChannelWriter, ec: ExecutionContext)
@@ -221,7 +221,7 @@ private[core] class PgRowPublisher(rowDesc: RowDescription,
       out.writeAndFlush(Execute(portalName, demand), Sync).onComplete {
         case Success(_) =>
           if (neverExecuted.compareAndSet(true, false)) {
-            timeoutScheduledTask = Some(timeoutHandler.scheduleTimeoutTask())
+            timeoutScheduledTask = maybeTimeoutHandler.map(_.scheduleTimeoutTask())
           }
 
         case Failure(NonFatal(ex)) =>

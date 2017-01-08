@@ -72,17 +72,17 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
     }
   }
 
-  override def beginTx()(implicit timeout: FiniteDuration): Future[Unit] = traced {
+  override def beginTx()(implicit timeout: Timeout): Future[Unit] = traced {
     argsNotNull()
     simpleQueryIgnoreResult(NativeSql("BEGIN"))
   }
 
-  override def commitTx()(implicit timeout: FiniteDuration): Future[Unit] = traced {
+  override def commitTx()(implicit timeout: Timeout): Future[Unit] = traced {
     argsNotNull()
     simpleQueryIgnoreResult(NativeSql("COMMIT"))
   }
 
-  override def rollbackTx()(implicit timeout: FiniteDuration): Future[Unit] = traced {
+  override def rollbackTx()(implicit timeout: Timeout): Future[Unit] = traced {
     argsNotNull()
     simpleQueryIgnoreResult(NativeSql("ROLLBACK"))
   }
@@ -93,21 +93,22 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
     returningInsert(sql, "*")
   }
 
-  override def validate()(implicit timeout: FiniteDuration): Future[Boolean] = traced {
-    argsNotNull()
-    simpleQueryIgnoreResult(NativeSql("")).map(_ => true).recoverWith {
-      case ex: IllegalSessionStateException => Future.failed(ex)
-      case _ => Future.successful(false)
-    }
-  }
-
-  override def returningInsert(sql: String, keyColumns: String*): Future[ReturningInsert] = traced {
+  override def returningInsert(sql: String,
+                               keyColumns: String*): Future[ReturningInsert] = traced {
     argsNotNull()
     checkNonEmptyString(sql)
     checkNonEmpty(keyColumns)
     val returningSql = sql + " returning " + keyColumns.mkString(",")
     statement(returningSql).map { stmt =>
       new ReturningInsertImpl(stmt)
+    }
+  }
+
+  override def validate()(implicit timeout: Timeout): Future[Boolean] = traced {
+    argsNotNull()
+    simpleQueryIgnoreResult(NativeSql("")).map(_ => true).recoverWith {
+      case ex: IllegalSessionStateException => Future.failed(ex)
+      case _ => Future.successful(false)
     }
   }
 
@@ -166,7 +167,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
   }
 
   private[core] def executeStatementForStream(nativeSql: NativeSql, params: Vector[ParamValue])(
-    implicit timeout: FiniteDuration): Future[ResultStream] = traced {
+    implicit timeout: Timeout): Future[ResultStream] = traced {
     fsmManager.ifReady { (reqId, txStatus) =>
       logger.debug(s"Executing statement '${nativeSql.value}'")
 
@@ -199,7 +200,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
                                           messages: ParseAndBind,
                                           streamPromise: Promise[PgResultStream],
                                           parsePromise: Promise[Unit])(
-                                           implicit timeout: FiniteDuration): Future[Unit] = {
+                                           implicit timeout: Timeout): Future[Unit] = {
     txStatus match {
       case TxStatus.Active | TxStatus.Failed =>
         fsmManager.triggerTransition(
@@ -220,7 +221,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
                                        portalName: Option[PortalName],
                                        streamPromise: Promise[PgResultStream],
                                        parsePromise: Promise[Unit])(
-                                        implicit timeout: FiniteDuration): StrmWaitingForDescribe = {
+                                        implicit timeout: Timeout): StrmWaitingForDescribe = {
     State.Streaming.waitingForDescribe(
       txMgmt = false,
       portalName = portalName,
@@ -229,7 +230,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
       pgTypes = config.pgTypes,
       typeConverters = config.typeConverters,
       sessionParams = sessionParams,
-      timeoutHandler = newTimeoutHandler(reqId, timeout),
+      maybeTimeoutHandler = newTimeoutHandler(reqId, timeout),
       lockFactory = config.lockFactory,
       fatalErrorNotifier = handleFatalError)(out, ec)
   }
@@ -239,14 +240,14 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
                           bind: Bind,
                           streamPromise: Promise[PgResultStream],
                           parsePromise: Promise[Unit])(
-                           implicit timeout: FiniteDuration): StrmBeginningTx = {
+                           implicit timeout: Timeout): StrmBeginningTx = {
     State.Streaming.beginningTx(
       maybeParse = parse,
       bind = bind,
       streamPromise = streamPromise,
       parsePromise = parsePromise,
       sessionParams = sessionParams,
-      timeoutHandler = newTimeoutHandler(reqId, timeout),
+      maybeTimeoutHandler = newTimeoutHandler(reqId, timeout),
       typeConverters = config.typeConverters,
       pgTypes = config.pgTypes,
       lockFactory = config.lockFactory,
@@ -302,7 +303,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
   }
 
   private[core] def executeStatementForRowsAffected(nativeSql: NativeSql, params: Vector[ParamValue])(
-    implicit timeout: FiniteDuration): Future[Long] = traced {
+    implicit timeout: Timeout): Future[Long] = traced {
     fsmManager.ifReady { (reqId, _) =>
       logger.debug(s"Executing write-only statement '$nativeSql'")
 
@@ -317,11 +318,11 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
         .writeAndFlush(bind, Execute(optionalPortalName = bind.portal, optionalFetchSize = None), Sync)
         .recoverWith(writeFailureHandler)
         .flatMap { _ =>
-          val timeoutTask = newTimeoutHandler(reqId, timeout).scheduleTimeoutTask()
+          val timeoutTask = newTimeoutHandler(reqId, timeout).map(_.scheduleTimeoutTask())
           updateStmtCacheIfNeeded(parse, parsePromise.future, nativeSql)
             .flatMap(_ => resultPromise.future)
             .map { result =>
-              timeoutTask.cancel()
+              timeoutTask.foreach(_.cancel())
               result
             }
         }
@@ -369,17 +370,17 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
     handleFatalError("Write error occurred, the connection will be closed", cause)
   }
 
-  private def simpleQueryIgnoreResult(sql: NativeSql)(implicit timeout: FiniteDuration): Future[Unit] = traced {
+  private def simpleQueryIgnoreResult(sql: NativeSql)(implicit timeout: Timeout): Future[Unit] = traced {
     fsmManager.ifReady { (reqId, _) =>
       val queryPromise = Promise[Unit]
       fsmManager.triggerTransition(State.simpleQuerying(queryPromise))
       out
         .writeAndFlush(Query(sql))
         .recoverWith(writeFailureHandler)
-        .map(_ => newTimeoutHandler(reqId, timeout).scheduleTimeoutTask())
-        .flatMap { timeoutTask =>
+        .map(_ => newTimeoutHandler(reqId, timeout).map(_.scheduleTimeoutTask()))
+        .flatMap { maybeTimeoutTask =>
           queryPromise.future.map { _ =>
-            timeoutTask.cancel()
+            maybeTimeoutTask.foreach(_.cancel())
           }
         }
     }
@@ -444,18 +445,24 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
       Future.failed(writeEx)
   }
 
-  private def newTimeoutHandler(reqId: RequestId, timeout: FiniteDuration): TimeoutHandler = traced {
-    new TimeoutHandler(scheduler, timeout, timeoutAction = {
-      val shouldCancel = fsmManager.startHandlingTimeout(reqId)
-      if (shouldCancel) {
-        logger.debug(s"Timeout occurred for request '$reqId', cancelling it")
-        maybeBackendKeyData.foreach { bkd =>
-          requestCanceler(bkd).onComplete(_ => fsmManager.finishHandlingTimeout())
+  private def newTimeoutHandler(reqId: RequestId,
+                                timeout: Timeout): Option[TimeoutHandler] = traced {
+    if (timeout.value.isFinite()) {
+      val duration = FiniteDuration(timeout.value.length, timeout.value.unit)
+      Some(new TimeoutHandler(scheduler, duration, timeoutAction = {
+        val shouldCancel = fsmManager.startHandlingTimeout(reqId)
+        if (shouldCancel) {
+          logger.debug(s"Timeout occurred for request '$reqId', cancelling it")
+          maybeBackendKeyData.foreach { bkd =>
+            requestCanceler(bkd).onComplete(_ => fsmManager.finishHandlingTimeout())
+          }
+        } else {
+          logger.debug(s"Timeout task ran for request '$reqId', but this request is not being executed anymore")
         }
-      } else {
-        logger.debug(s"Timeout task ran for request '$reqId', but this request is not being executed anymore")
-      }
-    })
+      }))
+    } else {
+      None
+    }
   }
 
   private[core] def deallocateStatement(nativeSql: NativeSql): Future[Unit] = traced {

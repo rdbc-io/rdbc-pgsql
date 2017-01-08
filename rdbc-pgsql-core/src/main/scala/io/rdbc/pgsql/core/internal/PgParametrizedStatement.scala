@@ -19,10 +19,9 @@ package io.rdbc.pgsql.core.internal
 import io.rdbc.implbase.AnyParametrizedStatementPartialImpl
 import io.rdbc.pgsql.core.pgstruct.ParamValue
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
-import io.rdbc.sapi.{AnyParametrizedStatement, ResultSet, ResultStream}
+import io.rdbc.sapi.{AnyParametrizedStatement, ResultStream, Timeout}
 import io.rdbc.util.Logging
 
-import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
 private[core] class PgParametrizedStatement(executor: PgStatementExecutor,
@@ -38,11 +37,11 @@ private[core] class PgParametrizedStatement(executor: PgStatementExecutor,
     deallocator.deallocateStatement(nativeSql)
   }
 
-  def executeForStream()(implicit timeout: FiniteDuration): Future[ResultStream] = traced {
+  def executeForStream()(implicit timeout: Timeout): Future[ResultStream] = traced {
     executor.executeStatementForStream(nativeSql, params)
   }
 
-  override def executeForRowsAffected()(implicit timeout: FiniteDuration): Future[Long] = traced {
+  override def executeForRowsAffected()(implicit timeout: Timeout): Future[Long] = traced {
     executor.executeStatementForRowsAffected(nativeSql, params)
   }
 }
