@@ -37,7 +37,7 @@ class StrmWaitingForDescribe private[fsm](txMgmt: Boolean,
                                           pgTypes: PgTypeRegistry,
                                           typeConverters: TypeConverterRegistry,
                                           sessionParams: SessionParams,
-                                          timeoutHandler: TimeoutHandler,
+                                          maybeTimeoutHandler: Option[TimeoutHandler],
                                           lockFactory: LockFactory,
                                           fatalErrorNotifier: FatalErrorNotifier)
                                          (implicit out: ChannelWriter, ec: ExecutionContext)
@@ -104,7 +104,7 @@ class StrmWaitingForDescribe private[fsm](txMgmt: Boolean,
       pgTypes = pgTypes,
       typeConverters = typeConverters,
       sessionParams = sessionParams,
-      timeoutHandler = timeoutHandler,
+      maybeTimeoutHandler = maybeTimeoutHandler,
       lockFactory = lockFactory,
       fatalErrorNotifier = fatalErrorNotifier
     )

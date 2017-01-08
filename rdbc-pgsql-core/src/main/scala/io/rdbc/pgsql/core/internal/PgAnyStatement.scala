@@ -100,6 +100,6 @@ private[core] class PgAnyStatement(stmtExecutor: PgStatementExecutor,
     pgTypes
       .typeByClass(cls)
       .map(body)
-      .getOrElse(throw NoSuitableConverterFoundException(cls))
+      .getOrElse(throw new NoSuitableConverterFoundException(cls))
   }
 }

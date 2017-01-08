@@ -165,7 +165,7 @@ private[core] object State extends Logging {
                     streamPromise: Promise[PgResultStream],
                     parsePromise: Promise[Unit],
                     sessionParams: SessionParams,
-                    timeoutHandler: TimeoutHandler,
+                    maybeTimeoutHandler: Option[TimeoutHandler],
                     typeConverters: TypeConverterRegistry,
                     pgTypes: PgTypeRegistry,
                     lockFactory: LockFactory,
@@ -178,7 +178,7 @@ private[core] object State extends Logging {
         streamPromise = streamPromise,
         parsePromise = parsePromise,
         sessionParams = sessionParams,
-        timeoutHandler = timeoutHandler,
+        maybeTimeoutHandler = maybeTimeoutHandler,
         typeConverters = typeConverters,
         pgTypes = pgTypes,
         lockFactory = lockFactory,
@@ -228,7 +228,7 @@ private[core] object State extends Logging {
                            pgTypes: PgTypeRegistry,
                            typeConverters: TypeConverterRegistry,
                            sessionParams: SessionParams,
-                           timeoutHandler: TimeoutHandler,
+                           maybeTimeoutHandler: Option[TimeoutHandler],
                            lockFactory: LockFactory,
                            fatalErrorNotifier: FatalErrorNotifier)
                           (implicit out: ChannelWriter, ec: ExecutionContext): StrmWaitingForDescribe = {
@@ -240,7 +240,7 @@ private[core] object State extends Logging {
         pgTypes = pgTypes,
         typeConverters = typeConverters,
         sessionParams = sessionParams,
-        timeoutHandler = timeoutHandler,
+        maybeTimeoutHandler = maybeTimeoutHandler,
         lockFactory = lockFactory,
         fatalErrorNotifier = fatalErrorNotifier
       )
