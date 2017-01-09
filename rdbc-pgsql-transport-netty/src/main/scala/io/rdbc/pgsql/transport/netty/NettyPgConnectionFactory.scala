@@ -29,6 +29,7 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder
 import io.netty.handler.timeout.WriteTimeoutHandler
 import io.netty.util.concurrent.GlobalEventExecutor
 import io.rdbc.api.exceptions.RdbcException
+import io.rdbc.implbase.ConnectionFactoryPartialImpl
 import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgUncategorizedException}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{CancelRequest, Terminate}
@@ -58,7 +59,7 @@ object NettyPgConnectionFactory extends Logging {
 }
 
 class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
-  extends ConnectionFactory
+  extends ConnectionFactoryPartialImpl
     with Logging {
 
   protected implicit val ec = config.ec
