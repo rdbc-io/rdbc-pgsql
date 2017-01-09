@@ -21,19 +21,18 @@ import java.nio.charset.Charset
 import akka.stream.scaladsl.{Sink, Source}
 import io.rdbc.pgsql.scodec.ScodecDecoderFactory
 import io.rdbc.pgsql.transport.netty.NettyPgConnectionFactory
-import io.rdbc.sapi.Interpolators._
-import io.rdbc.sapi.Row
+import io.rdbc.sapi._
 import org.reactivestreams.{Subscriber, Subscription}
 import scodec.bits.BitVector
 
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Random, Success}
 
 object Tst extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -85,7 +84,7 @@ object Tst extends App {
 object CacheTst extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -141,7 +140,7 @@ object CacheTst extends App {
 object InsertTst extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -174,7 +173,7 @@ object InsertTst extends App {
 object NoDataTest extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -210,7 +209,7 @@ object NoDataTest extends App {
 object EmptyQueryTest extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -246,7 +245,7 @@ object EmptyQueryTest extends App {
 object BindByIdxTst extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -281,7 +280,7 @@ object BindByIdxTst extends App {
 object IdleTest extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
     .connection()
@@ -298,7 +297,7 @@ object IdleTest extends App {
 object BeginTwiceTst extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
     .connection()
@@ -320,7 +319,7 @@ object BeginTwiceTst extends App {
 object TstFloat extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
     .connection()
@@ -375,7 +374,7 @@ class SlowSubscriber extends Subscriber[Row] {
 
 object StreamTest extends App {
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
     .connection()
@@ -402,7 +401,7 @@ object StreamTest extends App {
 object TxTest extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
     .connection()
@@ -431,7 +430,7 @@ object TxTest extends App {
 object ErrTest extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
     .connection()
@@ -455,7 +454,7 @@ object ErrTest extends App {
 object ErrTestTx extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
     .connection()
@@ -485,7 +484,7 @@ object ErrTestTx extends App {
 object PerfTst extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val connFact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -552,7 +551,7 @@ object DecodeTst extends App {
 object KeyGenTest extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -587,7 +586,7 @@ object KeyGenTest extends App {
 object TimeoutTest extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(5, "seconds")
+  implicit val timeout = 5.seconds.timeout
 
   NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
     .connection()
@@ -615,7 +614,7 @@ object TimeoutTest extends App {
 object ConnClosedTest extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
     .connection()
@@ -661,7 +660,7 @@ object ConnClosedTest extends App {
 
 object IfIdleTest extends App {
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
     .connection()
@@ -695,7 +694,7 @@ object IfIdleTest extends App {
 object ParallelTest extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val connFact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -747,7 +746,7 @@ object ParallelTest extends App {
 object SmallintTest extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -782,7 +781,7 @@ object NullTest extends App {
   import io.rdbc.sapi.SqlParam._
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -821,7 +820,7 @@ object NullTest extends App {
 object NullTest2 extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -898,7 +897,7 @@ object StmTest extends App {
 object StreamParamsTst extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -940,7 +939,7 @@ object StreamParamsTst extends App {
 object ManyInsertTest extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -982,7 +981,7 @@ object ManyInsertTest extends App {
 object MultiConnTst extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -994,7 +993,7 @@ object MultiConnTst extends App {
 object TypeTst extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
@@ -1090,7 +1089,7 @@ object DataRowTst extends App {
 object ListenNotify extends App {
 
   implicit val ec = ExecutionContext.global
-  implicit val timeout = FiniteDuration.apply(10, "seconds")
+  implicit val timeout = 10.seconds.timeout
 
   val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
 
