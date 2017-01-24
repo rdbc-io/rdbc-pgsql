@@ -1,5 +1,6 @@
 #rdbc-pgsql
 
-This is an attempt to implement a PostgreSQL RDBC driver implementation.
+This is an implementation of a PostgreSQL RDBC driver.
 
-The code is at pre-alpha state, a proof of concept really.
+The project is currently in testing stage.
+
