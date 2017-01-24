@@ -39,13 +39,19 @@ private[core] class PgAnyStatement(stmtExecutor: PgStatementExecutor,
     with Logging {
 
   def bind(params: (String, Any)*): AnyParametrizedStatement = traced {
+    //TODO too many params exception
     val pgParamValues = toPgParamValueSeq(Map(params: _*))
     pgParametrizedStatement(pgParamValues)
   }
 
   def bindByIdx(params: Any*): AnyParametrizedStatement = traced {
-    val pgParamValues = params.map(toPgParamValue).toVector
-    pgParametrizedStatement(pgParamValues)
+    //TODO too many params exception
+    if (params.size < nativeStmt.params.size) {
+      throw new MissingParamValException(nativeStmt.params(params.size))
+    } else {
+      val pgParamValues = params.map(toPgParamValue).toVector
+      pgParametrizedStatement(pgParamValues)
+    }
   }
 
   def noParams: AnyParametrizedStatement = traced(bindByIdx())
