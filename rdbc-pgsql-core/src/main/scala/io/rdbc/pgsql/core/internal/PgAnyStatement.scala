@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.core.internal
 
 import akka.stream.scaladsl.Source
-import io.rdbc.api.exceptions.{MissingParamValException, NoSuitableConverterFoundException}
+import io.rdbc.api.exceptions.{MissingParamValException, NoSuitableConverterFoundException, TooManyParamsException}
 import io.rdbc.implbase.BindablePartialImpl
 import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.pgstruct.{Oid, ParamValue}
@@ -39,15 +39,15 @@ private[core] class PgAnyStatement(stmtExecutor: PgStatementExecutor,
     with Logging {
 
   def bind(params: (String, Any)*): AnyParametrizedStatement = traced {
-    //TODO too many params exception
     val pgParamValues = toPgParamValueSeq(Map(params: _*))
     pgParametrizedStatement(pgParamValues)
   }
 
   def bindByIdx(params: Any*): AnyParametrizedStatement = traced {
-    //TODO too many params exception
     if (params.size < nativeStmt.params.size) {
       throw new MissingParamValException(nativeStmt.params(params.size))
+    } else if(params.size > nativeStmt.params.size) {
+      throw new TooManyParamsException(provided = params.size, expected = nativeStmt.params.size)
     } else {
       val pgParamValues = params.map(toPgParamValue).toVector
       pgParametrizedStatement(pgParamValues)
