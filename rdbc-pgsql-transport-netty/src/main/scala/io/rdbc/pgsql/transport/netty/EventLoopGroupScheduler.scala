@@ -18,12 +18,16 @@ package io.rdbc.pgsql.transport.netty
 
 import io.netty.channel.EventLoopGroup
 import io.rdbc.pgsql.core.internal.scheduler.{ScheduledTask, TaskScheduler}
+import io.rdbc.util.Logging
 
 import scala.concurrent.duration.FiniteDuration
 
-private[netty] class EventLoopGroupScheduler(eventLoopGroup: EventLoopGroup) extends TaskScheduler {
+private[netty] class EventLoopGroupScheduler(eventLoopGroup: EventLoopGroup)
+  extends TaskScheduler
+    with Logging {
 
-  def schedule(delay: FiniteDuration)(action: => Unit): ScheduledTask = {
+  def schedule(delay: FiniteDuration)(action: => Unit): ScheduledTask = traced {
+    logger.debug(s"Scheduling a task to run in $delay using ELG $eventLoopGroup")
     val fut = eventLoopGroup.schedule(runnable(action), delay.length, delay.unit)
     new NettyScheduledTask(fut)
   }

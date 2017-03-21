@@ -16,10 +16,17 @@
 
 package io.rdbc.pgsql.core.internal.scheduler
 
+import io.rdbc.util.Logging
+
 import scala.concurrent.duration.FiniteDuration
 
-private[core] class TimeoutHandler(scheduler: TaskScheduler, timeout: FiniteDuration, timeoutAction: => Unit) {
-  def scheduleTimeoutTask(): ScheduledTask = {
+private[core] class TimeoutHandler(scheduler: TaskScheduler,
+                                   timeout: FiniteDuration,
+                                   timeoutAction: => Unit)
+  extends Logging {
+
+  def scheduleTimeoutTask(): ScheduledTask = traced {
+    logger.debug(s"Scheduling a timeout task to run in $timeout using scheduler $scheduler")
     scheduler.schedule(timeout)(timeoutAction)
   }
 }

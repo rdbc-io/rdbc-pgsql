@@ -26,6 +26,7 @@ import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.util.concurrent.LockFactory
 import io.rdbc.pgsql.core.{ChannelWriter, FatalErrorNotifier, SessionParams}
 import io.rdbc.sapi.{Row, TypeConverterRegistry}
+import io.rdbc.util.Logging
 import org.reactivestreams.{Publisher, Subscriber, Subscription}
 
 import scala.concurrent.ExecutionContext
@@ -116,7 +117,7 @@ private[core] class PgRowPublisher(rowDesc: RowDescription,
                                    lockFactory: LockFactory,
                                    @volatile private[this] var fatalErrorNotifier: FatalErrorNotifier)
                                   (implicit out: ChannelWriter, ec: ExecutionContext)
-  extends Publisher[Row] {
+  extends Publisher[Row] with Logging {
 
   import PgRowPublisher._
 
@@ -221,7 +222,10 @@ private[core] class PgRowPublisher(rowDesc: RowDescription,
       out.writeAndFlush(Execute(portalName, demand), Sync).onComplete {
         case Success(_) =>
           if (neverExecuted.compareAndSet(true, false)) {
+            logger.trace(s"Statement was never executed, scheduling a timeout task with handler $maybeTimeoutHandler")
             timeoutScheduledTask = maybeTimeoutHandler.map(_.scheduleTimeoutTask())
+          } else {
+            logger.trace("Statement was executed before, not scheduling a timeout task")
           }
 
         case Failure(NonFatal(ex)) =>
