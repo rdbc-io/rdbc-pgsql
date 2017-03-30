@@ -26,7 +26,7 @@ private[core] class TimeoutHandler(scheduler: TaskScheduler,
   extends Logging {
 
   def scheduleTimeoutTask(): ScheduledTask = traced {
-    logger.debug(s"Scheduling a timeout task to run in $timeout using scheduler $scheduler")
+    logger.error(s"Scheduling a timeout task to run in $timeout using scheduler $scheduler")
     scheduler.schedule(timeout)(timeoutAction)
   }
 }

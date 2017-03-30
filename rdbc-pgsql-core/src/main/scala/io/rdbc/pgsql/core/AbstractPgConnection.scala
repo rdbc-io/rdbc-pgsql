@@ -42,7 +42,8 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 //TODO make a note in Connection scaladoc that implementations must be thread safe
-abstract class AbstractPgConnection(config: PgConnectionConfig,
+abstract class AbstractPgConnection(val id: ConnId,
+                                    config: PgConnectionConfig,
                                     implicit private[this] val out: ChannelWriter,
                                     implicit protected val ec: ExecutionContext,
                                     scheduler: TaskScheduler,
@@ -146,6 +147,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
 
   protected final def handleBackendMessage(msg: PgBackendMessage): Unit = traced {
     //argsNotNull()
+    logger.trace(s"Handling backend message $msg")
     msg match {
       case paramStatus: ParameterStatus => handleParamStatusChange(paramStatus)
       case _ =>
@@ -322,7 +324,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
           updateStmtCacheIfNeeded(parse, parsePromise.future, nativeSql)
             .flatMap(_ => resultPromise.future)
             .map { result =>
-              timeoutTask.foreach(_.cancel())
+              timeoutTask.foreach(_.cancel()) //TODO timeout task has to be cancelled regardless of future's success
               result
             }
         }
@@ -378,7 +380,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
         .writeAndFlush(Query(sql))
         .recoverWith(writeFailureHandler)
         .map(_ => newTimeoutHandler(reqId, timeout).map(_.scheduleTimeoutTask()))
-        .flatMap { maybeTimeoutTask =>
+        .flatMap { maybeTimeoutTask => //TODO timeout task has to be cancelled regardless of future's success
           queryPromise.future.map { _ =>
             maybeTimeoutTask.foreach(_.cancel())
           }
@@ -452,12 +454,12 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
       Some(new TimeoutHandler(scheduler, duration, timeoutAction = {
         val shouldCancel = fsmManager.startHandlingTimeout(reqId)
         if (shouldCancel) {
-          logger.debug(s"Timeout occurred for request '$reqId', cancelling it")
+          logger.error(s"Timeout occurred for request '$reqId', cancelling it") //TODO timeouts happen spuriously & they are executed even after a connection is closed, this needs to be fixed. Timeout tasks need to be cancelled
           maybeBackendKeyData.foreach { bkd =>
             requestCanceler(bkd).onComplete(_ => fsmManager.finishHandlingTimeout())
           }
         } else {
-          logger.debug(s"Timeout task ran for request '$reqId', but this request is not being executed anymore")
+          logger.error(s"Timeout task ran for request '$reqId', but this request is not being executed anymore")
         }
       }))
     } else {

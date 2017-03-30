@@ -27,7 +27,7 @@ private[netty] class EventLoopGroupScheduler(eventLoopGroup: EventLoopGroup)
     with Logging {
 
   def schedule(delay: FiniteDuration)(action: => Unit): ScheduledTask = traced {
-    logger.debug(s"Scheduling a task to run in $delay using ELG $eventLoopGroup")
+    logger.error(s"Scheduling a task to run in ${delay.length} ${delay.unit} using ELG $eventLoopGroup")
     val fut = eventLoopGroup.schedule(runnable(action), delay.length, delay.unit)
     new NettyScheduledTask(fut)
   }

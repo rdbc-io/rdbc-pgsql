@@ -28,6 +28,8 @@ package object core {
 
   type RequestCanceler = BackendKeyData => Future[Unit]
 
+  case class ConnId(value: String) extends AnyVal
+
   private[core] type FatalErrorNotifier = (String, Throwable) => Unit
 
   private[core] case class RequestId(value: Long) extends AnyVal
