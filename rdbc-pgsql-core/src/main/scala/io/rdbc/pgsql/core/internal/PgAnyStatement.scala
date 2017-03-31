@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.core.internal
 
 import akka.stream.scaladsl.Source
-import io.rdbc.api.exceptions.{MissingParamValException, NoSuitableConverterFoundException}
+import io.rdbc.api.exceptions._
 import io.rdbc.implbase.BindablePartialImpl
 import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.pgstruct.{Oid, ParamValue}
@@ -44,8 +44,14 @@ private[core] class PgAnyStatement(stmtExecutor: PgStatementExecutor,
   }
 
   def bindByIdx(params: Any*): AnyParametrizedStatement = traced {
-    val pgParamValues = params.map(toPgParamValue).toVector
-    pgParametrizedStatement(pgParamValues)
+    if (params.size < nativeStmt.params.size) {
+      throw new MissingParamValException(nativeStmt.params(params.size))
+    } else if (params.size > nativeStmt.params.size) {
+      throw new TooManyParamsException(provided = params.size, expected = nativeStmt.params.size)
+    } else {
+      val pgParamValues = params.map(toPgParamValue).toVector
+      pgParametrizedStatement(pgParamValues)
+    }
   }
 
   def noParams: AnyParametrizedStatement = traced(bindByIdx())
@@ -71,11 +77,22 @@ private[core] class PgAnyStatement(stmtExecutor: PgStatementExecutor,
   }
 
   private def toPgParamValueSeq(params: Map[String, Any]): Vector[ParamValue] = traced {
+
+    case class Acc(res: Vector[ParamValue], left: Set[String])
+
     val pgParamsMap = params.mapValues(toPgParamValue)
-    val indexedPgParams = nativeStmt.params.foldLeft(Vector.empty[ParamValue]) { (acc, paramName) =>
-      acc :+ pgParamsMap.getOrElse(paramName, throw new MissingParamValException(paramName))
+    val init = Acc(res = Vector.empty, left = params.keySet)
+    val indexedPgParams = nativeStmt.params.foldLeft(init) { (acc, paramName) =>
+      acc.copy(
+        res = acc.res :+ pgParamsMap.getOrElse(paramName, throw new MissingParamValException(paramName)),
+        left = acc.left - paramName
+      )
     }
-    indexedPgParams
+    if (indexedPgParams.left.nonEmpty) {
+      throw new NoSuchParamException(indexedPgParams.left.head)
+    } else {
+      indexedPgParams.res
+    }
   }
 
   private def toPgParamValue(value: Any): ParamValue = traced {
