@@ -24,7 +24,7 @@ import io.rdbc.pgsql.core.pgstruct.messages.backend.{DataRow, RowDescription}
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.util.concurrent.LockFactory
-import io.rdbc.pgsql.core.{ChannelWriter, FatalErrorNotifier, SessionParams}
+import io.rdbc.pgsql.core.{ChannelWriter, FatalErrorNotifier, RequestId, SessionParams}
 import io.rdbc.sapi.{Row, TypeConverterRegistry}
 import io.rdbc.util.Logging
 import org.reactivestreams.{Publisher, Subscriber, Subscription}
@@ -116,7 +116,7 @@ private[core] class PgRowPublisher(rowDesc: RowDescription,
                                    maybeTimeoutHandler: Option[TimeoutHandler],
                                    lockFactory: LockFactory,
                                    @volatile private[this] var fatalErrorNotifier: FatalErrorNotifier)
-                                  (implicit out: ChannelWriter, ec: ExecutionContext)
+                                  (implicit reqId: RequestId, out: ChannelWriter, ec: ExecutionContext)
   extends Publisher[Row] with Logging {
 
   import PgRowPublisher._
@@ -223,7 +223,7 @@ private[core] class PgRowPublisher(rowDesc: RowDescription,
         case Success(_) =>
           if (neverExecuted.compareAndSet(true, false)) {
             logger.trace(s"Statement was never executed, scheduling a timeout task with handler $maybeTimeoutHandler")
-            timeoutScheduledTask = maybeTimeoutHandler.map(_.scheduleTimeoutTask())
+            timeoutScheduledTask = maybeTimeoutHandler.map(_.scheduleTimeoutTask(reqId))
           } else {
             logger.trace("Statement was executed before, not scheduling a timeout task")
           }

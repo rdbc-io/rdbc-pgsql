@@ -57,7 +57,7 @@ abstract class AbstractPgConnection(val id: ConnId,
     with PgStatementDeallocator
     with Logging {
 
-  private[this] val fsmManager = new PgSessionFsmManager(config.lockFactory, this)
+  private[this] val fsmManager = new PgSessionFsmManager(id, config.lockFactory, this)
   @volatile private[this] var sessionParams = SessionParams.default
   @volatile private[this] var stmtCache = LruStmtCache.empty(config.stmtCacheCapacity)
   @volatile private[this] var maybeBackendKeyData = Option.empty[BackendKeyData]
@@ -234,7 +234,7 @@ abstract class AbstractPgConnection(val id: ConnId,
       sessionParams = sessionParams,
       maybeTimeoutHandler = newTimeoutHandler(reqId, timeout),
       lockFactory = config.lockFactory,
-      fatalErrorNotifier = handleFatalError)(out, ec)
+      fatalErrorNotifier = handleFatalError)(reqId, out, ec)
   }
 
   private def beginningTx(reqId: RequestId,
@@ -253,7 +253,7 @@ abstract class AbstractPgConnection(val id: ConnId,
       typeConverters = config.typeConverters,
       pgTypes = config.pgTypes,
       lockFactory = config.lockFactory,
-      fatalErrorNotifier = handleFatalError)(out, ec)
+      fatalErrorNotifier = handleFatalError)(reqId, out, ec)
   }
 
   sealed trait StatementStatus
@@ -320,12 +320,11 @@ abstract class AbstractPgConnection(val id: ConnId,
         .writeAndFlush(bind, Execute(optionalPortalName = bind.portal, optionalFetchSize = None), Sync)
         .recoverWith(writeFailureHandler)
         .flatMap { _ =>
-          val timeoutTask = newTimeoutHandler(reqId, timeout).map(_.scheduleTimeoutTask())
+          val timeoutTask = newTimeoutHandler(reqId, timeout).map(_.scheduleTimeoutTask(reqId))
           updateStmtCacheIfNeeded(parse, parsePromise.future, nativeSql)
             .flatMap(_ => resultPromise.future)
-            .map { result =>
-              timeoutTask.foreach(_.cancel()) //TODO timeout task has to be cancelled regardless of future's success
-              result
+            .andThen { case _ =>
+              timeoutTask.foreach(_.cancel())
             }
         }
     }
@@ -379,9 +378,9 @@ abstract class AbstractPgConnection(val id: ConnId,
       out
         .writeAndFlush(Query(sql))
         .recoverWith(writeFailureHandler)
-        .map(_ => newTimeoutHandler(reqId, timeout).map(_.scheduleTimeoutTask()))
-        .flatMap { maybeTimeoutTask => //TODO timeout task has to be cancelled regardless of future's success
-          queryPromise.future.map { _ =>
+        .map(_ => newTimeoutHandler(reqId, timeout).map(_.scheduleTimeoutTask(reqId)))
+        .flatMap { maybeTimeoutTask =>
+          queryPromise.future.andThen { case _ =>
             maybeTimeoutTask.foreach(_.cancel())
           }
         }
@@ -451,7 +450,7 @@ abstract class AbstractPgConnection(val id: ConnId,
                                 timeout: Timeout): Option[TimeoutHandler] = traced {
     if (timeout.value.isFinite()) {
       val duration = FiniteDuration(timeout.value.length, timeout.value.unit)
-      Some(new TimeoutHandler(scheduler, duration, timeoutAction = {
+      Some(new TimeoutHandler(scheduler, duration, timeoutAction = () => {
         val shouldCancel = fsmManager.startHandlingTimeout(reqId)
         if (shouldCancel) {
           logger.error(s"Timeout occurred for request '$reqId', cancelling it") //TODO timeouts happen spuriously & they are executed even after a connection is closed, this needs to be fixed. Timeout tasks need to be cancelled

@@ -27,7 +27,7 @@ import io.rdbc.pgsql.core.pgstruct.messages.backend._
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{Bind, Parse, PortalName}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.util.concurrent.LockFactory
-import io.rdbc.pgsql.core.{ChannelWriter, FatalErrorNotifier, PgMsgHandler, SessionParams}
+import io.rdbc.pgsql.core._
 import io.rdbc.sapi.TypeConverterRegistry
 import io.rdbc.util.Logging
 
@@ -170,7 +170,7 @@ private[core] object State extends Logging {
                     pgTypes: PgTypeRegistry,
                     lockFactory: LockFactory,
                     fatalErrorNotifier: FatalErrorNotifier)
-                   (implicit out: ChannelWriter,
+                   (implicit reqId: RequestId, out: ChannelWriter,
                     ec: ExecutionContext): StrmBeginningTx = {
       new StrmBeginningTx(
         maybeParse = maybeParse,
@@ -231,7 +231,7 @@ private[core] object State extends Logging {
                            maybeTimeoutHandler: Option[TimeoutHandler],
                            lockFactory: LockFactory,
                            fatalErrorNotifier: FatalErrorNotifier)
-                          (implicit out: ChannelWriter, ec: ExecutionContext): StrmWaitingForDescribe = {
+                          (implicit reqId: RequestId, out: ChannelWriter, ec: ExecutionContext): StrmWaitingForDescribe = {
       new StrmWaitingForDescribe(
         txMgmt = txMgmt,
         portalName = portalName,
