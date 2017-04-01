@@ -323,9 +323,8 @@ abstract class AbstractPgConnection(val id: ConnId,
           val timeoutTask = newTimeoutHandler(reqId, timeout).map(_.scheduleTimeoutTask(reqId))
           updateStmtCacheIfNeeded(parse, parsePromise.future, nativeSql)
             .flatMap(_ => resultPromise.future)
-            .map { result =>
+            .andThen { case _ =>
               timeoutTask.foreach(_.cancel())
-              result
             }
         }
     }
@@ -381,7 +380,7 @@ abstract class AbstractPgConnection(val id: ConnId,
         .recoverWith(writeFailureHandler)
         .map(_ => newTimeoutHandler(reqId, timeout).map(_.scheduleTimeoutTask(reqId)))
         .flatMap { maybeTimeoutTask =>
-          queryPromise.future.map { _ =>
+          queryPromise.future.andThen { case _ =>
             maybeTimeoutTask.foreach(_.cancel())
           }
         }
@@ -451,7 +450,7 @@ abstract class AbstractPgConnection(val id: ConnId,
                                 timeout: Timeout): Option[TimeoutHandler] = traced {
     if (timeout.value.isFinite()) {
       val duration = FiniteDuration(timeout.value.length, timeout.value.unit)
-      Some(new TimeoutHandler(scheduler, duration, timeoutAction = {
+      Some(new TimeoutHandler(scheduler, duration, timeoutAction = () => {
         val shouldCancel = fsmManager.startHandlingTimeout(reqId)
         if (shouldCancel) {
           logger.debug(s"Timeout occurred for request '$reqId', cancelling it")
