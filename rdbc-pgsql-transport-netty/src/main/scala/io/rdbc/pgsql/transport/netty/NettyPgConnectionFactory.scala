@@ -75,7 +75,7 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
   }
 
   private[this] val scheduler = {
-    new EventLoopGroupScheduler(config.eventLoopGroup)
+    new JdkScheduler(config.eventLoopGroup)
   }
 
   private[this] val openChannels = {

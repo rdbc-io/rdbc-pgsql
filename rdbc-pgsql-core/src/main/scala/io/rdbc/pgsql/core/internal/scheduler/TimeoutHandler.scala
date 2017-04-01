@@ -23,7 +23,7 @@ import scala.concurrent.duration.FiniteDuration
 
 private[core] class TimeoutHandler(scheduler: TaskScheduler,
                                    timeout: FiniteDuration,
-                                   timeoutAction: Unit)
+                                   timeoutAction: () => Unit)
   extends Logging {
 
   def scheduleTimeoutTask(reqId: RequestId): ScheduledTask = traced {
