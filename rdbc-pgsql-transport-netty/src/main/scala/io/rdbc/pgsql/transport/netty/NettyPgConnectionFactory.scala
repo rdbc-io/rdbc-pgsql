@@ -34,7 +34,7 @@ import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgUncategor
 import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{CancelRequest, Terminate}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.core.{AbstractPgConnection, PgConnectionConfig}
+import io.rdbc.pgsql.core.{AbstractPgConnection, ConnId, PgConnectionConfig}
 import io.rdbc.sapi.{ConnectionFactory, TypeConverterRegistry}
 import io.rdbc.util.Logging
 
@@ -178,6 +178,7 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
     )
 
     new NettyPgConnection(
+      id = ConnId(ch.id().asShortText()),
       config = connConfig,
       out = new NettyChannelWriter(ch),
       decoder = decoderHandler,

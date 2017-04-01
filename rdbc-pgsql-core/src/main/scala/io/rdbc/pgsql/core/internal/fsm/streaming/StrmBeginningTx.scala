@@ -23,7 +23,7 @@ import io.rdbc.pgsql.core.pgstruct.messages.backend.{CommandComplete, ReadyForQu
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.util.concurrent.LockFactory
-import io.rdbc.pgsql.core.{ChannelWriter, FatalErrorNotifier, PgMsgHandler, SessionParams}
+import io.rdbc.pgsql.core._
 import io.rdbc.sapi.TypeConverterRegistry
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -40,7 +40,7 @@ class StrmBeginningTx private[fsm](maybeParse: Option[Parse],
                                    pgTypes: PgTypeRegistry,
                                    lockFactory: LockFactory,
                                    fatalErrorNotifier: FatalErrorNotifier)
-                                  (implicit out: ChannelWriter,
+                                  (implicit reqId: RequestId, out: ChannelWriter,
                                    ec: ExecutionContext)
   extends State {
 
