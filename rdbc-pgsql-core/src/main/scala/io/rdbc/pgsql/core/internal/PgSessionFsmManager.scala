@@ -20,13 +20,14 @@ import io.rdbc.api.exceptions.IllegalSessionStateException
 import io.rdbc.pgsql.core.exception.PgDriverInternalErrorException
 import io.rdbc.pgsql.core.internal.fsm._
 import io.rdbc.pgsql.core.util.concurrent.LockFactory
-import io.rdbc.pgsql.core.{ClientRequest, RequestId}
+import io.rdbc.pgsql.core.{ClientRequest, ConnId, RequestId}
 import io.rdbc.util.Logging
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 
-private[core] class PgSessionFsmManager(lockFactory: LockFactory,
+private[core] class PgSessionFsmManager(connId: ConnId,
+                                        lockFactory: LockFactory,
                                         fatalErrorHandler: FatalErrorHandler
                                        )(implicit val ec: ExecutionContext)
   extends Logging {
@@ -35,7 +36,7 @@ private[core] class PgSessionFsmManager(lockFactory: LockFactory,
   private[this] var handlingTimeout = false
   private[this] var state: State = Uninitialized
   private[this] var readyPromise = Promise[Unit]
-  private[this] var lastRequestId = RequestId(0L)
+  private[this] var lastRequestId = RequestId(connId, 0L)
 
   /* TODO can't make this traced, compilation fails, investigate */
   def ifReady[A](request: ClientRequest[A]): Future[A] = {
@@ -81,7 +82,7 @@ private[core] class PgSessionFsmManager(lockFactory: LockFactory,
     ready = false
     state = StartingRequest
     readyPromise = Promise[Unit]
-    lastRequestId = RequestId(lastRequestId.value + 1L)
+    lastRequestId = lastRequestId.copy(value = lastRequestId.value + 1L)
     lastRequestId
   }
 
