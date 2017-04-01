@@ -16,26 +16,27 @@
 
 package io.rdbc.pgsql.transport.netty
 
-import io.netty.channel.EventLoopGroup
+import java.util.concurrent.ScheduledExecutorService
+
 import io.rdbc.pgsql.core.internal.scheduler.{ScheduledTask, TaskScheduler}
 import io.rdbc.util.Logging
 
 import scala.concurrent.duration.FiniteDuration
 
-private[netty] class EventLoopGroupScheduler(eventLoopGroup: EventLoopGroup)
+private[netty] class JdkScheduler(executorService: ScheduledExecutorService)
   extends TaskScheduler
     with Logging {
 
-  def schedule(delay: FiniteDuration)(action: => Unit): ScheduledTask = traced {
-    logger.error(s"Scheduling a task to run in ${delay.length} ${delay.unit} using $eventLoopGroup")
-    val fut = eventLoopGroup.schedule(runnable(action), delay.length, delay.unit)
-    new NettyScheduledTask(fut)
+  def schedule(delay: FiniteDuration)(action: () => Unit): ScheduledTask = traced {
+    logger.error(s"Scheduling a task to run in ${delay.length} ${delay.unit} using $executorService")
+    val fut = executorService.schedule(runnable(action), delay.length, delay.unit)
+    new JdkScheduledTask(fut)
   }
 
   /* Scala 2.11 compat */
-  private def runnable(action: => Unit): Runnable = {
+  private def runnable(action: () => Unit): Runnable = {
     new Runnable() {
-      def run(): Unit = action
+      def run(): Unit = action()
     }
   }
 }
