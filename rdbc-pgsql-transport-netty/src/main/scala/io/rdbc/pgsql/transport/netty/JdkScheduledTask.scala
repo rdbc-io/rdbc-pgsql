@@ -16,22 +16,13 @@
 
 package io.rdbc.pgsql.transport.netty
 
-import io.netty.channel.EventLoopGroup
-import io.rdbc.pgsql.core.internal.scheduler.{ScheduledTask, TaskScheduler}
+import java.util.concurrent.ScheduledFuture
 
-import scala.concurrent.duration.FiniteDuration
+import io.rdbc.pgsql.core.internal.scheduler.ScheduledTask
 
-private[netty] class EventLoopGroupScheduler(eventLoopGroup: EventLoopGroup) extends TaskScheduler {
-
-  def schedule(delay: FiniteDuration)(action: => Unit): ScheduledTask = {
-    val fut = eventLoopGroup.schedule(runnable(action), delay.length, delay.unit)
-    new NettyScheduledTask(fut)
-  }
-
-  /* Scala 2.11 compat */
-  private def runnable(action: => Unit): Runnable = {
-    new Runnable() {
-      def run(): Unit = action
-    }
+private[netty] class JdkScheduledTask(scheduledFuture: ScheduledFuture[_])
+  extends ScheduledTask {
+  def cancel(): Unit = {
+    scheduledFuture.cancel(false) // false = don't interrupt if running
   }
 }

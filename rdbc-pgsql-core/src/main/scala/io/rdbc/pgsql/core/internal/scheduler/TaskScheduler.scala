@@ -19,5 +19,5 @@ package io.rdbc.pgsql.core.internal.scheduler
 import scala.concurrent.duration.FiniteDuration
 
 trait TaskScheduler {
-  def schedule(delay: FiniteDuration)(action: => Unit): ScheduledTask
+  def schedule(delay: FiniteDuration)(action: () => Unit): ScheduledTask
 }

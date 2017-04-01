@@ -42,7 +42,8 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
 //TODO make a note in Connection scaladoc that implementations must be thread safe
-abstract class AbstractPgConnection(config: PgConnectionConfig,
+abstract class AbstractPgConnection(val id: ConnId,
+                                    config: PgConnectionConfig,
                                     implicit private[this] val out: ChannelWriter,
                                     implicit protected val ec: ExecutionContext,
                                     scheduler: TaskScheduler,
@@ -56,7 +57,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
     with PgStatementDeallocator
     with Logging {
 
-  private[this] val fsmManager = new PgSessionFsmManager(config.lockFactory, this)
+  private[this] val fsmManager = new PgSessionFsmManager(id, config.lockFactory, this)
   @volatile private[this] var sessionParams = SessionParams.default
   @volatile private[this] var stmtCache = LruStmtCache.empty(config.stmtCacheCapacity)
   @volatile private[this] var maybeBackendKeyData = Option.empty[BackendKeyData]
@@ -146,6 +147,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
 
   protected final def handleBackendMessage(msg: PgBackendMessage): Unit = traced {
     //argsNotNull()
+    logger.trace(s"Handling backend message $msg")
     msg match {
       case paramStatus: ParameterStatus => handleParamStatusChange(paramStatus)
       case _ =>
@@ -232,7 +234,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
       sessionParams = sessionParams,
       maybeTimeoutHandler = newTimeoutHandler(reqId, timeout),
       lockFactory = config.lockFactory,
-      fatalErrorNotifier = handleFatalError)(out, ec)
+      fatalErrorNotifier = handleFatalError)(reqId, out, ec)
   }
 
   private def beginningTx(reqId: RequestId,
@@ -251,7 +253,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
       typeConverters = config.typeConverters,
       pgTypes = config.pgTypes,
       lockFactory = config.lockFactory,
-      fatalErrorNotifier = handleFatalError)(out, ec)
+      fatalErrorNotifier = handleFatalError)(reqId, out, ec)
   }
 
   sealed trait StatementStatus
@@ -318,12 +320,11 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
         .writeAndFlush(bind, Execute(optionalPortalName = bind.portal, optionalFetchSize = None), Sync)
         .recoverWith(writeFailureHandler)
         .flatMap { _ =>
-          val timeoutTask = newTimeoutHandler(reqId, timeout).map(_.scheduleTimeoutTask())
+          val timeoutTask = newTimeoutHandler(reqId, timeout).map(_.scheduleTimeoutTask(reqId))
           updateStmtCacheIfNeeded(parse, parsePromise.future, nativeSql)
             .flatMap(_ => resultPromise.future)
-            .map { result =>
+            .andThen { case _ =>
               timeoutTask.foreach(_.cancel())
-              result
             }
         }
     }
@@ -377,9 +378,9 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
       out
         .writeAndFlush(Query(sql))
         .recoverWith(writeFailureHandler)
-        .map(_ => newTimeoutHandler(reqId, timeout).map(_.scheduleTimeoutTask()))
+        .map(_ => newTimeoutHandler(reqId, timeout).map(_.scheduleTimeoutTask(reqId)))
         .flatMap { maybeTimeoutTask =>
-          queryPromise.future.map { _ =>
+          queryPromise.future.andThen { case _ =>
             maybeTimeoutTask.foreach(_.cancel())
           }
         }
@@ -449,7 +450,7 @@ abstract class AbstractPgConnection(config: PgConnectionConfig,
                                 timeout: Timeout): Option[TimeoutHandler] = traced {
     if (timeout.value.isFinite()) {
       val duration = FiniteDuration(timeout.value.length, timeout.value.unit)
-      Some(new TimeoutHandler(scheduler, duration, timeoutAction = {
+      Some(new TimeoutHandler(scheduler, duration, timeoutAction = () => {
         val shouldCancel = fsmManager.startHandlingTimeout(reqId)
         if (shouldCancel) {
           logger.debug(s"Timeout occurred for request '$reqId', cancelling it")

@@ -1,7 +1,7 @@
 import sbt._
 
 object Version {
-  val rdbc = "0.0.40"
+  val rdbc = "0.0.41"
   val netty = "4.0.42.Final"
 }
 
