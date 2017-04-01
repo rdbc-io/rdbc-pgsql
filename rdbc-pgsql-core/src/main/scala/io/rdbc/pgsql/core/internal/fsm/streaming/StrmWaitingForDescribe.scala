@@ -24,7 +24,7 @@ import io.rdbc.pgsql.core.pgstruct.messages.backend._
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.PortalName
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.util.concurrent.LockFactory
-import io.rdbc.pgsql.core.{ChannelWriter, FatalErrorNotifier, PgMsgHandler, SessionParams}
+import io.rdbc.pgsql.core._
 import io.rdbc.sapi.TypeConverterRegistry
 
 import scala.concurrent.{ExecutionContext, Promise}
@@ -40,7 +40,7 @@ class StrmWaitingForDescribe private[fsm](txMgmt: Boolean,
                                           maybeTimeoutHandler: Option[TimeoutHandler],
                                           lockFactory: LockFactory,
                                           fatalErrorNotifier: FatalErrorNotifier)
-                                         (implicit out: ChannelWriter, ec: ExecutionContext)
+                                         (implicit reqId: RequestId, out: ChannelWriter, ec: ExecutionContext)
   extends State {
 
   @volatile private[this] var maybeAfterDescData = Option.empty[AfterDescData]

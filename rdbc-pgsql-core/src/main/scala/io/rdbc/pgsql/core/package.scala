@@ -28,9 +28,13 @@ package object core {
 
   type RequestCanceler = BackendKeyData => Future[Unit]
 
+  case class ConnId(value: String) extends AnyVal
+
   private[core] type FatalErrorNotifier = (String, Throwable) => Unit
 
-  private[core] case class RequestId(value: Long) extends AnyVal
+  private[core] case class RequestId(connId: ConnId, value: Long) {
+    override def toString: String = s"${connId.value}:$value"
+  }
 
   private[core] case class RdbcSql(value: String) extends AnyVal
 

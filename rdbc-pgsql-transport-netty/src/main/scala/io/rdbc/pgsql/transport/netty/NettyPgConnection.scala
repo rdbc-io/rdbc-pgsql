@@ -26,7 +26,8 @@ import io.rdbc.pgsql.core.pgstruct.messages.backend._
 
 import scala.concurrent.ExecutionContext
 
-private[netty] class NettyPgConnection(config: PgConnectionConfig,
+private[netty] class NettyPgConnection(id: ConnId,
+                                       config: PgConnectionConfig,
                                        out: ChannelWriter,
                                        decoder: PgMsgDecoderHandler,
                                        encoder: PgMsgEncoderHandler,
@@ -35,6 +36,7 @@ private[netty] class NettyPgConnection(config: PgConnectionConfig,
                                        requestCanceler: RequestCanceler,
                                        streamMaterializer: Materializer)
   extends AbstractPgConnection(
+    id = id,
     config = config,
     out = out,
     ec = ec,
