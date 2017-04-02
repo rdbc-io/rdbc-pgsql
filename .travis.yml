@@ -1,10 +1,34 @@
 language: scala
-jdk:
-- oraclejdk8
-scala:
-- 2.12.1
-- 2.11.8
 sudo: false
+dist: trusty
+
+matrix:
+  include:
+    - jdk: oraclejdk8
+      scala: 2.12.1
+      addons:
+          postgresql: 9.4
+    - jdk: oraclejdk8
+      scala: 2.12.1
+      addons:
+          postgresql: 9.5
+    - jdk: oraclejdk8
+      scala: 2.12.1
+      addons:
+          postgresql: 9.6
+    - jdk: oraclejdk8
+      scala: 2.11.8
+      addons:
+          postgresql: 9.4
+    - jdk: oraclejdk8
+      scala: 2.11.8
+      addons:
+          postgresql: 9.5
+    - jdk: oraclejdk8
+      scala: 2.11.8
+      addons:
+          postgresql: 9.6
+
 install: ci/bootstrap.sh
 script: sbt ++$TRAVIS_SCALA_VERSION clean scalastyle coverage test coverageReport
 after_success: bash <(curl -s https://codecov.io/bash)
@@ -14,6 +38,10 @@ deploy:
   script: sbt ++$TRAVIS_SCALA_VERSION publish
   on:
     tags: true
+services:
+  - postgresql
+before_script:
+  - psql -c 'create database rdbc;' -U postgres
 cache:
   directories:
   - "$HOME/.ivy2/cache"
