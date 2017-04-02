@@ -1,7 +1,7 @@
 import sbt._
 
 object Version {
-  val rdbc = "0.0.41"
+  val rdbc = "0.0.42"
   val netty = "4.0.42.Final"
 }
 
@@ -20,4 +20,7 @@ object Library {
   val sourcecode = "com.lihaoyi" %% "sourcecode" % "0.1.3"
   val nettyHandler = "io.netty" % "netty-handler" % Version.netty
   val nettyEpoll = "io.netty" % "netty-transport-native-epoll" % Version.netty classifier "linux-x86_64"
+
+  val rdbcTests = "io.rdbc" %% "rdbc-tests" % Version.rdbc % Test
+  val scalatest = "org.scalatest" %% "scalatest" % "3.0.1" % Test
 }
