@@ -178,7 +178,7 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
     )
 
     new NettyPgConnection(
-      id = ConnId(ch.localAddress().toString),
+      id = ConnId(System.identityHashCode(ch).toString),
       config = connConfig,
       out = new NettyChannelWriter(ch),
       decoder = decoderHandler,
