@@ -28,7 +28,7 @@ private[netty] class JdkScheduler(executorService: ScheduledExecutorService)
     with Logging {
 
   def schedule(delay: FiniteDuration)(action: () => Unit): ScheduledTask = traced {
-    logger.error(s"Scheduling a task to run in ${delay.length} ${delay.unit} using $executorService")
+    logger.debug(s"Scheduling a task to run in ${delay.length} ${delay.unit} using $executorService")
     val fut = executorService.schedule(runnable(action), delay.length, delay.unit)
     new JdkScheduledTask(fut)
   }

@@ -45,7 +45,7 @@ class Authenticating private[fsm](initPromise: Promise[BackendKeyData],
         stay andThenF out.writeAndFlush(authState.responses)
       }
 
-    case AuthOk if waitingForOk => goto(new Initializing(initPromise))
+    case AuthOk => goto(new Initializing(initPromise))
   }
 
   private def ifAuthenticatorSupports(authReq: AuthRequest)(body: => StateAction): StateAction = {
