@@ -43,6 +43,10 @@ object PasswordMessage {
     PasswordMessage(ByteVector.view(credentials))
   }
 
+  def cleartext(password: String): PasswordMessage = {
+    PasswordMessage(ByteVector.view(password.getBytes("US-ASCII"))) //TODO US-ASCII?
+  }
+
   private def bytesToHex(bytes: Array[Byte]): String = {
     bytes.map("%02x" format _).mkString
   }
