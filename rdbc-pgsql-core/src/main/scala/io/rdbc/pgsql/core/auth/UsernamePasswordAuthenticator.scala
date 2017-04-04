@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.core.auth
 
 import io.rdbc.pgsql.core.auth.AuthState.AuthComplete
-import io.rdbc.pgsql.core.pgstruct.messages.backend.auth.{AuthBackendMessage, AuthRequestMd5}
+import io.rdbc.pgsql.core.pgstruct.messages.backend.auth.{AuthBackendMessage, AuthRequestCleartext, AuthRequestMd5}
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.PasswordMessage
 
 import scala.collection.immutable
@@ -27,12 +27,14 @@ class UsernamePasswordAuthenticator(val username: String, val password: String) 
   def authenticate(authReqMessage: AuthBackendMessage): AuthState = authReqMessage match {
     case req: AuthRequestMd5 =>
       AuthComplete(immutable.Seq(PasswordMessage.md5(username, password, req.salt)))
+    case AuthRequestCleartext =>
+      AuthComplete(immutable.Seq(PasswordMessage.cleartext(password)))
     //TODO more username password mechanisms
   }
 
   def supports(authReqMessage: AuthBackendMessage): Boolean = {
     authReqMessage match {
-      case _: AuthRequestMd5 => true
+      case _: AuthRequestMd5 | AuthRequestCleartext => true
       case _ => false
     }
   }

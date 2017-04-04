@@ -22,7 +22,7 @@ import _root_.scodec.codecs._
 import _root_.scodec.{Attempt, Codec, DecodeResult, Err, SizeBound}
 import io.rdbc.pgsql.core.pgstruct.TxStatus
 import io.rdbc.pgsql.core.pgstruct.messages.backend._
-import io.rdbc.pgsql.core.pgstruct.messages.backend.auth.{AuthBackendMessage, AuthOk, AuthRequestMd5}
+import io.rdbc.pgsql.core.pgstruct.messages.backend.auth._
 import io.rdbc.pgsql.scodec._
 import scodec.bits.BitVector
 
@@ -153,6 +153,7 @@ package object backend {
     discriminated[AuthBackendMessage]
       .by("auth_type_id" | int32)
       .typecase(0x00, provide(AuthOk))
+      .typecase(0x03, provide(AuthRequestCleartext))
       .typecase(0x05, authRequestMd5)
       .withContext("auth_type")
   }
