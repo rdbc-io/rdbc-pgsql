@@ -89,7 +89,8 @@ lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
       Library.rdbcTests,
       Library.scalaLogging,
       Library.logback,
-      Library.scalatest
+      Library.scalatest,
+      Library.pgsql
     ),
     buildInfoPackage := "io.rdbc.pgsql.transport.netty"
   ).dependsOn(core, scodec)

@@ -23,4 +23,5 @@ object Library {
 
   val rdbcTests = "io.rdbc" %% "rdbc-tests" % Version.rdbc % Test
   val scalatest = "org.scalatest" %% "scalatest" % "3.0.1" % Test
+  val pgsql = "ru.yandex.qatools.embed" % "postgresql-embedded" % "1.22" % Test
 }
