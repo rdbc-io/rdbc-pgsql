@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite hostname="Krzysztofs-MBP.home" name="org.reactivestreams.tck.PublisherVerification" tests="36" failures="0" timestamp="22 Apr 2017 16:46:27 GMT" time="23.447" errors="0">
+  <testcase name="optional_spec104_mustSignalOnErrorWhenFails" time="0.791" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="optional_spec105_emptyStreamMustTerminateBySignallingOnComplete" time="0.148" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="optional_spec111_maySupportMultiSubscribe" time="0.041" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification">
+    <skipped/>
+  </testcase>
+  <testcase name="optional_spec111_multicast_mustProduceTheSameElementsInTheSameSequenceToAllOfItsSubscribersWhenRequestingManyUpfront" time="0.029" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification">
+    <skipped/>
+  </testcase>
+  <testcase name="optional_spec111_multicast_mustProduceTheSameElementsInTheSameSequenceToAllOfItsSubscribersWhenRequestingManyUpfrontAndCompleteAsExpected" time="0.029" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification">
+    <skipped/>
+  </testcase>
+  <testcase name="optional_spec111_multicast_mustProduceTheSameElementsInTheSameSequenceToAllOfItsSubscribersWhenRequestingOneByOne" time="0.027" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification">
+    <skipped/>
+  </testcase>
+  <testcase name="required_createPublisher1MustProduceAStreamOfExactly1Element" time="0.022" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_createPublisher3MustProduceAStreamOfExactly3Elements" time="0.03" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec101_subscriptionRequestMustResultInTheCorrectNumberOfProducedElements" time="0.328" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec102_maySignalLessThanRequestedAndTerminateSubscription" time="0.022" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec105_mustSignalOnCompleteWhenFiniteStreamTerminates" time="0.118" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec107_mustNotEmitFurtherSignalsOnceOnCompleteHasBeenSignalled" time="0.117" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec109_mayRejectCallsToSubscribeIfPublisherIsUnableOrUnwillingToServeThemRejectionMustTriggerOnErrorAfterOnSubscribe" time="0.015" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec109_mustIssueOnSubscribeForNonNullSubscriber" time="0.013" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec109_subscribeThrowNPEOnNullSubscriber" time="0.01" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec302_mustAllowSynchronousRequestCallsFromOnNextAndOnSubscribe" time="0.119" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec303_mustNotAllowUnboundedRecursion" time="0.016" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec306_afterSubscriptionIsCancelledRequestMustBeNops" time="0.116" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec307_afterSubscriptionIsCancelledAdditionalCancelationsMustBeNops" time="0.12" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec309_requestNegativeNumberMustSignalIllegalArgumentException" time="0.124" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec309_requestZeroMustSignalIllegalArgumentException" time="0.125" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec312_cancelMustMakeThePublisherToEventuallyStopSignaling" time="0.342" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec313_cancelMustMakeThePublisherEventuallyDropAllReferencesToTheSubscriber" time="1.846" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec317_mustNotSignalOnErrorWhenPendingAboveLongMaxValue" time="0.002" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification">
+    <skipped/>
+  </testcase>
+  <testcase name="required_spec317_mustSupportACumulativePendingElementCountUpToLongMaxValue" time="0.016" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_spec317_mustSupportAPendingElementCountUpToLongMaxValue" time="0.013" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_validate_boundedDepthOfOnNextAndRequestRecursion" time="0.0" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="required_validate_maxElementsFromPublisher" time="0.0" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="stochastic_spec103_mustSignalOnMethodsSequentially" time="1.342" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification"/>
+  <testcase name="untested_spec106_mustConsiderSubscriptionCancelledAfterOnErrorOrOnCompleteHasBeenCalled" time="0.0" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification">
+    <skipped/>
+  </testcase>
+  <testcase name="untested_spec107_mustNotEmitFurtherSignalsOnceOnErrorHasBeenSignalled" time="0.001" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification">
+    <skipped/>
+  </testcase>
+  <testcase name="untested_spec108_possiblyCanceledSubscriptionShouldNotReceiveOnErrorOrOnCompleteSignals" time="0.0" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification">
+    <skipped/>
+  </testcase>
+  <testcase name="untested_spec109_subscribeShouldNotThrowNonFatalThrowable" time="0.0" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification">
+    <skipped/>
+  </testcase>
+  <testcase name="untested_spec110_rejectASubscriptionRequestIfTheSameSubscriberSubscribesTwice" time="0.0" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification">
+    <skipped/>
+  </testcase>
+  <testcase name="untested_spec304_requestShouldNotPerformHeavyComputations" time="0.001" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification">
+    <skipped/>
+  </testcase>
+  <testcase name="untested_spec305_cancelMustNotSynchronouslyPerformHeavyCompuatation" time="0.0" classname="io.rdbc.pgsql.transport.netty.PgRowPublisherVerification">
+    <skipped/>
+  </testcase>
+</testsuite>

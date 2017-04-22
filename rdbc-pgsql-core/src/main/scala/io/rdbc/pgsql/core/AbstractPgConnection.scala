@@ -123,7 +123,7 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   override def forceRelease(): Future[Unit] = traced {
     //TODO do nothing if already released
-    logger.info("Forcing a connection release")
+    logger.debug("Forcing a connection release")
     doRelease("Connection released by client (forced)")
   }
 
