@@ -18,7 +18,7 @@ package io.rdbc.pgsql.core.internal
 
 import akka.stream.scaladsl.Source
 import io.rdbc.api.exceptions._
-import io.rdbc.implbase.BindablePartialImpl
+import io.rdbc.implbase.StatementPartialImpl
 import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.pgstruct.{Oid, ParamValue}
 import io.rdbc.pgsql.core.types.{PgType, PgTypeRegistry}
@@ -34,16 +34,16 @@ private[core] class PgAnyStatement(stmtExecutor: PgStatementExecutor,
                                    sessionParams: SessionParams,
                                    nativeStmt: PgNativeStatement)
                                   (implicit ec: ExecutionContext)
-  extends AnyStatement
-    with BindablePartialImpl[AnyParametrizedStatement]
+  extends Statement
+    with StatementPartialImpl
     with Logging {
 
-  def bind(params: (String, Any)*): AnyParametrizedStatement = traced {
+  def bind(params: (String, Any)*): ParametrizedStatement = traced {
     val pgParamValues = toPgParamValueSeq(Map(params: _*))
     pgParametrizedStatement(pgParamValues)
   }
 
-  def bindByIdx(params: Any*): AnyParametrizedStatement = traced {
+  def bindByIdx(params: Any*): ParametrizedStatement = traced {
     if (params.size < nativeStmt.params.size) {
       throw new MissingParamValException(nativeStmt.params(params.size))
     } else if (params.size > nativeStmt.params.size) {
@@ -54,7 +54,7 @@ private[core] class PgAnyStatement(stmtExecutor: PgStatementExecutor,
     }
   }
 
-  def noParams: AnyParametrizedStatement = traced(bindByIdx())
+  def noParams: ParametrizedStatement = traced(bindByIdx())
 
   def streamParams(paramsPublisher: Publisher[Map[String, Any]]): Future[Unit] = traced {
     val pgParamsSource = Source.fromPublisher(paramsPublisher).map { paramMap =>

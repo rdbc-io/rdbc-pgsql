@@ -16,10 +16,10 @@
 
 package io.rdbc.pgsql.core.internal
 
-import io.rdbc.implbase.AnyParametrizedStatementPartialImpl
+import io.rdbc.implbase.ParametrizedStatementPartialImpl
 import io.rdbc.pgsql.core.pgstruct.ParamValue
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
-import io.rdbc.sapi.{AnyParametrizedStatement, ResultStream, Timeout}
+import io.rdbc.sapi.{ParametrizedStatement, ResultStream, Timeout}
 import io.rdbc.util.Logging
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -29,8 +29,8 @@ private[core] class PgParametrizedStatement(executor: PgStatementExecutor,
                                             nativeSql: NativeSql,
                                             params: Vector[ParamValue])
                                            (implicit protected val ec: ExecutionContext)
-  extends AnyParametrizedStatement
-    with AnyParametrizedStatementPartialImpl
+  extends ParametrizedStatement
+    with ParametrizedStatementPartialImpl
     with Logging {
 
   def deallocate(): Future[Unit] = traced {
