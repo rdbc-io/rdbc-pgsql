@@ -56,7 +56,8 @@ class PgRdbcSuite extends RdbcSuite with BeforeAndAfterAll {
 
   protected def connection(): Connection = connFact.connection().get
 
-  protected val arbitraryDataType: String = "int4"
+  protected val intDataType = "int4"
+  protected val arbitraryDataType: String = intDataType
 
   protected def slowStatement(time: FiniteDuration): String = s"select pg_sleep(${time.toSeconds})"
 }

@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import io.rdbc.api.exceptions.{ConnectionClosedException, IllegalSessionStateException}
-import io.rdbc.implbase.{ConnectionPartialImpl, ReturningInsertImpl}
+import io.rdbc.implbase.ConnectionPartialImpl
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.exception.PgUnsupportedCharsetException
 import io.rdbc.pgsql.core.internal._
@@ -65,11 +65,17 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   override def watchForIdle: Future[this.type] = fsmManager.readyFuture.map(_ => this)
 
-  override def statement(sql: String): Future[AnyStatement] = traced {
+  override def statement(sql: String, options: StatementOptions): Future[Statement] = traced {
     argsNotNull()
     checkNonEmptyString(sql)
+    val StatementOptions(keyColumns) = options
+    val finalSql = keyColumns match {
+      case KeyColumns.None => sql
+      case KeyColumns.All => s"$sql returning *"
+      case KeyColumns.Named(cols) => sql + " returning " + cols.mkString(",")
+    }
     Future.successful {
-      new PgAnyStatement(this, this, config.pgTypes, sessionParams, PgNativeStatement.parse(RdbcSql(sql)))
+      new PgAnyStatement(this, this, config.pgTypes, sessionParams, PgNativeStatement.parse(RdbcSql(finalSql)))
     }
   }
 
@@ -86,23 +92,6 @@ abstract class AbstractPgConnection(val id: ConnId,
   override def rollbackTx()(implicit timeout: Timeout): Future[Unit] = traced {
     argsNotNull()
     simpleQueryIgnoreResult(NativeSql("ROLLBACK"))
-  }
-
-  override def returningInsert(sql: String): Future[ReturningInsert] = traced {
-    argsNotNull()
-    checkNonEmptyString(sql)
-    returningInsert(sql, "*")
-  }
-
-  override def returningInsert(sql: String,
-                               keyColumns: String*): Future[ReturningInsert] = traced {
-    argsNotNull()
-    checkNonEmptyString(sql)
-    checkNonEmpty(keyColumns)
-    val returningSql = sql + " returning " + keyColumns.mkString(",")
-    statement(returningSql).map { stmt =>
-      new ReturningInsertImpl(stmt)
-    }
   }
 
   override def validate()(implicit timeout: Timeout): Future[Boolean] = traced {
@@ -257,10 +246,15 @@ abstract class AbstractPgConnection(val id: ConnId,
   }
 
   sealed trait StatementStatus
+
   object StatementStatus {
+
     case class NotCachedDoCache(stmtName: StmtName) extends StatementStatus
+
     case object NotCachedDontCache extends StatementStatus
+
     case class Cached(stmtName: StmtName) extends StatementStatus
+
   }
 
   private def determineStmtStatus(nativeSql: NativeSql): StatementStatus = {
@@ -278,6 +272,7 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   object ParseAndBind {
     def apply(bind: Bind): ParseAndBind = ParseAndBind(None, bind)
+
     def apply(parse: Parse, bind: Bind): ParseAndBind = ParseAndBind(Some(parse), bind)
   }
 

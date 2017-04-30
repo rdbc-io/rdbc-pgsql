@@ -81,6 +81,23 @@ object Tst extends App {
 
 }
 
+object Ddl extends App {
+
+  implicit val ec = ExecutionContext.global
+  implicit val timeout = 10.seconds.timeout
+
+  val fact = NettyPgConnectionFactory("localhost", 5432, "povder", "povder")
+
+  val x = fact.connection()
+    .flatMap { conn =>
+      println("hai\n\n\n")
+
+      conn.statement("drop table nonexistent").flatMap(_.noParamsF).flatMap(_.executeForStream())
+    }
+
+  Await.result(x, timeout.value)
+}
+
 object CacheTst extends App {
 
   implicit val ec = ExecutionContext.global
@@ -308,7 +325,6 @@ object BeginTwiceTst extends App {
         Await.result(conn.beginTx().flatMap(_ => conn.commitTx()), Duration.Inf)
       }
 
-
     }
     .recover {
       case ex => ex.printStackTrace()
@@ -367,6 +383,7 @@ class SlowSubscriber extends Subscriber[Row] {
       }
     }.run()
   }
+
   override def onComplete(): Unit = println("complete")
 
   override def onNext(t: Row): Unit = println(s"next $t")
@@ -561,9 +578,9 @@ object KeyGenTest extends App {
       println("hai\n\n\n")
 
       val rsFut = for {
-        stmt <- conn.returningInsert("insert into serial_test(x) values (:x)")
+        stmt <- conn.statement("insert into serial_test(x) values (:x)")
         parametrized <- stmt.bindF("x" -> 10)
-        keys <- parametrized.executeForKeysSet()
+        keys <- parametrized.executeForSet()
       } yield keys
 
       rsFut.map { keys =>
@@ -756,7 +773,7 @@ object SmallintTest extends App {
       println("hai\n\n\n")
 
       val rsFut = for {
-        stmt <- conn.insert("insert into test_smallint(x) values (:x)")
+        stmt <- conn.statement("insert into test_smallint(x) values (:x)")
         parametrized <- stmt.bindF("x" -> Int.MaxValue)
         rs <- parametrized.execute()
       } yield rs
@@ -794,7 +811,7 @@ object NullTest extends App {
       val yOpt = Some(10)
 
       val rsFut = for {
-        stmt <- conn.select("select :x as x, :y as y, :z as z")
+        stmt <- conn.statement("select :x as x, :y as y, :z as z")
         parametrized <- stmt.bindF("x" -> intOpt.toSqlParam, "y" -> yOpt.toSqlParam, "z" -> Some(1))
         rs <- parametrized.executeForSet()
       } yield rs
@@ -830,7 +847,7 @@ object NullTest2 extends App {
       println("hai\n\n\n")
 
       val rsFut = for {
-        stmt <- conn.insert("insert into test(x, s) values(:x, 'dupa')")
+        stmt <- conn.statement("insert into test(x, s) values(:x, 'dupa')")
         parametrized <- stmt.bindF("x" -> Some(1))
         rs <- parametrized.execute()
       } yield rs
@@ -954,7 +971,7 @@ object ManyInsertTest extends App {
 
       Await.ready(conn.beginTx(), Duration.Inf)
 
-      val insert = Await.result(conn.insert("insert into test(x) values (:x)"), Duration.Inf)
+      val insert = Await.result(conn.statement("insert into test(x) values (:x)"), Duration.Inf)
 
       while (j < 10000) {
         val rsFut = for {
@@ -1039,6 +1056,7 @@ object TypeTst extends App {
     }
 
 }
+
 object DataRowTst extends App {
 
   import scodec.bits._
@@ -1082,7 +1100,6 @@ object DataRowTst extends App {
     println(s"$x: time = ${time / 1000000.0}")
   }
 
-
 }
 
 
@@ -1101,7 +1118,7 @@ object ListenNotify extends App {
 
       val rsFut = for {
         stmt <- conn.statement(sql"LISTEN ch1")
-        rs <- stmt.executeIgnoringResult()
+        rs <- stmt.execute()
       } yield (stmt, rs)
 
       rsFut.map { _ =>
