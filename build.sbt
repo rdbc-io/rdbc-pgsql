@@ -81,6 +81,8 @@ lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
   .settings(
     name := "pgsql-transport-netty",
     logBuffered in Test := false,
+    parallelExecution in Test := false,
+    testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oD"),
     libraryDependencies ++= Vector(
       Library.nettyHandler,
       Library.nettyEpoll,
