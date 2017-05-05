@@ -1,7 +1,7 @@
 import sbt._
 
 object Version {
-  val rdbc = "0.0.47"
+  val rdbc = "0.0.48"
   val netty = "4.1.9.Final"
 }
 
@@ -23,5 +23,5 @@ object Library {
 
   val rdbcTests = "io.rdbc" %% "rdbc-tests" % Version.rdbc % Test
   val scalatest = "org.scalatest" %% "scalatest" % "3.0.1" % Test
-  val pgsql = "ru.yandex.qatools.embed" % "postgresql-embedded" % "1.23" % Test
+  val pgsql = "ru.yandex.qatools.embed" % "postgresql-embedded" % "2.1" % Test
 }

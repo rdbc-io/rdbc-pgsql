@@ -3,3 +3,5 @@
 /project/project
 /.idea
 /rdbc-pgsql*/target
+/rdbc-pgsql*/test-output
+/test-output
