@@ -3,8 +3,8 @@ import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
 
 lazy val commonSettings = Seq(
   organization := "io.rdbc.pgsql",
-  scalaVersion := "2.12.1",
-  crossScalaVersions := Vector("2.11.8"),
+  scalaVersion := "2.12.2",
+  crossScalaVersions := Vector("2.11.11"),
   scalacOptions ++= Vector(
     "-unchecked",
     "-deprecation",
@@ -81,6 +81,8 @@ lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
   .settings(
     name := "pgsql-transport-netty",
     logBuffered in Test := false,
+    parallelExecution in Test := false,
+    testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oD"),
     libraryDependencies ++= Vector(
       Library.nettyHandler,
       Library.nettyEpoll,

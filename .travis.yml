@@ -31,4 +31,3 @@ env:
     - PG_VER=V9_6
     - PG_VER=V9_5
     - PG_VER=V9_4
-    - PG_VER=V9_3
