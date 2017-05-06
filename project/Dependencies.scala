@@ -2,7 +2,7 @@ import sbt._
 
 object Version {
   val rdbc = "0.0.48"
-  val netty = "4.0.45.Final"
+  val netty = "4.0.46.Final"
 }
 
 object Library {
@@ -11,7 +11,7 @@ object Library {
   val rdbcTypeconv = "io.rdbc" %% "rdbc-typeconv" % Version.rdbc
   val rdbcUtil = "io.rdbc" %% "rdbc-util" % Version.rdbc
   val reactiveStreams = "org.reactivestreams" % "reactive-streams" % "1.0.0"
-  val akkaStream = "com.typesafe.akka" %% "akka-stream" % "2.5.0"
+  val akkaStream = "com.typesafe.akka" %% "akka-stream" % "2.5.1"
   val scodecBits = "org.scodec" %% "scodec-bits" % "1.1.4"
   val scodecCore = "org.scodec" %% "scodec-core" % "1.10.3"
   val typesafeConfig = "com.typesafe" % "config" % "1.3.1"
@@ -22,6 +22,6 @@ object Library {
   val nettyEpoll = "io.netty" % "netty-transport-native-epoll" % Version.netty classifier "linux-x86_64"
 
   val rdbcTests = "io.rdbc" %% "rdbc-tests" % Version.rdbc % Test
-  val scalatest = "org.scalatest" %% "scalatest" % "3.0.1" % Test
+  val scalatest = "org.scalatest" %% "scalatest" % "3.0.3" % Test
   val pgsql = "ru.yandex.qatools.embed" % "postgresql-embedded" % "2.1" % Test
 }
