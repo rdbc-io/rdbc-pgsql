@@ -39,7 +39,7 @@ private[core] class PgRow(rowDesc: RowDescription,
     with RowPartialImpl
     with Logging {
 
-  protected def any(name: String): Any = traced {
+  protected def any(name: String): Option[Any] = traced {
     argsNotNull()
     checkNonEmptyString(name)
     nameMapping.get(ColName(name)) match {
@@ -48,16 +48,16 @@ private[core] class PgRow(rowDesc: RowDescription,
     }
   }
 
-  protected def any(idx: Int): Any = traced {
+  protected def any(idx: Int): Option[Any] = traced {
     argsNotNull()
     check(idx, idx >= 0, "has to be >= 0")
     val colVal = cols(idx)
     colVal match {
-      case ColValue.Null => null
+      case ColValue.Null => None
       case ColValue.NotNull(rawFieldVal) =>
         val colDesc = rowDesc.colDescs(idx)
         colDesc.format match {
-          case ColFormat.Binary => binaryToObj(colDesc.dataType, rawFieldVal)
+          case ColFormat.Binary => Some(binaryToObj(colDesc.dataType, rawFieldVal))
           case ColFormat.Textual =>
             throw new PgDriverInternalErrorException(
               s"Value '$colVal' of column '$colDesc' is in textual format, which is unsupported"
