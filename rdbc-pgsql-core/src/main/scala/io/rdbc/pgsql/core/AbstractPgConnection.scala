@@ -68,7 +68,8 @@ abstract class AbstractPgConnection(val id: ConnId,
   override def statement(sql: String, options: StatementOptions): Future[Statement] = traced {
     argsNotNull()
     checkNonEmptyString(sql)
-    val StatementOptions(keyColumns) = options
+    /* deallocateOnComplete option can be ignored because all statements are cached */
+    val StatementOptions(_, keyColumns) = options
     val finalSql = keyColumns match {
       case KeyColumns.None => sql
       case KeyColumns.All => s"$sql returning *"
