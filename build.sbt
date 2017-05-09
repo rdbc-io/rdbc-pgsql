@@ -96,16 +96,3 @@ lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
     ),
     buildInfoPackage := "io.rdbc.pgsql.transport.netty"
   ).dependsOn(core, scodec)
-
-lazy val playground = (project in file("rdbc-pgsql-playground"))
-  .settings(commonSettings: _*)
-  .settings(
-    name := "pgsql-playground",
-    publishArtifact := false,
-    bintrayReleaseOnPublish := false,
-    libraryDependencies ++= Vector(
-      "org.postgresql" % "postgresql" % "9.4.1212",
-      "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
-    )
-  )
-  .dependsOn(nettyTransport)
