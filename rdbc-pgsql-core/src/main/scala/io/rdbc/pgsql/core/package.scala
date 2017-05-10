@@ -46,5 +46,4 @@ package object core {
 
   private[core] type ParamsSource = Source[Vector[ParamValue], NotUsed]
 
-  private[core] val unitFuture = Future.successful(())
 }
