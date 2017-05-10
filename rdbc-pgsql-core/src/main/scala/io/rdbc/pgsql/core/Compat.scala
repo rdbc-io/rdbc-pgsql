@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.internal
-
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
+package io.rdbc.pgsql.core
 
 import scala.concurrent.Future
 
-private[core] trait PgStatementDeallocator {
-  private[core] def deallocateStatement(nativeSql: NativeSql): Future[Unit]
+private[core] object Compat {
+
+  implicit class FutureObjectCompat(underlying: Future.type) {
+    val unit: Future[Unit] = Future.successful(())
+  }
 }

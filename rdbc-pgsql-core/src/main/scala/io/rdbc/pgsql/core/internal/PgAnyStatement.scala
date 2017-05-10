@@ -29,7 +29,6 @@ import org.reactivestreams.Publisher
 import scala.concurrent.{ExecutionContext, Future}
 
 private[core] class PgAnyStatement(stmtExecutor: PgStatementExecutor,
-                                   stmtDeallocator: PgStatementDeallocator,
                                    pgTypes: PgTypeRegistry,
                                    sessionParams: SessionParams,
                                    nativeStmt: PgNativeStatement)
@@ -63,14 +62,9 @@ private[core] class PgAnyStatement(stmtExecutor: PgStatementExecutor,
     stmtExecutor.executeParamsStream(nativeStmt.sql, pgParamsSource)
   }
 
-  def deallocate(): Future[Unit] = traced {
-    stmtDeallocator.deallocateStatement(nativeStmt.sql)
-  }
-
   private def pgParametrizedStatement(pgParamValues: Vector[ParamValue]): PgParametrizedStatement = traced {
     new PgParametrizedStatement(
       executor = stmtExecutor,
-      deallocator = stmtDeallocator,
       nativeSql = nativeStmt.sql,
       params = pgParamValues
     )

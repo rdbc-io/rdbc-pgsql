@@ -25,6 +25,7 @@ import io.netty.channel.epoll.{Epoll, EpollEventLoopGroup}
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.rdbc.ImmutSeq
+import io.rdbc.pgsql.core.StmtCacheConfig
 import io.rdbc.pgsql.core.auth.{Authenticator, UsernamePasswordAuthenticator}
 import io.rdbc.pgsql.core.codec.{DecoderFactory, EncoderFactory}
 import io.rdbc.pgsql.core.types.PgTypesProvider
@@ -58,7 +59,7 @@ object NettyPgConnFactoryConfig {
       dbName = dbName,
       authenticator = authenticator,
       maxBatchSize = 100L,
-      stmtCacheCapacity = 100,
+      stmtCacheConfig = StmtCacheConfig.Enabled(capacity = 100),
       typeConvertersProviders = Vector(new StandardTypeConvertersProvider),
       pgTypesProviders = Vector(new ScodecPgTypesProvider),
       msgDecoderFactory = new ScodecDecoderFactory,
@@ -90,7 +91,7 @@ case class NettyPgConnFactoryConfig(address: InetSocketAddress,
                                     dbName: String,
                                     authenticator: Authenticator,
                                     maxBatchSize: Long,
-                                    stmtCacheCapacity: Int,
+                                    stmtCacheConfig: StmtCacheConfig,
                                     typeConvertersProviders: ImmutSeq[TypeConvertersProvider],
                                     pgTypesProviders: ImmutSeq[PgTypesProvider],
                                     msgDecoderFactory: DecoderFactory,
