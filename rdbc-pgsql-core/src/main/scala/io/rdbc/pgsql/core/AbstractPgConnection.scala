@@ -80,7 +80,7 @@ abstract class AbstractPgConnection(val id: ConnId,
       case KeyColumns.Named(cols) => sql + " returning " + cols.mkString(",")
     }
     Future.successful {
-      new PgAnyStatement(
+      new PgStatement(
         stmtExecutor = this,
         pgTypes = config.pgTypes,
         sessionParams = sessionParams,

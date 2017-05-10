@@ -28,11 +28,11 @@ import org.reactivestreams.Publisher
 
 import scala.concurrent.{ExecutionContext, Future}
 
-private[core] class PgAnyStatement(stmtExecutor: PgStatementExecutor,
-                                   pgTypes: PgTypeRegistry,
-                                   sessionParams: SessionParams,
-                                   nativeStmt: PgNativeStatement)
-                                  (implicit ec: ExecutionContext)
+private[core] class PgStatement(stmtExecutor: PgStatementExecutor,
+                                pgTypes: PgTypeRegistry,
+                                sessionParams: SessionParams,
+                                nativeStmt: PgNativeStatement)
+                               (implicit ec: ExecutionContext)
   extends Statement
     with StatementPartialImpl
     with Logging {
