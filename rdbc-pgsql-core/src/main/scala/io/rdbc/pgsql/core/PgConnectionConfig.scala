@@ -20,8 +20,14 @@ import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.util.concurrent.LockFactory
 import io.rdbc.sapi.TypeConverterRegistry
 
-case class PgConnectionConfig(pgTypes: PgTypeRegistry,
-                              typeConverters: TypeConverterRegistry,
-                              lockFactory: LockFactory,
-                              maxBatchSize: Long,
-                              stmtCacheCapacity: Int)
+sealed trait StmtCacheConfig
+object StmtCacheConfig {
+  case object Disabled extends StmtCacheConfig
+  case class Enabled(capacity: Int) extends StmtCacheConfig
+}
+
+final case class PgConnectionConfig(pgTypes: PgTypeRegistry,
+                                    typeConverters: TypeConverterRegistry,
+                                    lockFactory: LockFactory,
+                                    maxBatchSize: Long,
+                                    stmtCacheConfig: StmtCacheConfig)

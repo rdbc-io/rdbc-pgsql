@@ -25,17 +25,12 @@ import io.rdbc.util.Logging
 import scala.concurrent.{ExecutionContext, Future}
 
 private[core] class PgParametrizedStatement(executor: PgStatementExecutor,
-                                            deallocator: PgStatementDeallocator,
                                             nativeSql: NativeSql,
                                             params: Vector[ParamValue])
                                            (implicit protected val ec: ExecutionContext)
   extends ParametrizedStatement
     with ParametrizedStatementPartialImpl
     with Logging {
-
-  def deallocate(): Future[Unit] = traced {
-    deallocator.deallocateStatement(nativeSql)
-  }
 
   def executeForStream()(implicit timeout: Timeout): Future[ResultStream] = traced {
     executor.executeStatementForStream(nativeSql, params)

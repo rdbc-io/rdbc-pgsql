@@ -23,6 +23,8 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import io.rdbc.api.exceptions.{ConnectionClosedException, IllegalSessionStateException}
 import io.rdbc.implbase.ConnectionPartialImpl
+import io.rdbc.pgsql.core.Compat._
+import io.rdbc.pgsql.core.StmtCacheConfig.{Disabled, Enabled}
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.exception.PgUnsupportedCharsetException
 import io.rdbc.pgsql.core.internal._
@@ -54,29 +56,36 @@ abstract class AbstractPgConnection(val id: ConnId,
     with WriteFailureHandler
     with FatalErrorHandler
     with PgStatementExecutor
-    with PgStatementDeallocator
     with Logging {
 
   private[this] val fsmManager = new PgSessionFsmManager(id, config.lockFactory, this)
   @volatile private[this] var sessionParams = SessionParams.default
-  @volatile private[this] var stmtCache = LruStmtCache.empty(config.stmtCacheCapacity)
   @volatile private[this] var maybeBackendKeyData = Option.empty[BackendKeyData]
   private[this] val stmtCounter = new AtomicInteger(0)
+
+  @volatile private[this] var maybeStmtCache = config.stmtCacheConfig match {
+    case Disabled => None
+    case Enabled(capacity) => Some(LruStmtCache.empty(capacity))
+  }
 
   override def watchForIdle: Future[this.type] = fsmManager.readyFuture.map(_ => this)
 
   override def statement(sql: String, options: StatementOptions): Future[Statement] = traced {
     argsNotNull()
     checkNonEmptyString(sql)
-    /* deallocateOnComplete option can be ignored because all statements are cached */
-    val StatementOptions(_, keyColumns) = options
+    val StatementOptions(keyColumns) = options
     val finalSql = keyColumns match {
       case KeyColumns.None => sql
       case KeyColumns.All => s"$sql returning *"
       case KeyColumns.Named(cols) => sql + " returning " + cols.mkString(",")
     }
     Future.successful {
-      new PgAnyStatement(this, this, config.pgTypes, sessionParams, PgNativeStatement.parse(RdbcSql(finalSql)))
+      new PgStatement(
+        stmtExecutor = this,
+        pgTypes = config.pgTypes,
+        sessionParams = sessionParams,
+        nativeStmt = PgNativeStatement.parse(RdbcSql(finalSql))
+      )
     }
   }
 
@@ -177,13 +186,15 @@ abstract class AbstractPgConnection(val id: ConnId,
   private def updateStmtCacheIfNeeded(maybeParse: Option[Parse],
                                       parseFut: Future[Unit],
                                       nativeSql: NativeSql): Future[Unit] = {
-    maybeParse.flatMap(_.optionalName) match {
-      case Some(stmtName) => parseFut.map { _ =>
-        val (newCache, evicted) = stmtCache.put(nativeSql, stmtName)
-        //TODO close evicted
-        stmtCache = newCache
+    maybeStmtCache.fold(Future.unit) { stmtCache =>
+      maybeParse.flatMap(_.optionalName) match {
+        case Some(stmtName) => parseFut.map { _ =>
+          val (newCache, evicted) = stmtCache.put(nativeSql, stmtName)
+          //TODO close evicted
+          maybeStmtCache = Some(newCache)
+        }
+        case None => Future.unit
       }
-      case None => unitFuture
     }
   }
 
@@ -259,15 +270,18 @@ abstract class AbstractPgConnection(val id: ConnId,
   }
 
   private def determineStmtStatus(nativeSql: NativeSql): StatementStatus = {
-    stmtCache.get(nativeSql) match {
-      case (newCache, Some(stmtName)) =>
-        stmtCache = newCache
-        StatementStatus.Cached(stmtName)
+    maybeStmtCache.fold[StatementStatus](StatementStatus.NotCachedDontCache) {
+      stmtCache =>
+        stmtCache.get(nativeSql) match {
+          case (newCache, Some(stmtName)) =>
+            maybeStmtCache = Some(newCache)
+            StatementStatus.Cached(stmtName)
 
-      case (newCache, None) =>
-        stmtCache = newCache
-        if (shouldCache(nativeSql)) StatementStatus.NotCachedDoCache(nextStmtName())
-        else StatementStatus.NotCachedDontCache
+          case (newCache, None) =>
+            maybeStmtCache = Some(newCache)
+            if (shouldCache(nativeSql)) StatementStatus.NotCachedDoCache(nextStmtName())
+            else StatementStatus.NotCachedDontCache
+        }
     }
   }
 
@@ -296,7 +310,7 @@ abstract class AbstractPgConnection(val id: ConnId,
   }
 
   private def shouldCache(nativeSql: NativeSql): Boolean = {
-    //for now, all statements are cached
+    //for now, all statements are cached if cache is enabled
     true
   }
 
@@ -463,15 +477,17 @@ abstract class AbstractPgConnection(val id: ConnId,
   }
 
   private[core] def deallocateStatement(nativeSql: NativeSql): Future[Unit] = traced {
-    fsmManager.ifReady { (_, txStatus) =>
-      stmtCache.evict(nativeSql) match {
-        case Some((newCache, evictedName)) =>
-          stmtCache = newCache
-          deallocateCached(evictedName)
+    maybeStmtCache.fold(Future.unit) { stmtCache =>
+      fsmManager.ifReady { (_, txStatus) =>
+        stmtCache.evict(nativeSql) match {
+          case Some((newCache, evictedName)) =>
+            maybeStmtCache = Some(newCache)
+            deallocateCached(evictedName)
 
-        case None =>
-          fsmManager.triggerTransition(Idle(txStatus))
-          unitFuture
+          case None =>
+            fsmManager.triggerTransition(Idle(txStatus))
+            Future.unit
+        }
       }
     }
   }
