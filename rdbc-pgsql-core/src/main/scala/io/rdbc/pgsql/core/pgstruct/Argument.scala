@@ -18,12 +18,12 @@ package io.rdbc.pgsql.core.pgstruct
 
 import scodec.bits.ByteVector
 
-sealed trait ParamValue {
+sealed trait Argument {
   def dataTypeOid: Oid
 }
 
-object ParamValue {
-  case class Null(dataTypeOid: Oid) extends ParamValue
-  case class Textual(value: String, dataTypeOid: Oid) extends ParamValue
-  case class Binary(value: ByteVector, dataTypeOid: Oid) extends ParamValue
+object Argument {
+  case class Null(dataTypeOid: Oid) extends Argument
+  case class Textual(value: String, dataTypeOid: Oid) extends Argument
+  case class Binary(value: ByteVector, dataTypeOid: Oid) extends Argument
 }

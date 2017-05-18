@@ -35,7 +35,7 @@ import io.rdbc.pgsql.core.internal.fsm.streaming.{StrmBeginningTx, StrmWaitingFo
 import io.rdbc.pgsql.core.internal.scheduler.{TaskScheduler, TimeoutHandler}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{SessionParamKey, _}
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
-import io.rdbc.pgsql.core.pgstruct.{ParamValue, ReturnColFormats, TxStatus}
+import io.rdbc.pgsql.core.pgstruct.{Argument, ReturnColFormats, TxStatus}
 import io.rdbc.sapi._
 import io.rdbc.util.Logging
 import io.rdbc.util.Preconditions._
@@ -167,7 +167,7 @@ abstract class AbstractPgConnection(val id: ConnId,
     doRelease(cause)
   }
 
-  private[core] def executeStatementForStream(nativeSql: NativeSql, params: Vector[ParamValue])(
+  private[core] def executeStatementForStream(nativeSql: NativeSql, params: Vector[Argument])(
     implicit timeout: Timeout): Future[ResultStream] = traced {
     fsmManager.ifReady { (reqId, txStatus) =>
       logger.debug(s"Executing statement '${nativeSql.value}'")
@@ -293,7 +293,7 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   case class ParseAndBind(parse: Option[Parse], bind: Bind)
 
-  private def newParseAndBind(nativeSql: NativeSql, params: Vector[ParamValue]): ParseAndBind = {
+  private def newParseAndBind(nativeSql: NativeSql, params: Vector[Argument]): ParseAndBind = {
     def newParse(maybeStmtName: Option[StmtName]): Parse = {
       Parse(maybeStmtName, nativeSql, params.map(_.dataTypeOid))
     }
@@ -314,7 +314,7 @@ abstract class AbstractPgConnection(val id: ConnId,
     true
   }
 
-  private[core] def executeStatementForRowsAffected(nativeSql: NativeSql, params: Vector[ParamValue])(
+  private[core] def executeStatementForRowsAffected(nativeSql: NativeSql, params: Vector[Argument])(
     implicit timeout: Timeout): Future[Long] = traced {
     fsmManager.ifReady { (reqId, _) =>
       logger.debug(s"Executing write-only statement '$nativeSql'")
@@ -340,8 +340,8 @@ abstract class AbstractPgConnection(val id: ConnId,
     }
   }
 
-  private[core] def executeParamsStream(nativeSql: NativeSql,
-                                        paramsSource: ParamsSource): Future[Unit] = traced {
+  private[core] def executeArgsStream(nativeSql: NativeSql,
+                                      paramsSource: ArgsSource): Future[Unit] = traced {
     fsmManager.ifReady { (_, _) =>
       sourceWithParseWritten(nativeSql, paramsSource)
         .batch(max = config.maxBatchSize, seed = Vector(_))(_ :+ _)
@@ -355,7 +355,7 @@ abstract class AbstractPgConnection(val id: ConnId,
   /** Transforms params source to a source which upon materialization sends "Parse" to the backend before
     * any of source's elements are processed. */
   private def sourceWithParseWritten(nativeSql: NativeSql,
-                                     paramsSource: ParamsSource): ParamsSource = {
+                                     paramsSource: ArgsSource): ArgsSource = {
     paramsSource.prefixAndTail(1).flatMapConcat { case (head, tail) =>
       val firstParams = head.head
       out.write(Parse(None, nativeSql, firstParams.map(_.dataTypeOid)))
@@ -363,7 +363,7 @@ abstract class AbstractPgConnection(val id: ConnId,
     }
   }
 
-  private def executeBatch(batch: Vector[Vector[ParamValue]]): Future[TxStatus] = {
+  private def executeBatch(batch: Vector[Vector[Argument]]): Future[TxStatus] = {
     val execute = Execute(optionalPortalName = None, optionalFetchSize = None)
     val batchMsgs = batch.flatMap { params =>
       Vector(Bind(execute.optionalPortalName, None, params, ReturnColFormats.AllBinary), execute)
