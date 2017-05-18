@@ -16,10 +16,10 @@
 
 package io.rdbc.pgsql.core.pgstruct.messages.frontend
 
-import io.rdbc.pgsql.core.pgstruct.{ParamValue, ReturnColFormats}
+import io.rdbc.pgsql.core.pgstruct.{Argument, ReturnColFormats}
 
 case class Bind(portal: Option[PortalName],
                 preparedStmt: Option[StmtName],
-                params: Vector[ParamValue],
+                params: Vector[Argument],
                 returnFieldFormats: ReturnColFormats)
   extends PgFrontendMessage
