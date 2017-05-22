@@ -46,8 +46,8 @@ class LruStmtCache private(val capacity: Int,
       val newMap = map - sql + (sql -> stmtWithIdx.copy(idx = newIdx))
       val newOrd = ord - idx + (newIdx -> sql)
       val newCache = new LruStmtCache(capacity, newIdx, newMap, newOrd)
-      (newCache, Some(name))
-    }.getOrElse(this, None)
+      (newCache, Some(name): Option[StmtName])
+    }.getOrElse((this, None))
   }
 
   def put(sql: NativeSql, stmtName: StmtName): (LruStmtCache, Set[StmtName]) = {
