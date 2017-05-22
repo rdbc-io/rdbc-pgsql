@@ -61,7 +61,7 @@ private[scodec] object ParamValuesCodec {
     def encode(params: Vector[Argument]): Attempt[BitVector] = {
       {
         vectorOfN(int16, formatCodec) ~ vectorOfN(int16, valueCodec)
-      }.encode(params, params)
+      }.encode((params, params))
     }
 
     def decode(bits: BitVector): Attempt[Nothing] = {
