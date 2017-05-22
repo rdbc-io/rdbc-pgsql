@@ -26,7 +26,7 @@ private[scodec] object ReturnFieldFormatsCodec extends Codec[ReturnColFormats] {
 
   def encode(value: ReturnColFormats): Attempt[BitVector] = value match {
     case ReturnColFormats.None | ReturnColFormats.AllTextual => int16.encode(0)
-    case ReturnColFormats.AllBinary => (int16 ~ int16).encode(1, 1)
+    case ReturnColFormats.AllBinary => (int16 ~ int16).encode((1, 1))
     case ReturnColFormats.Specific(formats) => vectorOfN(int16, colValFormat).encode(formats)
   }
 
