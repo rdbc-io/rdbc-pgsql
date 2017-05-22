@@ -21,32 +21,32 @@ import java.nio.charset.Charset
 import _root_.scodec.bits.BitVector
 import _root_.scodec.codecs._
 import _root_.scodec.{Attempt, Codec, DecodeResult, Err, SizeBound}
-import io.rdbc.pgsql.core.pgstruct.ParamValue
+import io.rdbc.pgsql.core.pgstruct.Argument
 
 private[scodec] object ParamValuesCodec {
 
-  private val formatCodec = new Codec[ParamValue] {
+  private val formatCodec = new Codec[Argument] {
     val sizeBound = SizeBound.exact(16)
 
-    def encode(value: ParamValue): Attempt[BitVector] = {
+    def encode(value: Argument): Attempt[BitVector] = {
       value match {
-        case _: ParamValue.Textual | _: ParamValue.Null => int16.encode(0)
-        case _: ParamValue.Binary => int16.encode(1)
+        case _: Argument.Textual | _: Argument.Null => int16.encode(0)
+        case _: Argument.Binary => int16.encode(1)
       }
     }
 
-    def decode(bits: BitVector): Attempt[DecodeResult[ParamValue]] = {
+    def decode(bits: BitVector): Attempt[DecodeResult[Argument]] = {
       Attempt.failure(Err("decoding not supported"))
     }
   }
 
-  private def valueCodec(implicit charset: Charset) = new Codec[ParamValue] {
+  private def valueCodec(implicit charset: Charset) = new Codec[Argument] {
     def sizeBound: SizeBound = SizeBound.atLeast(32)
 
-    def encode(value: ParamValue): Attempt[BitVector] = value match {
-      case _: ParamValue.Null => int32.encode(-1)
-      case ParamValue.Textual(value, _) => variableSizeBytes(int32, string).encode(value)
-      case ParamValue.Binary(value, _) => variableSizeBytes(int32, bytes).encode(value)
+    def encode(value: Argument): Attempt[BitVector] = value match {
+      case _: Argument.Null => int32.encode(-1)
+      case Argument.Textual(value, _) => variableSizeBytes(int32, string).encode(value)
+      case Argument.Binary(value, _) => variableSizeBytes(int32, bytes).encode(value)
     }
 
     def decode(bits: BitVector): Attempt[Nothing] = {
@@ -54,11 +54,11 @@ private[scodec] object ParamValuesCodec {
     }
   }
 
-  def paramValues(implicit charset: Charset): Codec[Vector[ParamValue]] = new Codec[Vector[ParamValue]] {
+  def paramValues(implicit charset: Charset): Codec[Vector[Argument]] = new Codec[Vector[Argument]] {
 
     val sizeBound: SizeBound = SizeBound.unknown
 
-    def encode(params: Vector[ParamValue]): Attempt[BitVector] = {
+    def encode(params: Vector[Argument]): Attempt[BitVector] = {
       {
         vectorOfN(int16, formatCodec) ~ vectorOfN(int16, valueCodec)
       }.encode(params, params)

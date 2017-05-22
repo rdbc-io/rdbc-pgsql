@@ -16,11 +16,15 @@
 
 package io.rdbc.pgsql.core.internal
 
+import akka.NotUsed
 import akka.stream.scaladsl.Source
+import io.rdbc.ImmutIndexedSeq
 import io.rdbc.api.exceptions._
 import io.rdbc.implbase.StatementPartialImpl
 import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.pgstruct.{Oid, ParamValue}
+import io.rdbc.pgsql.core.internal.PgNativeStatement.Params
+import io.rdbc.pgsql.core.internal.PgNativeStatement.Params.{Named, Positional}
+import io.rdbc.pgsql.core.pgstruct.{Argument, Oid}
 import io.rdbc.pgsql.core.types.{PgType, PgTypeRegistry}
 import io.rdbc.sapi._
 import io.rdbc.util.Logging
@@ -37,73 +41,109 @@ private[core] class PgStatement(stmtExecutor: PgStatementExecutor,
     with StatementPartialImpl
     with Logging {
 
-  def bind(params: (String, Any)*): ParametrizedStatement = traced {
-    val pgParamValues = toPgParamValueSeq(Map(params: _*))
-    pgParametrizedStatement(pgParamValues)
+  //TODO try to limit exceptions to public methods only - scan the code
+
+  def bind(args: (String, Any)*): ExecutableStatement = traced {
+    nativeStmt.params match {
+      case Positional(_) =>
+        args.headOption match {
+          case Some((param, _)) => throw new NoSuchParamException(param)
+          case None => pgParametrizedStatement(Vector.empty)
+        }
+
+      case namedParams: Named =>
+        val pgParamValues = argMapToPgArguments(Map(args: _*), namedParams)
+        pgParametrizedStatement(pgParamValues)
+    }
   }
 
-  def bindByIdx(params: Any*): ParametrizedStatement = traced {
-    if (params.size < nativeStmt.params.size) {
-      throw new MissingParamValException(nativeStmt.params(params.size))
-    } else if (params.size > nativeStmt.params.size) {
-      throw new TooManyParamsException(provided = params.size, expected = nativeStmt.params.size)
+  def bindByIdx(args: Any*): ExecutableStatement = traced {
+    val size = nativeStmt.params match {
+      case Positional(count) => count
+      case Named(seq) => seq.size
+    }
+    if (args.size < size) {
+      nativeStmt.params match {
+        case Positional(_) => throw new MissingParamValException((args.size + 1).toString)
+        case Named(seq) => throw new MissingParamValException(seq(args.size))
+      }
+    } else if (args.size > size) {
+      throw new TooManyParamsException(provided = args.size, expected = size)
     } else {
-      val pgParamValues = params.map(toPgParamValue).toVector
-      pgParametrizedStatement(pgParamValues)
+      val pgArguments = args.map(toPgArgument).toVector
+      pgParametrizedStatement(pgArguments)
     }
   }
 
-  def noParams: ParametrizedStatement = traced(bindByIdx())
+  def noArgs: ExecutableStatement = traced(bindByIdx())
 
-  def streamParams(paramsPublisher: Publisher[Map[String, Any]]): Future[Unit] = traced {
-    val pgParamsSource = Source.fromPublisher(paramsPublisher).map { paramMap =>
-      toPgParamValueSeq(paramMap)
+  def streamArgs(argsPublisher: Publisher[Map[String, Any]]): Future[Unit] = traced {
+    val pgArgsSource = Source.fromPublisher(argsPublisher).map { argMap =>
+      nativeStmt.params match {
+        case Positional(_) =>
+          argMap.headOption match {
+            case Some((param, _)) => throw new NoSuchParamException(param)
+            case None => Vector.empty
+          }
+
+        case namedParams: Named => argMapToPgArguments(argMap, namedParams)
+      }
     }
-    stmtExecutor.executeParamsStream(nativeStmt.sql, pgParamsSource)
+    streamPgArguments(pgArgsSource)
   }
 
-  private def pgParametrizedStatement(pgParamValues: Vector[ParamValue]): PgParametrizedStatement = traced {
-    new PgParametrizedStatement(
+  def streamArgsByIdx(argsPublisher: Publisher[ImmutIndexedSeq[Any]]): Future[Unit] = traced {
+    val pgArgsSource = Source.fromPublisher(argsPublisher).map { argsSeq =>
+      argsSeq.map(toPgArgument).toVector
+    }
+    streamPgArguments(pgArgsSource)
+  }
+
+  private def streamPgArguments(argsSource: Source[Vector[Argument], NotUsed]): Future[Unit] = traced {
+    stmtExecutor.executeArgsStream(nativeStmt.sql, argsSource)
+  }
+
+  private def pgParametrizedStatement(pgParamValues: Vector[Argument]): PgExecutableStatement = traced {
+    new PgExecutableStatement(
       executor = stmtExecutor,
       nativeSql = nativeStmt.sql,
       params = pgParamValues
     )
   }
 
-  private def toPgParamValueSeq(params: Map[String, Any]): Vector[ParamValue] = traced {
+  private def argMapToPgArguments(namedArgs: Map[String, Any], namedParams: Params.Named): Vector[Argument] = traced {
+    case class Acc(res: Vector[Argument], remaining: Set[String])
 
-    case class Acc(res: Vector[ParamValue], left: Set[String])
-
-    val pgParamsMap = params.mapValues(toPgParamValue)
-    val init = Acc(res = Vector.empty, left = params.keySet)
-    val indexedPgParams = nativeStmt.params.foldLeft(init) { (acc, paramName) =>
+    val Named(params) = namedParams
+    val pgParamsMap = namedArgs.mapValues(toPgArgument)
+    val init = Acc(res = Vector.empty, remaining = namedArgs.keySet)
+    val indexedPgParams = params.foldLeft(init) { (acc, paramName) =>
       acc.copy(
         res = acc.res :+ pgParamsMap.getOrElse(paramName, throw new MissingParamValException(paramName)),
-        left = acc.left - paramName
+        remaining = acc.remaining - paramName
       )
     }
-    if (indexedPgParams.left.nonEmpty) {
-      throw new NoSuchParamException(indexedPgParams.left.head)
-    } else {
-      indexedPgParams.res
+    indexedPgParams.remaining.headOption match {
+      case Some(param) => throw new NoSuchParamException(param)
+      case None => indexedPgParams.res
     }
   }
 
-  private def toPgParamValue(value: Any): ParamValue = traced {
+  private def toPgArgument(value: Any): Argument = traced {
     //TODO document in bind null/None/Some support
     value match {
-      case null | None => ParamValue.Null(Oid.unknownDataType)
-      case NullParam(cls) => withPgType(cls)(pgType => ParamValue.Null(pgType.typeOid))
+      case null | None => Argument.Null(Oid.unknownDataType)
+      case NullParam(cls) => withPgType(cls)(pgType => Argument.Null(pgType.typeOid))
       case NotNullParam(notNullVal) => notNullToPgParamValue(notNullVal)
       case Some(notNullVal) => notNullToPgParamValue(notNullVal)
       case notNullVal => notNullToPgParamValue(notNullVal)
     }
   }
 
-  private def notNullToPgParamValue(value: Any): ParamValue = traced {
+  private def notNullToPgParamValue(value: Any): Argument = traced {
     withPgType(value.getClass) { pgType =>
       val binVal = pgType.asInstanceOf[PgType[Any]].toPgBinary(value)(sessionParams)
-      ParamValue.Binary(binVal, pgType.typeOid)
+      Argument.Binary(binVal, pgType.typeOid)
     }
   }
 
