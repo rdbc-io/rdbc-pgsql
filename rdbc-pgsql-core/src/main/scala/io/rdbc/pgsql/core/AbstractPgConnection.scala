@@ -23,11 +23,11 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import io.rdbc.api.exceptions.{ConnectionClosedException, IllegalSessionStateException}
 import io.rdbc.implbase.ConnectionPartialImpl
-import io.rdbc.pgsql.core.Compat._
 import io.rdbc.pgsql.core.StmtCacheConfig.{Disabled, Enabled}
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.exception.PgUnsupportedCharsetException
 import io.rdbc.pgsql.core.internal._
+import io.rdbc.pgsql.core.internal.Compat._
 import io.rdbc.pgsql.core.internal.cache.LruStmtCache
 import io.rdbc.pgsql.core.internal.fsm.StateAction.{Fatal, Goto, Stay}
 import io.rdbc.pgsql.core.internal.fsm._
@@ -43,7 +43,6 @@ import io.rdbc.util.Preconditions._
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-//TODO make a note in Connection scaladoc that implementations must be thread safe
 abstract class AbstractPgConnection(val id: ConnId,
                                     config: PgConnectionConfig,
                                     implicit private[this] val out: ChannelWriter,
@@ -112,7 +111,7 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   override def release(): Future[Unit] = traced {
     //TODO do nothing if already released
-    fsmManager.ifReady { (_, _) =>
+    fsmManager.ifReadyF { (_, _) =>
       logger.debug(s"Releasing connection on client request")
       doRelease("Connection released by client")
     }
@@ -128,7 +127,7 @@ abstract class AbstractPgConnection(val id: ConnId,
     argsNotNull()
     logger.debug(s"Initializing connection")
     val initPromise = Promise[BackendKeyData]
-    fsmManager.triggerTransition(State.authenticating(initPromise, authenticator)(out, ec))
+    fsmManager.triggerTransition(State.authenticating(initPromise, authenticator)(out))
 
     out.writeAndFlush(Startup(dbUser, dbName)).recoverWith(writeFailureHandler).flatMap { _ =>
       initPromise.future.map { returnedBkd =>
@@ -158,26 +157,41 @@ abstract class AbstractPgConnection(val id: ConnId,
     }
   }
 
-  protected[core] final def handleFatalError(msg: String, cause: Throwable): Unit = traced {
+  override protected[core] final def handleFatalError(msg: String, cause: Throwable): Unit = traced {
     argsNotNull()
     checkNonEmptyString(msg)
     logger.error(msg, cause)
     doRelease(cause)
   }
 
-  private[core] def executeStatementForStream(nativeSql: NativeSql, params: Vector[Argument])(
-    implicit timeout: Timeout): Future[ResultStream] = traced {
+  override private[core]
+  def statementStream(nativeSql: NativeSql, params: Vector[Argument])
+                     (implicit timeout: Timeout): RowPublisher = {
     fsmManager.ifReady { (reqId, txStatus) =>
-      logger.debug(s"Executing statement '${nativeSql.value}'")
 
-      val msgs@ParseAndBind(parse, _) = newParseAndBind(nativeSql, params)
-      val streamPromise = Promise[PgResultStream]
-      val parsePromise = Promise[Unit]
+      val parseAndBind = newParseAndBind(nativeSql, params)
 
-      writeInitialExecuteMessages(txStatus, reqId, msgs, streamPromise, parsePromise)
-        .recoverWith(writeFailureHandler)
-        .flatMap(_ => updateStmtCacheIfNeeded(parse, parsePromise.future, nativeSql))
-        .flatMap(_ => streamPromise.future)
+      val preparePortalFun = (publisher: PgRowPublisher) => {
+        val msgs@ParseAndBind(parse, _) = parseAndBind
+        val describePromise = Promise[PortalDescData]
+        val parsePromise = Promise[Unit]
+
+        writeInitialExecuteMessages(txStatus, msgs, describePromise, parsePromise, publisher)
+          .recoverWith(writeFailureHandler)
+          .flatMap(_ => updateStmtCacheIfNeeded(parse, parsePromise.future, nativeSql))
+          .flatMap(_ => describePromise.future)
+      }
+
+      new PgRowPublisher(
+        preparePortal = preparePortalFun,
+        portalName = parseAndBind.bind.portal,
+        pgTypes = config.pgTypes,
+        typeConverters = config.typeConverters,
+        sessionParams = sessionParams,
+        maybeTimeoutHandler = newTimeoutHandler(reqId, timeout),
+        lockFactory = config.lockFactory,
+        fatalErrorNotifier = handleFatalError
+      )(reqId, out, ec)
     }
   }
 
@@ -197,62 +211,49 @@ abstract class AbstractPgConnection(val id: ConnId,
   }
 
   private def writeInitialExecuteMessages(txStatus: TxStatus,
-                                          reqId: RequestId,
                                           messages: ParseAndBind,
-                                          streamPromise: Promise[PgResultStream],
-                                          parsePromise: Promise[Unit])(
-                                           implicit timeout: Timeout): Future[Unit] = {
+                                          describePromise: Promise[PortalDescData],
+                                          parsePromise: Promise[Unit],
+                                          publisher: PgRowPublisher): Future[Unit] = {
     txStatus match {
       case TxStatus.Active | TxStatus.Failed =>
         fsmManager.triggerTransition(
-          waitingForDescribeResult(reqId, messages.bind.portal, streamPromise, parsePromise)
+          waitingForDescribeResult(messages.bind.portal, describePromise, parsePromise, publisher)
         )
         messages.parse.foreach(out.write(_))
         out.writeAndFlush(messages.bind, DescribePortal(messages.bind.portal), Sync)
 
       case TxStatus.Idle =>
         fsmManager.triggerTransition(
-          beginningTx(reqId, messages.parse, messages.bind, streamPromise, parsePromise)
+          beginningTx(messages.parse, messages.bind, describePromise, parsePromise, publisher)
         )
         out.writeAndFlush(Query(NativeSql("BEGIN")))
     }
   }
 
-  private def waitingForDescribeResult(reqId: RequestId,
-                                       portalName: Option[PortalName],
-                                       streamPromise: Promise[PgResultStream],
-                                       parsePromise: Promise[Unit])(
-                                        implicit timeout: Timeout): StrmWaitingForDescribe = {
+  private def waitingForDescribeResult(portalName: Option[PortalName],
+                                       describePromise: Promise[PortalDescData],
+                                       parsePromise: Promise[Unit],
+                                       publisher: PgRowPublisher): StrmWaitingForDescribe = {
     State.Streaming.waitingForDescribe(
       txMgmt = false,
+      publisher = publisher,
       portalName = portalName,
-      streamPromise = streamPromise,
-      parsePromise = parsePromise,
-      pgTypes = config.pgTypes,
-      typeConverters = config.typeConverters,
-      sessionParams = sessionParams,
-      maybeTimeoutHandler = newTimeoutHandler(reqId, timeout),
-      lockFactory = config.lockFactory,
-      fatalErrorNotifier = handleFatalError)(reqId, out, ec)
+      describePromise = describePromise,
+      parsePromise = parsePromise)(out, ec)
   }
 
-  private def beginningTx(reqId: RequestId,
-                          parse: Option[Parse],
+  private def beginningTx(parse: Option[Parse],
                           bind: Bind,
-                          streamPromise: Promise[PgResultStream],
-                          parsePromise: Promise[Unit])(
-                           implicit timeout: Timeout): StrmBeginningTx = {
+                          describePromise: Promise[PortalDescData],
+                          parsePromise: Promise[Unit],
+                          publisher: PgRowPublisher): StrmBeginningTx = {
     State.Streaming.beginningTx(
       maybeParse = parse,
       bind = bind,
-      streamPromise = streamPromise,
-      parsePromise = parsePromise,
-      sessionParams = sessionParams,
-      maybeTimeoutHandler = newTimeoutHandler(reqId, timeout),
-      typeConverters = config.typeConverters,
-      pgTypes = config.pgTypes,
-      lockFactory = config.lockFactory,
-      fatalErrorNotifier = handleFatalError)(reqId, out, ec)
+      publisher = publisher,
+      describePromise = describePromise,
+      parsePromise = parsePromise)(out, ec)
   }
 
   sealed trait StatementStatus
@@ -285,10 +286,8 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   object ParseAndBind {
     def apply(bind: Bind): ParseAndBind = ParseAndBind(None, bind)
-
     def apply(parse: Parse, bind: Bind): ParseAndBind = ParseAndBind(Some(parse), bind)
   }
-
   case class ParseAndBind(parse: Option[Parse], bind: Bind)
 
   private def newParseAndBind(nativeSql: NativeSql, params: Vector[Argument]): ParseAndBind = {
@@ -312,9 +311,10 @@ abstract class AbstractPgConnection(val id: ConnId,
     true
   }
 
-  private[core] def executeStatementForRowsAffected(nativeSql: NativeSql, params: Vector[Argument])(
+  override private[core] def executeStatementForRowsAffected(nativeSql: NativeSql,
+                                                             params: Vector[Argument])(
     implicit timeout: Timeout): Future[Long] = traced {
-    fsmManager.ifReady { (reqId, _) =>
+    fsmManager.ifReadyF { (reqId, _) =>
       logger.debug(s"Executing write-only statement '$nativeSql'")
 
       val ParseAndBind(parse, bind) = newParseAndBind(nativeSql, params)
@@ -338,9 +338,9 @@ abstract class AbstractPgConnection(val id: ConnId,
     }
   }
 
-  private[core] def executeArgsStream(nativeSql: NativeSql,
-                                      paramsSource: ArgsSource): Future[Unit] = traced {
-    fsmManager.ifReady { (_, _) =>
+  override private[core] def subscribeToStatementArgsStream(nativeSql: NativeSql,
+                                                            paramsSource: ArgsSource): Future[Unit] = traced {
+    fsmManager.ifReadyF { (_, _) =>
       sourceWithParseWritten(nativeSql, paramsSource)
         .batch(max = config.maxBatchSize, seed = Vector(_))(_ :+ _)
         .mapAsyncUnordered(parallelism = 1)(executeBatch)
@@ -375,12 +375,12 @@ abstract class AbstractPgConnection(val id: ConnId,
       .flatMap(_ => batchPromise.future)
   }
 
-  private[core] def handleWriteError(cause: Throwable): Unit = traced {
+  override private[core] def handleWriteError(cause: Throwable): Unit = traced {
     handleFatalError("Write error occurred, the connection will be closed", cause)
   }
 
   private def simpleQueryIgnoreResult(sql: NativeSql)(implicit timeout: Timeout): Future[Unit] = traced {
-    fsmManager.ifReady { (reqId, _) =>
+    fsmManager.ifReadyF { (reqId, _) =>
       val queryPromise = Promise[Unit]
       fsmManager.triggerTransition(State.simpleQuerying(queryPromise))
       out
@@ -476,7 +476,7 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   private[core] def deallocateStatement(nativeSql: NativeSql): Future[Unit] = traced {
     maybeStmtCache.fold(Future.unit) { stmtCache =>
-      fsmManager.ifReady { (_, txStatus) =>
+      fsmManager.ifReadyF { (_, txStatus) =>
         stmtCache.evict(nativeSql) match {
           case Some((newCache, evictedName)) =>
             maybeStmtCache = Some(newCache)

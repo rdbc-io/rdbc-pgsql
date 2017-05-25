@@ -16,14 +16,13 @@
 
 package io.rdbc.pgsql.core.internal.fsm
 
+import io.rdbc.pgsql.core.PgMsgHandler
 import io.rdbc.pgsql.core.exception.PgProtocolViolationException
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{BackendKeyData, ReadyForQuery}
-import io.rdbc.pgsql.core.{ChannelWriter, PgMsgHandler}
 
-import scala.concurrent.{ExecutionContext, Promise}
+import scala.concurrent.Promise
 
 class Initializing(initPromise: Promise[BackendKeyData])
-                  (implicit out: ChannelWriter, ec: ExecutionContext)
   extends State
     with NonFatalErrorsAreFatal {
 

@@ -18,18 +18,20 @@ package io.rdbc.pgsql.core.internal
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
+import io.rdbc.ImmutSeq
+import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.exception.PgSubscriptionRejectedException
+import io.rdbc.pgsql.core.internal.PgRowPublisher.PublisherState.{Cancelling, IdleReadyToPull}
 import io.rdbc.pgsql.core.internal.scheduler.{ScheduledTask, TimeoutHandler}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{DataRow, RowDescription}
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.util.concurrent.LockFactory
-import io.rdbc.pgsql.core.{ChannelWriter, FatalErrorNotifier, RequestId, SessionParams}
-import io.rdbc.sapi.{Row, TypeConverterRegistry}
+import io.rdbc.sapi.{ColumnMetadata, RowPublisher, Row, RowMetadata, TypeConverterRegistry, Warning}
 import io.rdbc.util.Logging
-import org.reactivestreams.{Publisher, Subscriber, Subscription}
+import org.reactivestreams.{Subscriber, Subscription}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -40,37 +42,65 @@ private[core] object PgRowPublisher {
     def request(n: Long): Unit = ()
   }
 
-  class LockGuardedState(lockFactory: LockFactory) {
+  trait PublisherState
+  object PublisherState {
+    case object Uninitialized extends PublisherState
+    case object PreparingPortal extends PublisherState
+    case object IdleReadyToPull extends PublisherState
+    case object PulledRows extends PublisherState
+    case object Cancelling extends PublisherState
+    case object Complete extends PublisherState
+    case object Errored extends PublisherState
+  }
+
+  class LockGuardedState(lockFactory: LockFactory)
+    extends Logging {
     private[this] val lock = lockFactory.lock
 
-    private[this] var ready = false
+    private[this] var publisherState: PublisherState = PublisherState.Uninitialized
     private[this] var demand = 0L
     private[this] var unboundedDemand = false
 
-    def ifCanQuery(body: (Option[Int]) => Unit): Unit = {
+    def ifUninitialized(body: () => Unit): Unit = {
       val action = lock.withLock {
-        if (ready && (demand > 0L || unboundedDemand)) {
-          ready = false
-          if (unboundedDemand) {
-            () => body(None)
-          } else {
-            val localDemand = demand
-            () => body(Some(localDemand.toInt)) //TODO isn't Some(localDemand.toInt) strict? Do I need localDemand?
-          }
-        } else () => ()
+        publisherState match {
+          case PublisherState.Uninitialized =>
+            setState(PublisherState.PreparingPortal)
+            () => body()
+          case _ => () => ()
+        }
       }
       action()
     }
 
-    def ifCanCancel(body: => Unit): Unit = {
-      val can = lock.withLock {
-        if (ready) {
-          ready = false
-          true
-        } else false
+    def ifCanPullRows(body: (Option[Int]) => Unit): Unit = {
+      val action = lock.withLock {
+        publisherState match {
+          case IdleReadyToPull if demand > 0L || unboundedDemand =>
+            setState(PublisherState.PulledRows)
+            if (unboundedDemand) {
+              () => body(None)
+            } else {
+              val localDemand = demand
+              () => body(Some(localDemand.toInt)) //TODO isn't Some(localDemand.toInt) strict? Do I need localDemand?
+            }
+          case _ => () => ()
+        }
+      }
+      action()
+    }
+
+    def ifCanCancel(body: PublisherState => Unit): Unit = {
+      val (can, state) = lock.withLock {
+        publisherState match {
+          case state@(PublisherState.IdleReadyToPull | PublisherState.Uninitialized) =>
+            setState(Cancelling)
+            (true, state)
+          case _ => (false, publisherState)
+        }
       }
       if (can) {
-        body
+        body(state)
       }
     }
 
@@ -98,17 +128,32 @@ private[core] object PgRowPublisher {
       }
     }
 
-    def setReady(): Unit = {
+    def setIdleReadyToPull(): Unit = {
       lock.withLock {
-        ready = true
+        setState(PublisherState.IdleReadyToPull)
       }
+    }
+
+    def setComplete(): Unit = {
+      lock.withLock {
+        setState(PublisherState.Complete)
+      }
+    }
+
+    def setErrored(): Unit = {
+      lock.withLock {
+        setState(PublisherState.Errored)
+      }
+    }
+
+    private def setState(newState: PublisherState): Unit = {
+      logger.debug(s"Publisher transitioning from $publisherState to $newState")
+      publisherState = newState
     }
   }
 }
 
-
-//TODO in the future tests, use reactive streams TCK to test this publisher & subscription
-private[core] class PgRowPublisher(rowDesc: RowDescription,
+private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[PortalDescData],
                                    val portalName: Option[PortalName],
                                    pgTypes: PgTypeRegistry,
                                    typeConverters: TypeConverterRegistry,
@@ -117,10 +162,11 @@ private[core] class PgRowPublisher(rowDesc: RowDescription,
                                    lockFactory: LockFactory,
                                    @volatile private[this] var fatalErrorNotifier: FatalErrorNotifier)
                                   (implicit reqId: RequestId, out: ChannelWriter, ec: ExecutionContext)
-  extends Publisher[Row] with Logging {
+  extends RowPublisher with Logging {
 
   import PgRowPublisher._
 
+  private[this] val portalDescDataPromise = Promise[PortalDescData]
   private[this] val subscriber = new AtomicReference(Option.empty[Subscriber[_ >: Row]])
   @volatile private[this] var cancelRequested = false
   private[this] val neverExecuted = new AtomicBoolean(true)
@@ -129,16 +175,11 @@ private[core] class PgRowPublisher(rowDesc: RowDescription,
 
   import lockGuarded._
 
-  private[this] val nameIdxMapping: Map[ColName, Int] = {
-    Map(rowDesc.colDescs.zipWithIndex.map {
-      case (cdesc, idx) => cdesc.name -> idx
-    }: _*)
-  }
-
   object RowSubscription extends Subscription {
     def cancel(): Unit = {
       ifCanCancel {
-        closePortal()
+        case PublisherState.Uninitialized => ()
+        case _ => closePortal()
       }
       cancelRequested = true
     }
@@ -170,7 +211,9 @@ private[core] class PgRowPublisher(rowDesc: RowDescription,
     }
   }
 
-  def handleRow(dataRow: DataRow): Unit = {
+  def handleRow(dataRow: DataRow,
+                rowDesc: RowDescription,
+                nameIdxMapping: Map[ColName, Int]): Unit = {
     /* this method is always called by the same I/O thread */
     //TODO should I make it thread-safe anyway?
     cancelTimeoutTask()
@@ -190,10 +233,11 @@ private[core] class PgRowPublisher(rowDesc: RowDescription,
   }
 
   def resume(): Unit = {
-    setReady()
+    setIdleReadyToPull()
     if (cancelRequested) {
-      ifCanCancel {
-        closePortal()
+      ifCanCancel { //TODO code dupl
+        case PublisherState.Uninitialized => ()
+        case _ => closePortal()
       }
     } else {
       tryQuerying()
@@ -209,18 +253,26 @@ private[core] class PgRowPublisher(rowDesc: RowDescription,
 
   def complete(): Unit = {
     cancelTimeoutTask()
+    setComplete()
     subscriber.get().foreach(_.onComplete())
   }
 
   def failure(ex: Throwable): Unit = {
     cancelTimeoutTask()
+    setErrored()
     subscriber.get().foreach(_.onError(ex))
   }
 
   private def tryQuerying(): Unit = {
-    ifCanQuery { demand =>
+    ifUninitialized { () =>
+      val preparePortalFut = preparePortal(this)
+      portalDescDataPromise.completeWith(preparePortalFut)
+      ()
+    }
+    ifCanPullRows { demand =>
       out.writeAndFlush(Execute(portalName, demand), Sync).onComplete {
         case Success(_) =>
+          //TODO should timeout task beb started on preparePortal or before execute?
           if (neverExecuted.compareAndSet(true, false)) {
             logger.trace(s"Statement was never executed, scheduling a timeout task with handler $maybeTimeoutHandler")
             timeoutScheduledTask = maybeTimeoutHandler.map(_.scheduleTimeoutTask(reqId))
@@ -241,4 +293,34 @@ private[core] class PgRowPublisher(rowDesc: RowDescription,
   private[core] def fatalErrNotifier_=(fen: FatalErrorNotifier): Unit = fatalErrorNotifier = fen
 
   private[core] def fatalErrNotifier: FatalErrorNotifier = fatalErrorNotifier
+
+  override val rowsAffected: Future[Long] = {
+    portalDescDataPromise.future.flatMap { descData =>
+      descData.rowsAffectedPromise.future
+    }
+  }
+
+  override val warnings: Future[ImmutSeq[Warning]] = {
+    portalDescDataPromise.future.flatMap { descData =>
+      descData.warningsPromise.future.map { warnMsgs =>
+        warnMsgs.map { warnMsg =>
+          Warning(warnMsg.statusData.shortInfo, warnMsg.statusData.sqlState)
+        }
+      }
+    }
+  }
+
+  override val metadata: Future[RowMetadata] = {
+    portalDescDataPromise.future.map { descData =>
+      val rowDesc = descData.rowDesc
+      val columnsMetadata = rowDesc.colDescs.map { colDesc =>
+        ColumnMetadata(
+          name = colDesc.name.value,
+          dbTypeId = colDesc.dataType.oid.value.toString,
+          cls = pgTypes.typeByOid(colDesc.dataType.oid).map(_.cls)
+        )
+      }
+      RowMetadata(columnsMetadata)
+    }
+  }
 }

@@ -98,7 +98,7 @@ private[core] class PgStatement(stmtExecutor: PgStatementExecutor,
   }
 
   private def streamPgArguments(argsSource: Source[Vector[Argument], NotUsed]): Future[Unit] = traced {
-    stmtExecutor.executeArgsStream(nativeStmt.sql, argsSource)
+    stmtExecutor.subscribeToStatementArgsStream(nativeStmt.sql, argsSource)
   }
 
   private def pgParametrizedStatement(pgParamValues: Vector[Argument]): PgExecutableStatement = traced {

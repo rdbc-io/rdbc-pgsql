@@ -19,16 +19,16 @@ package io.rdbc.pgsql.core.internal
 import io.rdbc.pgsql.core.ArgsSource
 import io.rdbc.pgsql.core.pgstruct.Argument
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
-import io.rdbc.sapi.{ResultStream, Timeout}
+import io.rdbc.sapi.{RowPublisher, Timeout}
 
 import scala.concurrent.Future
 
 private[core] trait PgStatementExecutor {
-  private[core] def executeStatementForStream(nativeSql: NativeSql, args: Vector[Argument])
-                                             (implicit timeout: Timeout): Future[ResultStream]
+  private[core] def statementStream(nativeSql: NativeSql, args: Vector[Argument])
+                                   (implicit timeout: Timeout): RowPublisher
 
   private[core] def executeStatementForRowsAffected(nativeSql: NativeSql, args: Vector[Argument])
                                                    (implicit timeout: Timeout): Future[Long]
 
-  private[core] def executeArgsStream(nativeSql: NativeSql, args: ArgsSource): Future[Unit]
+  private[core] def subscribeToStatementArgsStream(nativeSql: NativeSql, args: ArgsSource): Future[Unit]
 }

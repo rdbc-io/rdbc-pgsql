@@ -17,10 +17,7 @@
 package io.rdbc.pgsql.core.types
 
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatterBuilder
-import java.time.temporal.ChronoField
 
-import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.pgstruct.Oid
 
 trait PgTimestamp extends PgType[LocalDateTime] {

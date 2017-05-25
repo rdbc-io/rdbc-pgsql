@@ -16,15 +16,11 @@
 
 package io.rdbc.pgsql.core.internal.fsm.streaming
 
-import io.rdbc.pgsql.core.internal.PgResultStream
+import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.internal.fsm.{State, StateAction}
-import io.rdbc.pgsql.core.internal.scheduler.TimeoutHandler
+import io.rdbc.pgsql.core.internal.{PgRowPublisher, PortalDescData}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{CommandComplete, ReadyForQuery}
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
-import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.core.util.concurrent.LockFactory
-import io.rdbc.pgsql.core._
-import io.rdbc.sapi.TypeConverterRegistry
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
@@ -32,16 +28,10 @@ import scala.util.control.NonFatal
 private[core]
 class StrmBeginningTx private[fsm](maybeParse: Option[Parse],
                                    bind: Bind,
-                                   streamPromise: Promise[PgResultStream],
-                                   parsePromise: Promise[Unit],
-                                   sessionParams: SessionParams,
-                                   maybeTimeoutHandler: Option[TimeoutHandler],
-                                   typeConverters: TypeConverterRegistry,
-                                   pgTypes: PgTypeRegistry,
-                                   lockFactory: LockFactory,
-                                   fatalErrorNotifier: FatalErrorNotifier)
-                                  (implicit reqId: RequestId, out: ChannelWriter,
-                                   ec: ExecutionContext)
+                                   publisher: PgRowPublisher,
+                                   describePromise: Promise[PortalDescData],
+                                   parsePromise: Promise[Unit])
+                                  (implicit out: ChannelWriter, ec: ExecutionContext)
   extends State {
 
   @volatile private[this] var beginComplete = false
@@ -56,15 +46,10 @@ class StrmBeginningTx private[fsm](maybeParse: Option[Parse],
       goto(
         State.Streaming.waitingForDescribe(
           txMgmt = true,
+          publisher = publisher,
           portalName = bind.portal,
-          streamPromise = streamPromise,
-          parsePromise = parsePromise,
-          pgTypes = pgTypes,
-          typeConverters = typeConverters,
-          sessionParams = sessionParams,
-          maybeTimeoutHandler = maybeTimeoutHandler,
-          lockFactory = lockFactory,
-          fatalErrorNotifier = fatalErrorNotifier)
+          describePromise = describePromise,
+          parsePromise = parsePromise)
       ) andThen {
         out.writeAndFlush(bind, DescribePortal(bind.portal), Sync)
           .recoverWith { case NonFatal(ex) =>
@@ -75,7 +60,7 @@ class StrmBeginningTx private[fsm](maybeParse: Option[Parse],
   }
 
   private def sendFailureToClient(ex: Throwable): Unit = {
-    streamPromise.failure(ex)
+    describePromise.failure(ex)
     parsePromise.failure(ex)
   }
 
