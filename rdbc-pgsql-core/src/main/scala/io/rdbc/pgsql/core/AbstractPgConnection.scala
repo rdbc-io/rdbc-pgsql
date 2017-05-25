@@ -70,7 +70,7 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   override def watchForIdle: Future[this.type] = fsmManager.readyFuture.map(_ => this)
 
-  override def statement(sql: String, options: StatementOptions): Future[Statement] = traced {
+  override def statement(sql: String, options: StatementOptions): Statement = traced {
     argsNotNull()
     checkNonEmptyString(sql)
     val StatementOptions(keyColumns) = options
@@ -79,14 +79,12 @@ abstract class AbstractPgConnection(val id: ConnId,
       case KeyColumns.All => s"$sql returning *"
       case KeyColumns.Named(cols) => sql + " returning " + cols.mkString(",")
     }
-    Future.successful {
-      new PgStatement(
-        stmtExecutor = this,
-        pgTypes = config.pgTypes,
-        sessionParams = sessionParams,
-        nativeStmt = PgNativeStatement.parse(RdbcSql(finalSql))
-      )
-    }
+    new PgStatement(
+      stmtExecutor = this,
+      pgTypes = config.pgTypes,
+      sessionParams = sessionParams,
+      nativeStmt = PgNativeStatement.parse(RdbcSql(finalSql))
+    )
   }
 
   override def beginTx()(implicit timeout: Timeout): Future[Unit] = traced {
