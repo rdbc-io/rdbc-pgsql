@@ -7,7 +7,7 @@ import scala.Console._
 shellPrompt.in(ThisBuild) := (state => s"${CYAN}project:$GREEN${Project.extract(state).currentRef.project}$RESET> ")
 
 lazy val commonSettings = Vector(
-  organization := "io.rdbc",
+  organization := "io.rdbc.pgsql",
   scalaVersion := "2.12.2",
   crossScalaVersions := Vector("2.11.11"),
 
