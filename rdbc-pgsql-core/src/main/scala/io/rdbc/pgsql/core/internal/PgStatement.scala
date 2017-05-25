@@ -20,7 +20,6 @@ import akka.NotUsed
 import akka.stream.scaladsl.Source
 import io.rdbc.ImmutIndexedSeq
 import io.rdbc.api.exceptions._
-import io.rdbc.implbase.StatementPartialImpl
 import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.internal.PgNativeStatement.Params
 import io.rdbc.pgsql.core.internal.PgNativeStatement.Params.{Named, Positional}
@@ -38,7 +37,6 @@ private[core] class PgStatement(stmtExecutor: PgStatementExecutor,
                                 nativeStmt: PgNativeStatement)
                                (implicit ec: ExecutionContext)
   extends Statement
-    with StatementPartialImpl
     with Logging {
 
   //TODO try to limit exceptions to public methods only - scan the code
