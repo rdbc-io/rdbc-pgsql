@@ -19,7 +19,7 @@ package io.rdbc.pgsql
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import io.rdbc.pgsql.core.internal.fsm.StateAction
-import io.rdbc.pgsql.core.pgstruct.{ParamValue, TxStatus}
+import io.rdbc.pgsql.core.pgstruct.{Argument, TxStatus}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{BackendKeyData, PgBackendMessage}
 
 import scala.concurrent.Future
@@ -44,7 +44,6 @@ package object core {
 
   private[core] type PgMsgHandler = PartialFunction[PgBackendMessage, StateAction]
 
-  private[core] type ParamsSource = Source[Vector[ParamValue], NotUsed]
+  private[core] type ArgsSource = Source[Vector[Argument], NotUsed]
 
-  private[core] val unitFuture = Future.successful(())
 }

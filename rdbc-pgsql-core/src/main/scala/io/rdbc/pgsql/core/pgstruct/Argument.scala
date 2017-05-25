@@ -14,12 +14,16 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.internal
+package io.rdbc.pgsql.core.pgstruct
 
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
+import scodec.bits.ByteVector
 
-import scala.concurrent.Future
+sealed trait Argument {
+  def dataTypeOid: Oid
+}
 
-private[core] trait PgStatementDeallocator {
-  private[core] def deallocateStatement(nativeSql: NativeSql): Future[Unit]
+object Argument {
+  case class Null(dataTypeOid: Oid) extends Argument
+  case class Textual(value: String, dataTypeOid: Oid) extends Argument
+  case class Binary(value: ByteVector, dataTypeOid: Oid) extends Argument
 }

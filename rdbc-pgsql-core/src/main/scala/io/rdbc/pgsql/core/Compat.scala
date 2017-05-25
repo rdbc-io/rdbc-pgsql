@@ -14,16 +14,13 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.pgstruct
+package io.rdbc.pgsql.core
 
-import scodec.bits.ByteVector
+import scala.concurrent.Future
 
-sealed trait ParamValue {
-  def dataTypeOid: Oid
-}
+private[core] object Compat {
 
-object ParamValue {
-  case class Null(dataTypeOid: Oid) extends ParamValue
-  case class Textual(value: String, dataTypeOid: Oid) extends ParamValue
-  case class Binary(value: ByteVector, dataTypeOid: Oid) extends ParamValue
+  implicit class FutureObjectCompat(underlying: Future.type) {
+    val unit: Future[Unit] = Future.successful(())
+  }
 }

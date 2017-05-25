@@ -174,7 +174,7 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
       typeConverters = typeConverters,
       lockFactory = config.lockFactory,
       maxBatchSize = config.maxBatchSize,
-      stmtCacheCapacity = config.stmtCacheCapacity
+      stmtCacheConfig = config.stmtCacheConfig
     )
 
     new NettyPgConnection(
