@@ -21,7 +21,7 @@ import java.nio.charset.Charset
 import io.rdbc.pgsql.core.codec.Encoder
 import io.rdbc.pgsql.core.exception.PgEncodeException
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
-import io.rdbc.pgsql.scodec.msg.frontend.{pgFrontendMessage, _}
+import io.rdbc.pgsql.scodec.msg.frontend.pgFrontendMessage
 import scodec.Attempt.{Failure, Successful}
 import scodec.bits.ByteVector
 

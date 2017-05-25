@@ -35,7 +35,7 @@ import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{CancelRequest, Terminate}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.{AbstractPgConnection, ConnId, PgConnectionConfig}
-import io.rdbc.sapi.{ConnectionFactory, TypeConverterRegistry}
+import io.rdbc.sapi.TypeConverterRegistry
 import io.rdbc.util.Logging
 
 import scala.concurrent.Future

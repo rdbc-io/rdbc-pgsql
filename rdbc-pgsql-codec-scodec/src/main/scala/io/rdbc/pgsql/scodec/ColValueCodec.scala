@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.scodec
 
-import _root_.scodec.bits.{BitVector, ByteVector}
+import _root_.scodec.bits.BitVector
 import _root_.scodec.codecs._
 import _root_.scodec.{Attempt, Codec, DecodeResult, SizeBound}
 import io.rdbc.pgsql.core.pgstruct.ColValue
