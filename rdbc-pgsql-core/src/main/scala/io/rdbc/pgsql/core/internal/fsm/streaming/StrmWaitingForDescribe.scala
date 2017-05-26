@@ -16,34 +16,25 @@
 
 package io.rdbc.pgsql.core.internal.fsm.streaming
 
+import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.exception.PgProtocolViolationException
 import io.rdbc.pgsql.core.internal.fsm.{State, StateAction}
-import io.rdbc.pgsql.core.internal.scheduler.TimeoutHandler
-import io.rdbc.pgsql.core.internal.{PgResultStream, PgRowPublisher}
+import io.rdbc.pgsql.core.internal.{PgRowPublisher, PortalDescData}
 import io.rdbc.pgsql.core.pgstruct.messages.backend._
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.PortalName
-import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.core.util.concurrent.LockFactory
-import io.rdbc.pgsql.core._
-import io.rdbc.sapi.TypeConverterRegistry
 
 import scala.concurrent.{ExecutionContext, Promise}
 
 private[core]
 class StrmWaitingForDescribe private[fsm](txMgmt: Boolean,
+                                          publisher: PgRowPublisher,
                                           portalName: Option[PortalName],
-                                          streamPromise: Promise[PgResultStream],
-                                          parsePromise: Promise[Unit],
-                                          pgTypes: PgTypeRegistry,
-                                          typeConverters: TypeConverterRegistry,
-                                          sessionParams: SessionParams,
-                                          maybeTimeoutHandler: Option[TimeoutHandler],
-                                          lockFactory: LockFactory,
-                                          fatalErrorNotifier: FatalErrorNotifier)
-                                         (implicit reqId: RequestId, out: ChannelWriter, ec: ExecutionContext)
+                                          describePromise: Promise[PortalDescData],
+                                          parsePromise: Promise[Unit])
+                                         (implicit out: ChannelWriter, ec: ExecutionContext)
   extends State {
 
-  @volatile private[this] var maybeAfterDescData = Option.empty[AfterDescData]
+  @volatile private[this] var maybePortalDescData = Option.empty[PortalDescData]
 
   protected val msgHandler: PgMsgHandler = {
     case ParseComplete =>
@@ -52,78 +43,54 @@ class StrmWaitingForDescribe private[fsm](txMgmt: Boolean,
 
     case BindComplete => stay
     case _: ParameterDescription => stay
-    case NoData => completeStreamPromise(RowDescription.empty)
-    case rowDesc: RowDescription => completeStreamPromise(rowDesc)
+    case NoData => completeDescribePromise(RowDescription.empty)
+    case rowDesc: RowDescription => completeDescribePromise(rowDesc)
 
     case _: ReadyForQuery =>
-      maybeAfterDescData match {
+      maybePortalDescData match {
         case None =>
           val ex = new PgProtocolViolationException(
             "Ready for query received without prior row description"
           )
           fatal(ex) andThenF sendFailureToClient(ex)
 
-        case Some(afterDescData@AfterDescData(publisher, _, _)) =>
-          goto(new StrmPullingRows(txMgmt, afterDescData)) andThenF publisher.resume()
+        case Some(afterDescData) =>
+          goto(State.Streaming.pullingRows(txMgmt, afterDescData, publisher)) andThenF publisher.resume()
       }
   }
 
-  private def completeStreamPromise(rowDesc: RowDescription): StateAction = {
-    val publisher = createPublisher(rowDesc)
+  private def completeDescribePromise(rowDesc: RowDescription): StateAction = {
     val warningsPromise = Promise[Vector[StatusMessage.Notice]]
     val rowsAffectedPromise = Promise[Long]
 
-    val afterDescData = AfterDescData(
-      publisher = publisher,
+    val portalDescData = PortalDescData(
+      rowDesc = rowDesc,
       warningsPromise = warningsPromise,
       rowsAffectedPromise = rowsAffectedPromise
     )
-    maybeAfterDescData = Some(afterDescData)
+    maybePortalDescData = Some(portalDescData)
 
-    val stream = createStream(afterDescData, rowDesc)
-    streamPromise.success(stream)
+    describePromise.success(portalDescData)
     stay
   }
 
-  private def createStream(afterDescData: AfterDescData,
-                           rowDesc: RowDescription): PgResultStream = {
-    new PgResultStream(
-      rows = afterDescData.publisher,
-      rowDesc = rowDesc,
-      rowsAffected = afterDescData.rowsAffectedPromise.future,
-      warningMsgsFut = afterDescData.warningsPromise.future,
-      pgTypes = pgTypes,
-      typeConverters = typeConverters
-    )
-  }
-
-  private def createPublisher(rowDesc: RowDescription): PgRowPublisher = {
-    new PgRowPublisher(
-      rowDesc = rowDesc,
-      portalName = portalName,
-      pgTypes = pgTypes,
-      typeConverters = typeConverters,
-      sessionParams = sessionParams,
-      maybeTimeoutHandler = maybeTimeoutHandler,
-      lockFactory = lockFactory,
-      fatalErrorNotifier = fatalErrorNotifier
-    )
-  }
-
   private def sendFailureToClient(ex: Throwable): Unit = {
-    maybeAfterDescData match {
-      case Some(AfterDescData(publisher, warningsPromise, rowsAffectedPromise)) =>
-        publisher.failure(ex)
+    maybePortalDescData match {
+      case Some(PortalDescData(_, warningsPromise, rowsAffectedPromise)) =>
         warningsPromise.failure(ex)
         rowsAffectedPromise.failure(ex)
         parsePromise.failure(ex)
+        describePromise.failure(ex)
 
       case None =>
         if (!parsePromise.isCompleted) {
-          parsePromise.failure(ex)
+          parsePromise.failure(ex) //TODO this is not safe, is it? maybe it is because of single I/O thread
         }
-        streamPromise.failure(ex)
+        describePromise.failure(ex)
     }
+    publisher.failure(ex)
+    //TODO will this failure be signalled twice by publisher?
+    // one by failure, second by describePromise?
   }
 
   protected def onNonFatalError(ex: Throwable): StateAction = {

@@ -25,6 +25,7 @@ import io.rdbc.util.Logging
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 private[core] class PgSessionFsmManager(connId: ConnId,
                                         lockFactory: LockFactory,
@@ -39,13 +40,11 @@ private[core] class PgSessionFsmManager(connId: ConnId,
   private[this] var lastRequestId = RequestId(connId, 0L)
 
   /* TODO can't make this traced, compilation fails, investigate */
-  def ifReady[A](request: ClientRequest[A]): Future[A] = {
-    val action: () => Future[A] = lock.withLock {
+  def ifReady[A](request: ClientRequest[A]): A = {
+    val action: () => A = lock.withLock {
       if (handlingTimeout) {
         () =>
-          Future.failed {
-            new IllegalSessionStateException(s"Session is busy, currently cancelling timed out action")
-          }
+            throw new IllegalSessionStateException(s"Session is busy, currently cancelling timed out action")
       } else if (ready) {
         actionWhenReady(request)
       } else {
@@ -55,8 +54,15 @@ private[core] class PgSessionFsmManager(connId: ConnId,
     action()
   }
 
+  def ifReadyF[A](request: ClientRequest[Future[A]]): Future[A] = {
+    Try(ifReady(request)) match {
+      case Success(res) => res
+      case Failure(ex) => Future.failed(ex)
+    }
+  }
+
   /* TODO can't make this traced, compilation fails, investigate */
-  private def actionWhenReady[A](request: ClientRequest[A]): () => Future[A] = {
+  private def actionWhenReady[A](request: ClientRequest[A]): () => A = {
     state match {
       case Idle(txStatus) =>
         val newRequestId = prepareStateForNewRequest()
@@ -65,16 +71,16 @@ private[core] class PgSessionFsmManager(connId: ConnId,
       case state =>
         val ex = new PgDriverInternalErrorException(s"Expected connection state to be idle, actual state was $state")
         fatalErrorHandler.handleFatalError(ex.getMessage, ex)
-        () => Future.failed(ex)
+        () => throw ex
     }
   }
 
-  private def actionWhenNotReady[A](): () => Future[A] = traced {
+  private def actionWhenNotReady[A](): () => A = traced {
     state match {
       case ConnectionClosed(cause) =>
-        () => Future.failed(cause)
+        () => throw cause
       case _ =>
-        () => Future.failed(new IllegalSessionStateException(s"Session is busy, currently processing query"))
+        () => throw new IllegalSessionStateException(s"Session is busy, currently processing query")
     }
   }
 

@@ -121,7 +121,7 @@ package object backend {
     )
   }
 
-  private def dataRow(implicit charset: Charset): Codec[DataRow] = pgHeadlessMsg {
+  private def dataRow: Codec[DataRow] = pgHeadlessMsg {
     vectorOfN(
       "colCount"  | int16,
       "colValues" | colValue

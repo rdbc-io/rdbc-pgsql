@@ -17,18 +17,14 @@
 package io.rdbc.pgsql.core.internal.fsm
 
 import io.rdbc.api.exceptions.ConnectionClosedException
+import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgStatusDataException}
 import io.rdbc.pgsql.core.internal.fsm.streaming._
-import io.rdbc.pgsql.core.internal.scheduler.TimeoutHandler
-import io.rdbc.pgsql.core.internal.{PgResultStream, PgRowPublisher}
+import io.rdbc.pgsql.core.internal.{PgRowPublisher, PortalDescData}
 import io.rdbc.pgsql.core.pgstruct.TxStatus
 import io.rdbc.pgsql.core.pgstruct.messages.backend._
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{Bind, Parse, PortalName}
-import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.core.util.concurrent.LockFactory
-import io.rdbc.pgsql.core._
-import io.rdbc.sapi.TypeConverterRegistry
 import io.rdbc.util.Logging
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -98,8 +94,7 @@ private[core] object State extends Logging {
 
   def authenticating(initPromise: Promise[BackendKeyData],
                      authenticator: Authenticator)
-                    (implicit out: ChannelWriter,
-                     ec: ExecutionContext): Authenticating = {
+                    (implicit out: ChannelWriter): Authenticating = {
     new Authenticating(initPromise, authenticator)
   }
 
@@ -120,12 +115,11 @@ private[core] object State extends Logging {
     new ExecutingWriteOnly(parsePromise, resultPromise)
   }
 
-  def initializing(initPromise: Promise[BackendKeyData])
-                  (implicit out: ChannelWriter, ec: ExecutionContext): Initializing = {
+  def initializing(initPromise: Promise[BackendKeyData]): Initializing = {
     new Initializing(initPromise)
   }
 
-  def simpleQuerying(promise: Promise[Unit])(implicit out: ChannelWriter): SimpleQuerying = {
+  def simpleQuerying(promise: Promise[Unit]): SimpleQuerying = {
     new SimpleQuerying(promise)
   }
 
@@ -162,27 +156,17 @@ private[core] object State extends Logging {
 
     def beginningTx(maybeParse: Option[Parse],
                     bind: Bind,
-                    streamPromise: Promise[PgResultStream],
-                    parsePromise: Promise[Unit],
-                    sessionParams: SessionParams,
-                    maybeTimeoutHandler: Option[TimeoutHandler],
-                    typeConverters: TypeConverterRegistry,
-                    pgTypes: PgTypeRegistry,
-                    lockFactory: LockFactory,
-                    fatalErrorNotifier: FatalErrorNotifier)
-                   (implicit reqId: RequestId, out: ChannelWriter,
+                    publisher: PgRowPublisher,
+                    describePromise: Promise[PortalDescData],
+                    parsePromise: Promise[Unit])
+                   (implicit out: ChannelWriter,
                     ec: ExecutionContext): StrmBeginningTx = {
       new StrmBeginningTx(
         maybeParse = maybeParse,
         bind = bind,
-        streamPromise = streamPromise,
-        parsePromise = parsePromise,
-        sessionParams = sessionParams,
-        maybeTimeoutHandler = maybeTimeoutHandler,
-        typeConverters = typeConverters,
-        pgTypes = pgTypes,
-        lockFactory = lockFactory,
-        fatalErrorNotifier = fatalErrorNotifier
+        publisher = publisher,
+        describePromise = describePromise,
+        parsePromise = parsePromise
       )
     }
 
@@ -196,9 +180,9 @@ private[core] object State extends Logging {
       new StrmPendingCommit(publisher)
     }
 
-    def pullingRows(txMgmt: Boolean, afterDescData: AfterDescData)
+    def pullingRows(txMgmt: Boolean, afterDescData: PortalDescData, publisher: PgRowPublisher)
                    (implicit out: ChannelWriter, ec: ExecutionContext): StrmPullingRows = {
-      new StrmPullingRows(txMgmt, afterDescData)
+      new StrmPullingRows(txMgmt, afterDescData, publisher)
     }
 
     def queryFailed(txMgmt: Boolean, portalName: Option[PortalName])(sendFailureCause: => Unit)
@@ -222,29 +206,18 @@ private[core] object State extends Logging {
     }
 
     def waitingForDescribe(txMgmt: Boolean,
+                           publisher: PgRowPublisher,
                            portalName: Option[PortalName],
-                           streamPromise: Promise[PgResultStream],
-                           parsePromise: Promise[Unit],
-                           pgTypes: PgTypeRegistry,
-                           typeConverters: TypeConverterRegistry,
-                           sessionParams: SessionParams,
-                           maybeTimeoutHandler: Option[TimeoutHandler],
-                           lockFactory: LockFactory,
-                           fatalErrorNotifier: FatalErrorNotifier)
-                          (implicit reqId: RequestId,
-                           out: ChannelWriter,
+                           describePromise: Promise[PortalDescData],
+                           parsePromise: Promise[Unit])
+                          (implicit out: ChannelWriter,
                            ec: ExecutionContext): StrmWaitingForDescribe = {
       new StrmWaitingForDescribe(
         txMgmt = txMgmt,
+        publisher = publisher,
         portalName = portalName,
-        streamPromise = streamPromise,
-        parsePromise = parsePromise,
-        pgTypes = pgTypes,
-        typeConverters = typeConverters,
-        sessionParams = sessionParams,
-        maybeTimeoutHandler = maybeTimeoutHandler,
-        lockFactory = lockFactory,
-        fatalErrorNotifier = fatalErrorNotifier
+        describePromise = describePromise,
+        parsePromise = parsePromise
       )
     }
 

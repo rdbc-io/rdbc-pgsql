@@ -18,8 +18,6 @@ package io.rdbc.pgsql.scodec
 
 import java.time.Duration
 
-import io.rdbc.pgsql.core.types.PgTypeRegistry
-
 package object types {
   private[types] implicit class Duration2Micros(underlying: Duration) {
     def toMicros: Long = {

@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.internal.fsm.streaming
+package io.rdbc.pgsql.core.internal
 
-import io.rdbc.pgsql.core.internal.PgRowPublisher
-import io.rdbc.pgsql.core.pgstruct.messages.backend.StatusMessage
+import io.rdbc.pgsql.core.pgstruct.messages.backend.{RowDescription, StatusMessage}
 
 import scala.concurrent.Promise
 
-private[fsm] case class AfterDescData(publisher: PgRowPublisher,
-                                       warningsPromise: Promise[Vector[StatusMessage.Notice]],
-                                       rowsAffectedPromise: Promise[Long])
+private[core]
+case class PortalDescData(rowDesc: RowDescription,
+                          warningsPromise: Promise[Vector[StatusMessage.Notice]],
+                          rowsAffectedPromise: Promise[Long])

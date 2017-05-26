@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core
+package io.rdbc.pgsql.core.internal
 
 import scala.concurrent.Future
 

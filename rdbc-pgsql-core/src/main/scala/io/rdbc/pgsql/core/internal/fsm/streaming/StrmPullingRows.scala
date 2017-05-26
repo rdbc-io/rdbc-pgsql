@@ -16,20 +16,26 @@
 
 package io.rdbc.pgsql.core.internal.fsm.streaming
 
+import io.rdbc.pgsql.core.internal.{PgRowPublisher, PortalDescData}
 import io.rdbc.pgsql.core.internal.fsm.{State, StateAction, WaitingForReady, WarningCollection}
 import io.rdbc.pgsql.core.pgstruct.messages.backend._
+import io.rdbc.pgsql.core.pgstruct.messages.frontend.ColName
 import io.rdbc.pgsql.core.{ChannelWriter, PgMsgHandler}
 
 import scala.concurrent.ExecutionContext
 
 private[core]
-class StrmPullingRows private[fsm](txMgmt: Boolean, afterDescData: AfterDescData)
+class StrmPullingRows private[fsm](txMgmt: Boolean, afterDescData: PortalDescData, publisher: PgRowPublisher)
                                   (implicit out: ChannelWriter, ec: ExecutionContext)
   extends State
     with WarningCollection {
   //TODO warnings should be collected in all extended query states
 
-  private[this] val publisher = afterDescData.publisher
+  private[this] val nameIdxMapping: Map[ColName, Int] = {
+    Map(afterDescData.rowDesc.colDescs.zipWithIndex.map {
+      case (cdesc, idx) => cdesc.name -> idx
+    }: _*)
+  }
 
   publisher.fatalErrNotifier = (msg, ex) => {
     logger.error(s"Fatal error occured in the publisher: $msg")
@@ -43,7 +49,7 @@ class StrmPullingRows private[fsm](txMgmt: Boolean, afterDescData: AfterDescData
     case PortalSuspended => stay
 
     case dr: DataRow =>
-      publisher.handleRow(dr)
+      publisher.handleRow(dr, afterDescData.rowDesc, nameIdxMapping)
       stay
 
     case ReadyForQuery(_) =>
@@ -56,6 +62,9 @@ class StrmPullingRows private[fsm](txMgmt: Boolean, afterDescData: AfterDescData
     case CommandComplete(_, rowsAffected) =>
       completePulling(rowsAffected.map(_.toLong).getOrElse(0L))
 
+    //TODO distinguish between cancelled subscription and not-cancelled
+    // if the subscription was cancelled no publisher.complete or publisher.failure
+    // should happen
     case CloseComplete => //TODO we use only unnamed portals, closing them is not necessary
       if (txMgmt) goto(new StrmPendingCommit(publisher))
       else goto(new WaitingForReady(
@@ -79,7 +88,7 @@ class StrmPullingRows private[fsm](txMgmt: Boolean, afterDescData: AfterDescData
   }
 
   protected def onNonFatalError(ex: Throwable): StateAction = {
-    goto(State.Streaming.queryFailed(txMgmt, afterDescData.publisher.portalName) {
+    goto(State.Streaming.queryFailed(txMgmt, publisher.portalName) {
       sendFailureToClient(ex)
     })
   }

@@ -35,7 +35,7 @@ object ScodecPgDate extends ScodecPgType[LocalDate] with PgDate with CommonCodec
   private[this] val PgZero: LocalDate = LocalDate.of(2000, Month.JANUARY, 1)
 
   private def int2LocalDate(i: Int): LocalDate = {
-    PgZero.plus(i, DAYS)
+    PgZero.plus(i.toLong, DAYS)
   }
 
   private def localDate2Int(ld: LocalDate): Int = {

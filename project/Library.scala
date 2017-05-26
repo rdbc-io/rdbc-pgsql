@@ -1,7 +1,7 @@
 import sbt._
 
 object Library {
-  private val rdbcVersion = "0.0.59"
+  private val rdbcVersion = "0.0.60"
   private val nettyVersion = "4.0.46.Final"
 
   val rdbcScalaApi = "io.rdbc" %% "rdbc-api-scala" % rdbcVersion
