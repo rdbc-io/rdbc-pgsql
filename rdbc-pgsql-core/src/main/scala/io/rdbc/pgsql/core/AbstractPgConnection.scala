@@ -182,7 +182,7 @@ abstract class AbstractPgConnection(val id: ConnId,
           .flatMap(_ => describePromise.future)
       }
 
-      new PgRowPublisher(
+      val publisher = new PgRowPublisher(
         preparePortal = preparePortalFun,
         portalName = parseAndBind.bind.portal,
         pgTypes = config.pgTypes,
@@ -192,6 +192,10 @@ abstract class AbstractPgConnection(val id: ConnId,
         lockFactory = config.lockFactory,
         fatalErrorNotifier = handleFatalError
       )(reqId, out, ec)
+
+      fsmManager.triggerTransition(State.Streaming.waitingForSubscriber)
+
+      publisher
     }
   }
 
