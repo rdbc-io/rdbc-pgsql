@@ -154,6 +154,8 @@ private[core] object State extends Logging {
 
   object Streaming {
 
+    val waitingForSubscriber = new StrmWaitingForSubscriber
+
     def beginningTx(maybeParse: Option[Parse],
                     bind: Bind,
                     publisher: PgRowPublisher,
