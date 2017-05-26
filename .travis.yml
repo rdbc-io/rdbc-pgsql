@@ -21,6 +21,7 @@ before_cache:
 env:
   global:
     - CI=true #to decrease coursier verbosity
+    - DEFAULT_TIMEOUT_MILLIS=300 #Reactive Streams testkit timeout for async ops
   matrix:
     - PG_VER=V9_6
     - PG_VER=V9_5
