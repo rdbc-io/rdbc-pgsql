@@ -19,7 +19,7 @@ package io.rdbc.pgsql.core.internal
 import io.rdbc.implbase.ExecutableStatementPartialImpl
 import io.rdbc.pgsql.core.pgstruct.Argument
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
-import io.rdbc.sapi.{ExecutableStatement, ResultStream, Timeout}
+import io.rdbc.sapi.{ExecutableStatement, RowPublisher, Timeout}
 import io.rdbc.util.Logging
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -32,8 +32,8 @@ private[core] class PgExecutableStatement(executor: PgStatementExecutor,
     with ExecutableStatementPartialImpl
     with Logging {
 
-  def executeForStream()(implicit timeout: Timeout): Future[ResultStream] = traced {
-    executor.executeStatementForStream(nativeSql, params)
+  def stream()(implicit timeout: Timeout): RowPublisher = traced {
+    executor.statementStream(nativeSql, params)
   }
 
   override def executeForRowsAffected()(implicit timeout: Timeout): Future[Long] = traced {

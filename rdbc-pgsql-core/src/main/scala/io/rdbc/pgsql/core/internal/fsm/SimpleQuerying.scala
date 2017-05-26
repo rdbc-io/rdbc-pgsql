@@ -16,13 +16,13 @@
 
 package io.rdbc.pgsql.core.internal.fsm
 
+import io.rdbc.pgsql.core.PgMsgHandler
 import io.rdbc.pgsql.core.pgstruct.messages.backend._
-import io.rdbc.pgsql.core.{ChannelWriter, PgMsgHandler}
 
 import scala.concurrent.Promise
 
 private[core]
-class SimpleQuerying private[fsm](promise: Promise[Unit])(implicit out: ChannelWriter) extends State {
+class SimpleQuerying private[fsm](promise: Promise[Unit]) extends State {
 
   protected val msgHandler: PgMsgHandler = {
     case _: RowDescription => stay

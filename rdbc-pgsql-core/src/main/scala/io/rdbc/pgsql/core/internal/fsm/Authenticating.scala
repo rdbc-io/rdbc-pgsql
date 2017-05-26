@@ -23,13 +23,12 @@ import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.pgstruct.messages.backend.auth.{AuthOk, AuthRequest}
 import io.rdbc.pgsql.core.{ChannelWriter, PgMsgHandler}
 
-import scala.concurrent.{ExecutionContext, Promise}
+import scala.concurrent.Promise
 
 private[core]
 class Authenticating private[fsm](initPromise: Promise[BackendKeyData],
                                   authenticator: Authenticator)
-                                 (implicit out: ChannelWriter,
-                                  ec: ExecutionContext)
+                                 (implicit out: ChannelWriter)
   extends State
     with NonFatalErrorsAreFatal {
 

@@ -40,7 +40,7 @@ package object core {
 
   private[core] case class StmtParamName(value: String) extends AnyVal
 
-  private[core] type ClientRequest[A] = (RequestId, TxStatus) => Future[A]
+  private[core] type ClientRequest[A] = (RequestId, TxStatus) => A
 
   private[core] type PgMsgHandler = PartialFunction[PgBackendMessage, StateAction]
 
