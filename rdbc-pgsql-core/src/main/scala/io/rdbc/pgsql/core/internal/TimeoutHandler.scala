@@ -14,10 +14,21 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.internal.scheduler
+package io.rdbc.pgsql.core.internal
+
+import io.rdbc.pgsql.core.RequestId
+import io.rdbc.util.Logging
+import io.rdbc.util.scheduler.{ScheduledTask, TaskScheduler}
 
 import scala.concurrent.duration.FiniteDuration
 
-trait TaskScheduler {
-  def schedule(delay: FiniteDuration)(action: () => Unit): ScheduledTask
+private[core] class TimeoutHandler(scheduler: TaskScheduler,
+                                   timeout: FiniteDuration,
+                                   timeoutAction: () => Unit)
+  extends Logging {
+
+  def scheduleTimeoutTask(reqId: RequestId): ScheduledTask = traced {
+    logger.debug(s"Scheduling a timeout task for request '$reqId' to run in $timeout using scheduler '$scheduler'")
+    scheduler.schedule(timeout)(timeoutAction)
+  }
 }
