@@ -14,15 +14,9 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.transport.netty
+package io.rdbc.pgsql.core.internal.fsm.streaming
 
-import java.util.concurrent.ScheduledFuture
+import io.rdbc.pgsql.core.internal.fsm.EmptyState
 
-import io.rdbc.pgsql.core.internal.scheduler.ScheduledTask
-
-private[netty] class JdkScheduledTask(scheduledFuture: ScheduledFuture[_])
-  extends ScheduledTask {
-  def cancel(): Unit = {
-    scheduledFuture.cancel(false) // false = don't interrupt if running
-  }
-}
+private[core] class StrmWaitingForSubscriber private[fsm]()
+  extends EmptyState
