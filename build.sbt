@@ -90,3 +90,12 @@ lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
     ),
     buildInfoPackage := "io.rdbc.pgsql.transport.netty"
   ).dependsOn(core, scodec)
+
+lazy val rdbcPgsqlDoc = (project in file("rdbc-pgsql-doc"))
+  .enablePlugins(TemplateReplace)
+  .settings(
+    publishArtifact := false,
+    mkdocsVariables := Map(
+      "version" -> version.value
+    )
+  )
