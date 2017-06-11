@@ -21,8 +21,8 @@ import java.nio.charset.Charset
 import akka.stream.Materializer
 import io.netty.channel.{ChannelHandlerContext, SimpleChannelInboundHandler}
 import io.rdbc.pgsql.core._
-import io.rdbc.pgsql.core.internal.scheduler.TaskScheduler
 import io.rdbc.pgsql.core.pgstruct.messages.backend._
+import io.rdbc.util.scheduler.TaskScheduler
 
 import scala.concurrent.ExecutionContext
 

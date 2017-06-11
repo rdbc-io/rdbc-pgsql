@@ -22,13 +22,13 @@ import io.rdbc.ImmutSeq
 import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.exception.PgSubscriptionRejectedException
 import io.rdbc.pgsql.core.internal.PgRowPublisher.PublisherState.{Cancelling, IdleReadyToPull}
-import io.rdbc.pgsql.core.internal.scheduler.{ScheduledTask, TimeoutHandler}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{DataRow, RowDescription}
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.util.concurrent.LockFactory
-import io.rdbc.sapi.{ColumnMetadata, RowPublisher, Row, RowMetadata, TypeConverterRegistry, Warning}
+import io.rdbc.sapi.{ColumnMetadata, Row, RowMetadata, RowPublisher, TypeConverterRegistry, Warning}
 import io.rdbc.util.Logging
+import io.rdbc.util.scheduler.ScheduledTask
 import org.reactivestreams.{Subscriber, Subscription}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
