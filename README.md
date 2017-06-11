@@ -5,10 +5,12 @@
 [![license](https://img.shields.io/github/license/rdbc-io/rdbc-pgsql.svg?style=flat-square)](https://github.com/rdbc-io/rdbc-pgsql/blob/master/LICENSE)
 ## What is rdbc-pgsql?
 
-rdbc-pgsql is a netty-based PostgreSQL [rdbc](https://github.com/rdbc-io/rdbc) driver
-allowing asynchronous communication with the database in Scala and Java languages.
+rdbc-pgsql is a netty-based PostgreSQL [rdbc](https://github.com/rdbc-io/rdbc#what-is-rdbc)
+driver allowing asynchronous communication with the database in Scala and Java
+languages.
 
 ## Documentation
 
 Documentation on the driver is currently work in progress. However, most of the time
 you'll be using the driver via the API which is already documented [here](http://rdbc.io).
+    

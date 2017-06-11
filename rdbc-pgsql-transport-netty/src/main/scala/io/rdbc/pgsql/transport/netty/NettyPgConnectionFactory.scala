@@ -35,8 +35,9 @@ import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{CancelRequest, Terminate}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.pgsql.core.{AbstractPgConnection, ConnId, PgConnectionConfig}
-import io.rdbc.sapi.TypeConverterRegistry
+import io.rdbc.sapi.{Timeout, TypeConverterRegistry}
 import io.rdbc.util.Logging
+import io.rdbc.util.scheduler.JdkScheduler
 
 import scala.concurrent.Future
 import scala.util.control.NonFatal
@@ -118,10 +119,10 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
     }
   }
 
-  def connection(): Future[AbstractPgConnection] = traced {
+  def connection()(implicit timeout: Timeout): Future[AbstractPgConnection] = traced {
     if (!shutDown.get()) {
       val initializer = new ConnChannelInitializer
-      baseBootstrap()
+      baseBootstrap(Some(timeout))
         .handler(initializer)
         .connect().scalaFut
         .flatMap { _ =>
@@ -190,7 +191,7 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
     )
   }
 
-  private def baseBootstrap(): Bootstrap = traced {
+  private def baseBootstrap(connectTimeout: Option[Timeout]): Bootstrap = traced {
     val address = if (config.address.isUnresolved) {
       new InetSocketAddress(config.address.getHostString, config.address.getPort)
     } else {
@@ -205,12 +206,20 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
     config.channelOptions.foreach { opt =>
       bootstrap.option(opt.option.asInstanceOf[ChannelOption[Any]], opt.value)
     }
+    connectTimeout.foreach { timeout =>
+      if (timeout.value.isFinite()) {
+        bootstrap.option[Integer](
+          ChannelOption.CONNECT_TIMEOUT_MILLIS,
+          timeout.value.toMillis.toInt
+        )
+      }
+    }
 
     bootstrap
   }
 
   private def abortRequest(bkd: BackendKeyData): Future[Unit] = traced {
-    baseBootstrap()
+    baseBootstrap(connectTimeout = None)
       .handler {
         channelInitializer { ch =>
           ch.pipeline().addLast(new PgMsgEncoderHandler(config.msgEncoderFactory))

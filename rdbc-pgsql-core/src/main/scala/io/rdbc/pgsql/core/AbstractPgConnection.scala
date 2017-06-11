@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
-import io.rdbc.api.exceptions.{ConnectionClosedException, IllegalSessionStateException}
+import io.rdbc.api.exceptions.{ConnectionClosedException, ConnectionValidationException, IllegalSessionStateException}
 import io.rdbc.implbase.ConnectionPartialImpl
 import io.rdbc.pgsql.core.StmtCacheConfig.{Disabled, Enabled}
 import io.rdbc.pgsql.core.auth.Authenticator
@@ -32,16 +32,17 @@ import io.rdbc.pgsql.core.internal.cache.LruStmtCache
 import io.rdbc.pgsql.core.internal.fsm.StateAction.{Fatal, Goto, Stay}
 import io.rdbc.pgsql.core.internal.fsm._
 import io.rdbc.pgsql.core.internal.fsm.streaming.{StrmBeginningTx, StrmWaitingForDescribe}
-import io.rdbc.pgsql.core.internal.scheduler.{TaskScheduler, TimeoutHandler}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{SessionParamKey, _}
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
 import io.rdbc.pgsql.core.pgstruct.{Argument, ReturnColFormats, TxStatus}
 import io.rdbc.sapi._
 import io.rdbc.util.Logging
 import io.rdbc.util.Preconditions._
+import io.rdbc.util.scheduler.TaskScheduler
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.control.NonFatal
 
 abstract class AbstractPgConnection(val id: ConnId,
                                     config: PgConnectionConfig,
@@ -101,11 +102,11 @@ abstract class AbstractPgConnection(val id: ConnId,
     simpleQueryIgnoreResult(NativeSql("ROLLBACK"))
   }
 
-  override def validate()(implicit timeout: Timeout): Future[Boolean] = traced {
+  override def validate()(implicit timeout: Timeout): Future[Unit] = traced {
     argsNotNull()
-    simpleQueryIgnoreResult(NativeSql("")).map(_ => true).recoverWith {
+    simpleQueryIgnoreResult(NativeSql("")).recoverWith {
       case ex: IllegalSessionStateException => Future.failed(ex)
-      case _ => Future.successful(false)
+      case NonFatal(ex) => Future.failed(new ConnectionValidationException(ex))
     }
   }
 
