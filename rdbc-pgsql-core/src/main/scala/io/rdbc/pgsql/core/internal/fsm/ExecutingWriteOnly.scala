@@ -44,6 +44,7 @@ class ExecutingWriteOnly private[fsm](parsePromise: Promise[Unit],
   private def sendFailureToClient(ex: Throwable): Unit = traced {
     if (!parsePromise.isCompleted) parsePromise.failure(ex)
     resultPromise.failure(ex)
+    ()
   }
 
   protected def onFatalError(ex: Throwable): Unit = traced {

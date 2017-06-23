@@ -38,6 +38,7 @@ class ExecutingBatch private[fsm](batchPromise: Promise[TxStatus])
 
   protected def onFatalError(ex: Throwable): Unit = traced {
     batchPromise.failure(ex)
+    ()
   }
 
   protected def onNonFatalError(ex: Throwable): StateAction = traced {

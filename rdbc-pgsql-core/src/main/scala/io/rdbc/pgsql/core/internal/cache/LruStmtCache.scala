@@ -23,11 +23,14 @@ import scala.collection.immutable.SortedMap
 
 object LruStmtCache {
 
-  private implicit val ord = Ordering.by[StmtWithIdx, Long](s => s.idx)
-
   private case class StmtWithIdx(stmtName: StmtName, idx: Long)
 
-  def empty(capacity: Int): LruStmtCache = new LruStmtCache(capacity, 0L, Map.empty, SortedMap.empty)
+  def empty(capacity: Int): LruStmtCache = new LruStmtCache(
+    capacity = capacity,
+    lastIdx = 0L,
+    map = Map.empty,
+    ord = SortedMap.empty
+  )
 }
 
 class LruStmtCache private(val capacity: Int,

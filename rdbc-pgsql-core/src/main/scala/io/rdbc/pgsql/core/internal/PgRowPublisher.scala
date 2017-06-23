@@ -25,12 +25,12 @@ import io.rdbc.pgsql.core.internal.PgRowPublisher.PublisherState.{Cancelling, Id
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{DataRow, RowDescription}
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
 import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.core.util.concurrent.LockFactory
 import io.rdbc.sapi.{ColumnMetadata, Row, RowMetadata, RowPublisher, TypeConverterRegistry, Warning}
 import io.rdbc.util.Logging
 import io.rdbc.util.scheduler.ScheduledTask
 import org.reactivestreams.{Subscriber, Subscription}
 
+import scala.concurrent.stm._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -53,17 +53,19 @@ private[core] object PgRowPublisher {
     case object Errored extends PublisherState
   }
 
-  class LockGuardedState(lockFactory: LockFactory)
+  class ConcurrentState
     extends Logging {
-    private[this] val lock = lockFactory.lock
 
-    private[this] var publisherState: PublisherState = PublisherState.Uninitialized
-    private[this] var demand = 0L
-    private[this] var unboundedDemand = false
+    private[this] val publisherState: Ref[PublisherState] = {
+      Ref(PublisherState.Uninitialized: PublisherState)
+    }
+
+    private[this] val demand = Ref(0L)
+    private[this] val unboundedDemand = Ref(false)
 
     def ifUninitialized(body: () => Unit): Unit = {
-      val action = lock.withLock {
-        publisherState match {
+      val action = atomic { implicit tx =>
+        publisherState() match {
           case PublisherState.Uninitialized =>
             setState(PublisherState.PreparingPortal)
             () => body()
@@ -74,14 +76,14 @@ private[core] object PgRowPublisher {
     }
 
     def ifCanPullRows(body: (Option[Int]) => Unit): Unit = {
-      val action = lock.withLock {
-        publisherState match {
-          case IdleReadyToPull if demand > 0L || unboundedDemand =>
+      val action = atomic { implicit tx =>
+        publisherState() match {
+          case IdleReadyToPull if demand() > 0L || unboundedDemand() =>
             setState(PublisherState.PulledRows)
-            if (unboundedDemand) {
+            if (unboundedDemand()) {
               () => body(None)
             } else {
-              val localDemand = demand
+              val localDemand = demand()
               () => body(Some(localDemand.toInt)) //TODO isn't Some(localDemand.toInt) strict? Do I need localDemand?
             }
           case _ => () => ()
@@ -91,12 +93,12 @@ private[core] object PgRowPublisher {
     }
 
     def ifCanCancel(body: PublisherState => Unit): Unit = {
-      val (can, state) = lock.withLock {
-        publisherState match {
+      val (can, state) = atomic { implicit tx =>
+        publisherState() match {
           case state@(PublisherState.IdleReadyToPull | PublisherState.Uninitialized) =>
             setState(Cancelling)
             (true, state)
-          case _ => (false, publisherState)
+          case _ => (false, publisherState())
         }
       }
       if (can) {
@@ -105,50 +107,50 @@ private[core] object PgRowPublisher {
     }
 
     def increaseDemand(n: Long): Unit = {
-      lock.withLock {
+      atomic { implicit tx =>
         try {
-          demand = Math.addExact(demand, n)
+          demand() = Math.addExact(demand(), n)
         } catch {
-          case _: ArithmeticException => unboundedDemand = true
+          case _: ArithmeticException => unboundedDemand() = true
         }
       }
     }
 
     def decrementDemand(): Unit = {
-      lock.withLock {
-        if (!unboundedDemand) {
-          demand = demand - 1L
+      atomic { implicit tx =>
+        if (!unboundedDemand()) {
+          demand() = demand() - 1L
         }
       }
     }
 
     def setUnboundedDemand(): Unit = {
-      lock.withLock {
-        unboundedDemand = true
+      atomic { implicit tx =>
+        unboundedDemand() = true
       }
     }
 
     def setIdleReadyToPull(): Unit = {
-      lock.withLock {
+      atomic { implicit tx =>
         setState(PublisherState.IdleReadyToPull)
       }
     }
 
     def setComplete(): Unit = {
-      lock.withLock {
+      atomic { implicit tx =>
         setState(PublisherState.Complete)
       }
     }
 
     def setErrored(): Unit = {
-      lock.withLock {
+      atomic { implicit tx =>
         setState(PublisherState.Errored)
       }
     }
 
-    private def setState(newState: PublisherState): Unit = {
+    private def setState(newState: PublisherState)(implicit txn: InTxn): Unit = {
       logger.debug(s"Publisher transitioning from $publisherState to $newState")
-      publisherState = newState
+      publisherState() = newState
     }
   }
 }
@@ -159,7 +161,6 @@ private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[Por
                                    typeConverters: TypeConverterRegistry,
                                    sessionParams: SessionParams,
                                    maybeTimeoutHandler: Option[TimeoutHandler],
-                                   lockFactory: LockFactory,
                                    @volatile private[this] var fatalErrorNotifier: FatalErrorNotifier)
                                   (implicit reqId: RequestId, out: ChannelWriter, ec: ExecutionContext)
   extends RowPublisher with Logging {
@@ -171,15 +172,17 @@ private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[Por
   @volatile private[this] var cancelRequested = false
   private[this] val neverExecuted = new AtomicBoolean(true)
   @volatile private[this] var timeoutScheduledTask = Option.empty[ScheduledTask]
-  private[this] val lockGuarded = new LockGuardedState(lockFactory)
+  private[this] val concurrentState = new ConcurrentState()
 
-  import lockGuarded._
+  import concurrentState._
 
   object RowSubscription extends Subscription {
     def cancel(): Unit = {
       ifCanCancel {
         case PublisherState.Uninitialized => ()
-        case _ => closePortal()
+        case _ =>
+          closePortal()
+          ()
       }
       cancelRequested = true
     }
@@ -237,14 +240,16 @@ private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[Por
     if (cancelRequested) {
       ifCanCancel { //TODO code dupl
         case PublisherState.Uninitialized => ()
-        case _ => closePortal()
+        case _ =>
+          closePortal()
+          ()
       }
     } else {
       tryQuerying()
     }
   }
 
-  private def closePortal(): Unit = {
+  private def closePortal(): Future[Unit] = {
     out.writeAndFlush(ClosePortal(portalName), Sync).recover {
       case NonFatal(ex) =>
         fatalErrNotifier("Write error when closing portal", ex)

@@ -17,7 +17,6 @@
 package io.rdbc.pgsql.core
 
 import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.core.util.concurrent.LockFactory
 import io.rdbc.sapi.TypeConverterRegistry
 
 sealed trait StmtCacheConfig
@@ -28,6 +27,5 @@ object StmtCacheConfig {
 
 final case class PgConnectionConfig(pgTypes: PgTypeRegistry,
                                     typeConverters: TypeConverterRegistry,
-                                    lockFactory: LockFactory,
                                     maxBatchSize: Long,
                                     stmtCacheConfig: StmtCacheConfig)

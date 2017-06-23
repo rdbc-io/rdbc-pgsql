@@ -41,7 +41,7 @@ class Authenticating private[fsm](initPromise: Promise[BackendKeyData],
         if (isComplete(authState)) {
           waitingForOk = true
         }
-        stay andThenF out.writeAndFlush(authState.responses)
+        stay andThen out.writeAndFlush(authState.responses)
       }
 
     case AuthOk => goto(new Initializing(initPromise))
