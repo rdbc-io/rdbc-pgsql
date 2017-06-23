@@ -36,5 +36,6 @@ class SimpleQuerying private[fsm](promise: Promise[Unit]) extends State {
 
   protected def onFatalError(ex: Throwable): Unit = traced {
     promise.failure(ex)
+    ()
   }
 }

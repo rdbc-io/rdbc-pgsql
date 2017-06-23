@@ -64,7 +64,7 @@ class StrmQueryFailed private[fsm](txMgmt: Boolean,
   }
 
   private def closePortal(): StateAction.Stay = {
-    stay andThenF out.writeAndFlush(ClosePortal(portalName), Sync).recoverWith {
+    stay andThen out.writeAndFlush(ClosePortal(portalName), Sync).recoverWith {
       case NonFatal(ex) =>
         sendFailureToClient(ex)
         Future.failed(ex)

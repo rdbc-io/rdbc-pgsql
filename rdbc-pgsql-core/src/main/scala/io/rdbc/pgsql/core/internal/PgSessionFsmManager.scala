@@ -19,33 +19,31 @@ package io.rdbc.pgsql.core.internal
 import io.rdbc.api.exceptions.IllegalSessionStateException
 import io.rdbc.pgsql.core.exception.PgDriverInternalErrorException
 import io.rdbc.pgsql.core.internal.fsm._
-import io.rdbc.pgsql.core.util.concurrent.LockFactory
 import io.rdbc.pgsql.core.{ClientRequest, ConnId, RequestId}
 import io.rdbc.util.Logging
 
+import scala.concurrent.stm._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 private[core] class PgSessionFsmManager(connId: ConnId,
-                                        lockFactory: LockFactory,
                                         fatalErrorHandler: FatalErrorHandler
                                        )(implicit val ec: ExecutionContext)
   extends Logging {
-  private[this] val lock = lockFactory.lock
-  private[this] var ready = false
-  private[this] var handlingTimeout = false
-  private[this] var state: State = Uninitialized
-  private[this] var readyPromise = Promise[Unit]
-  private[this] var lastRequestId = RequestId(connId, 0L)
+  private[this] val ready = Ref(false)
+  private[this] val handlingTimeout = Ref(false)
+  private[this] val state: Ref[State] = Ref(State.uninitialized: State)
+  private[this] val readyPromise = Ref(Promise[Unit])
+  private[this] val lastRequestId = Ref(RequestId(connId, 0L))
 
   /* TODO can't make this traced, compilation fails, investigate */
   def ifReady[A](request: ClientRequest[A]): A = {
-    val action: () => A = lock.withLock {
-      if (handlingTimeout) {
+    val action: () => A = atomic { implicit tx =>
+      if (handlingTimeout()) {
         () =>
-            throw new IllegalSessionStateException(s"Session is busy, currently cancelling timed out action")
-      } else if (ready) {
+          throw new IllegalSessionStateException(s"Session is busy, currently cancelling timed out action")
+      } else if (ready()) {
         actionWhenReady(request)
       } else {
         actionWhenNotReady()
@@ -62,8 +60,8 @@ private[core] class PgSessionFsmManager(connId: ConnId,
   }
 
   /* TODO can't make this traced, compilation fails, investigate */
-  private def actionWhenReady[A](request: ClientRequest[A]): () => A = {
-    state match {
+  private def actionWhenReady[A](request: ClientRequest[A])(implicit txn: InTxn): () => A = {
+    state() match {
       case Idle(txStatus) =>
         val newRequestId = prepareStateForNewRequest()
         () => request(newRequestId, txStatus)
@@ -75,8 +73,8 @@ private[core] class PgSessionFsmManager(connId: ConnId,
     }
   }
 
-  private def actionWhenNotReady[A](): () => A = traced {
-    state match {
+  private def actionWhenNotReady[A]()(implicit txn: InTxn): () => A = traced {
+    state() match {
       case ConnectionClosed(cause) =>
         () => throw cause
       case _ =>
@@ -84,41 +82,37 @@ private[core] class PgSessionFsmManager(connId: ConnId,
     }
   }
 
-  private def prepareStateForNewRequest(): RequestId = traced {
-    ready = false
-    state = StartingRequest
-    readyPromise = Promise[Unit]
-    lastRequestId = lastRequestId.copy(value = lastRequestId.value + 1L)
-    lastRequestId
+  private def prepareStateForNewRequest()(implicit txn: InTxn): RequestId = traced {
+    ready() = false
+    state() = StartingRequest
+    readyPromise() = Promise[Unit]
+    lastRequestId() = lastRequestId().copy(value = lastRequestId().value + 1L)
+    lastRequestId()
   }
 
   def triggerTransition(newState: State, afterTransition: Option[() => Future[Unit]] = None): Boolean = traced {
-    val successful = lock.withLock {
-      state match {
+    val transitioned = atomic { implicit tx =>
+      state() match {
         case ConnectionClosed(_) => false
         case _ =>
           newState match {
-            case Idle(_) =>
-              ready = true
-              readyPromise.success(())
-
-            case ConnectionClosed(cause) =>
-              ready = false
-              if (!readyPromise.isCompleted) {
-                readyPromise.failure(cause)
-              }
-
+            case Idle(_) => ready() = true
+            case ConnectionClosed(_) => ready() = false
             case _ => ()
           }
-          state = newState
+          state() = newState
           true
       }
     }
-    if (successful) {
+    if (transitioned) {
       logger.debug(s"Transitioned to state '$newState'")
+      newState match {
+        case Idle(_) => readyPromise.single().success(())
+        case _ => ()
+      }
       runAfterTransition(afterTransition)
     }
-    successful
+    transitioned
   }
 
   private def runAfterTransition(afterTransition: Option[() => Future[Unit]]): Unit = {
@@ -132,20 +126,20 @@ private[core] class PgSessionFsmManager(connId: ConnId,
   }
 
   def startHandlingTimeout(reqId: RequestId): Boolean = traced {
-    lock.withLock {
-      if (!handlingTimeout && !ready && lastRequestId == reqId) {
-        handlingTimeout = true
+    atomic { implicit txn =>
+      if (!handlingTimeout() && !ready() && lastRequestId() == reqId) {
+        handlingTimeout() = true
         true
       } else false
     }
   }
 
   def finishHandlingTimeout(): Unit = traced {
-    lock.withLock(handlingTimeout = false)
+    handlingTimeout.single() = false
   }
 
-  def currentState: State = traced(lock.withLock(state))
+  def currentState: State = traced(state.single())
 
-  def readyFuture: Future[Unit] = traced(lock.withLock(readyPromise.future))
+  def readyFuture: Future[Unit] = traced(readyPromise.single().future)
 
 }

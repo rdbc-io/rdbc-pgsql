@@ -44,5 +44,6 @@ class Initializing(initPromise: Promise[BackendKeyData])
 
   protected def onError(ex: Throwable): Unit = traced {
     initPromise.failure(ex)
+    ()
   }
 }

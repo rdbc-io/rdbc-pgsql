@@ -29,7 +29,6 @@ import io.rdbc.pgsql.core.StmtCacheConfig
 import io.rdbc.pgsql.core.auth.{Authenticator, UsernamePasswordAuthenticator}
 import io.rdbc.pgsql.core.codec.{DecoderFactory, EncoderFactory}
 import io.rdbc.pgsql.core.types.PgTypesProvider
-import io.rdbc.pgsql.core.util.concurrent.{BlockLockFactory, LockFactory}
 import io.rdbc.pgsql.scodec.types.ScodecPgTypesProvider
 import io.rdbc.pgsql.scodec.{ScodecDecoderFactory, ScodecEncoderFactory}
 import io.rdbc.sapi.TypeConvertersProvider
@@ -70,7 +69,6 @@ object NettyPgConnFactoryConfig {
       channelOptions = Vector(ChannelOptionValue(ChannelOption.SO_KEEPALIVE, java.lang.Boolean.TRUE)),
       actorSystemConfig = tconfig,
       actorMaterializerSettings = ActorMaterializerSettings(tconfig.getConfig("akka.stream.materializer")),
-      lockFactory = new BlockLockFactory,
       ec = ExecutionContext.global
     )
   }
@@ -102,7 +100,6 @@ case class NettyPgConnFactoryConfig(address: InetSocketAddress,
                                     channelOptions: ImmutSeq[ChannelOptionValue[_]],
                                     actorSystemConfig: Config,
                                     actorMaterializerSettings: ActorMaterializerSettings,
-                                    lockFactory: LockFactory,
                                     ec: ExecutionContext) {
 
   def withHost(host: String): NettyPgConnFactoryConfig = {

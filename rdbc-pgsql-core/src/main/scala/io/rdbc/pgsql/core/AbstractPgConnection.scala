@@ -58,7 +58,7 @@ abstract class AbstractPgConnection(val id: ConnId,
     with PgStatementExecutor
     with Logging {
 
-  private[this] val fsmManager = new PgSessionFsmManager(id, config.lockFactory, this)
+  private[this] val fsmManager = new PgSessionFsmManager(id, this)
   @volatile private[this] var sessionParams = SessionParams.default
   @volatile private[this] var maybeBackendKeyData = Option.empty[BackendKeyData]
   private[this] val stmtCounter = new AtomicInteger(0)
@@ -156,6 +156,7 @@ abstract class AbstractPgConnection(val id: ConnId,
             doRelease(ex).map(_ => afterReleaseAction.foreach(_.apply()))
         }
     }
+    ()
   }
 
   override protected[core] final def handleFatalError(msg: String, cause: Throwable): Unit = traced {
@@ -163,6 +164,7 @@ abstract class AbstractPgConnection(val id: ConnId,
     checkNonEmptyString(msg)
     logger.error(msg, cause)
     doRelease(cause)
+    ()
   }
 
   override private[core]
@@ -190,7 +192,6 @@ abstract class AbstractPgConnection(val id: ConnId,
         typeConverters = config.typeConverters,
         sessionParams = sessionParams,
         maybeTimeoutHandler = newTimeoutHandler(reqId, timeout),
-        lockFactory = config.lockFactory,
         fatalErrorNotifier = handleFatalError
       )(reqId, out, ec)
 

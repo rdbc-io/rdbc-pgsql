@@ -18,6 +18,7 @@ object Library {
   val sourcecode = "com.lihaoyi" %% "sourcecode" % "0.1.3"
   val nettyHandler = "io.netty" % "netty-handler" % nettyVersion
   val nettyEpoll = "io.netty" % "netty-transport-native-epoll" % nettyVersion classifier "linux-x86_64"
+  val stm = "org.scala-stm" %% "scala-stm" % "0.8"
 
   val rdbcTests = "io.rdbc" %% "rdbc-tests" % rdbcVersion % Test
   val scalatest = "org.scalatest" %% "scalatest" % "3.0.3" % Test
