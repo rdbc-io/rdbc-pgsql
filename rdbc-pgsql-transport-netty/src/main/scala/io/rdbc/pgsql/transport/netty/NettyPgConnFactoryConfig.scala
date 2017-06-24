@@ -21,7 +21,6 @@ import java.net.InetSocketAddress
 import akka.stream.ActorMaterializerSettings
 import com.typesafe.config.{Config, ConfigFactory}
 import io.netty.channel._
-import io.netty.channel.epoll.{Epoll, EpollEventLoopGroup}
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.rdbc.ImmutSeq
@@ -74,13 +73,11 @@ object NettyPgConnFactoryConfig {
   }
 
   private def defaultChannelFactory: ChannelFactory[_ <: SocketChannel] = {
-    if (Epoll.isAvailable) new EpollChannelFactory
-    else new NioChannelFactory
+    new NioChannelFactory
   }
 
   private def defaultEventLoopGroup: EventLoopGroup = {
-    if (Epoll.isAvailable) new EpollEventLoopGroup()
-    else new NioEventLoopGroup()
+    new NioEventLoopGroup()
   }
 }
 

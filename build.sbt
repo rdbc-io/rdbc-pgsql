@@ -78,7 +78,6 @@ lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
     name := "pgsql-transport-netty",
     libraryDependencies ++= Vector(
       Library.nettyHandler,
-      Library.nettyEpoll,
       Library.rdbcTypeconv,
       Library.rdbcUtil,
       Library.rdbcTests,
