@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2017 Krzysztof Pado
+ * Copyright 2016 rdbc contributors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import java.net.InetSocketAddress
 import akka.stream.ActorMaterializerSettings
 import com.typesafe.config.{Config, ConfigFactory}
 import io.netty.channel._
-import io.netty.channel.epoll.{Epoll, EpollEventLoopGroup}
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.rdbc.ImmutSeq
@@ -74,13 +73,11 @@ object NettyPgConnFactoryConfig {
   }
 
   private def defaultChannelFactory: ChannelFactory[_ <: SocketChannel] = {
-    if (Epoll.isAvailable) new EpollChannelFactory
-    else new NioChannelFactory
+    new NioChannelFactory
   }
 
   private def defaultEventLoopGroup: EventLoopGroup = {
-    if (Epoll.isAvailable) new EpollEventLoopGroup()
-    else new NioEventLoopGroup()
+    new NioEventLoopGroup()
   }
 }
 
