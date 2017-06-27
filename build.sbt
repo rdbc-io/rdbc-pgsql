@@ -50,10 +50,12 @@ lazy val core = (project in file("rdbc-pgsql-core"))
       Library.rdbcUtil,
       Library.typesafeConfig,
       Library.scalaLogging,
-      Library.akkaStream,
       Library.sourcecode,
       Library.scodecBits,
-      Library.stm
+      Library.stm,
+      Library.logback % Test,
+      Library.scalatest % Test,
+      Library.reactiveStreamsTck % Test
     ),
     buildInfoPackage := "io.rdbc.pgsql.core"
   )
@@ -80,11 +82,11 @@ lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
       Library.nettyHandler,
       Library.rdbcTypeconv,
       Library.rdbcUtil,
-      Library.rdbcTests,
       Library.scalaLogging,
-      Library.logback,
-      Library.scalatest,
-      Library.pgsql
+      Library.logback % Test,
+      Library.rdbcTests % Test,
+      Library.scalatest % Test,
+      Library.pgsql % Test
     ),
     buildInfoPackage := "io.rdbc.pgsql.transport.netty"
   ).dependsOn(core, scodec)

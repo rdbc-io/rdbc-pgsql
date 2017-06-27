@@ -16,10 +16,8 @@
 
 package io.rdbc.pgsql
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
 import io.rdbc.pgsql.core.internal.fsm.StateAction
-import io.rdbc.pgsql.core.pgstruct.{Argument, TxStatus}
+import io.rdbc.pgsql.core.pgstruct.TxStatus
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{BackendKeyData, PgBackendMessage}
 
 import scala.concurrent.Future
@@ -43,7 +41,5 @@ package object core {
   private[core] type ClientRequest[A] = (RequestId, TxStatus) => A
 
   private[core] type PgMsgHandler = PartialFunction[PgBackendMessage, StateAction]
-
-  private[core] type ArgsSource = Source[Vector[Argument], NotUsed]
 
 }

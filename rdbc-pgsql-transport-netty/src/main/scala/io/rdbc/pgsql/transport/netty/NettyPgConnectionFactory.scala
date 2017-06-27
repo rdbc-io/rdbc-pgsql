@@ -20,8 +20,6 @@ import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel._
 import io.netty.channel.group.DefaultChannelGroup
@@ -39,7 +37,7 @@ import io.rdbc.sapi.{Timeout, TypeConverterRegistry}
 import io.rdbc.util.Logging
 import io.rdbc.util.scheduler.JdkScheduler
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
 object NettyPgConnectionFactory extends Logging {
@@ -63,7 +61,7 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
   extends ConnectionFactoryPartialImpl
     with Logging {
 
-  protected implicit val ec = config.ec
+  protected implicit val ec: ExecutionContext = config.ec
 
   private[this] val pgTypes = {
     PgTypeRegistry(config.pgTypesProviders.flatMap(_.types))
@@ -81,14 +79,6 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
 
   private[this] val openChannels = {
     new DefaultChannelGroup(GlobalEventExecutor.INSTANCE) //TODO really global?
-  }
-
-  private[this] val actorSystem = {
-    ActorSystem("rdbc-pgsql-netty", config.actorSystemConfig)
-  }
-
-  private[this] val streamMaterializer = {
-    ActorMaterializer(config.actorMaterializerSettings)(actorSystem)
   }
 
   private[this] val shutDown = new AtomicBoolean(false)
@@ -157,9 +147,6 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
 
         _ <- config.eventLoopGroup.shutdownGracefully(0L, 0L, TimeUnit.SECONDS).scalaFut
           .recover(warn("could not shutdown event loop group"))
-
-        _ <- actorSystem.terminate()
-          .recover(warn("could not terminate the actor system"))
       } yield ()
     } else {
       logger.warn("Shutdown request received for already shut down connection factory")
@@ -185,8 +172,7 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
       encoder = encoderHandler,
       ec = ec,
       scheduler = scheduler,
-      requestCanceler = abortRequest,
-      streamMaterializer = streamMaterializer
+      requestCanceler = abortRequest
     )
   }
 

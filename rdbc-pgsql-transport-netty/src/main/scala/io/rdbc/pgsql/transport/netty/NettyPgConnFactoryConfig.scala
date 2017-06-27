@@ -18,8 +18,7 @@ package io.rdbc.pgsql.transport.netty
 
 import java.net.InetSocketAddress
 
-import akka.stream.ActorMaterializerSettings
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import io.netty.channel._
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
@@ -49,14 +48,12 @@ object NettyPgConnFactoryConfig {
   }
 
   def apply(authenticator: Authenticator, dbRole: String, dbName: String): NettyPgConnFactoryConfig = {
-    val tconfig = ConfigFactory.load()
-
     NettyPgConnFactoryConfig(
       address = InetSocketAddress.createUnresolved("localhost", 5432),
       dbRole = dbRole,
       dbName = dbName,
       authenticator = authenticator,
-      maxBatchSize = 100L,
+      maxBatchSize = 100,
       stmtCacheConfig = StmtCacheConfig.Enabled(capacity = 100),
       typeConvertersProviders = Vector(new StandardTypeConvertersProvider),
       pgTypesProviders = Vector(new ScodecPgTypesProvider),
@@ -66,8 +63,6 @@ object NettyPgConnFactoryConfig {
       channelFactory = defaultChannelFactory,
       eventLoopGroup = defaultEventLoopGroup,
       channelOptions = Vector(ChannelOptionValue(ChannelOption.SO_KEEPALIVE, java.lang.Boolean.TRUE)),
-      actorSystemConfig = tconfig,
-      actorMaterializerSettings = ActorMaterializerSettings(tconfig.getConfig("akka.stream.materializer")),
       ec = ExecutionContext.global
     )
   }
@@ -85,7 +80,7 @@ case class NettyPgConnFactoryConfig(address: InetSocketAddress,
                                     dbRole: String,
                                     dbName: String,
                                     authenticator: Authenticator,
-                                    maxBatchSize: Long,
+                                    maxBatchSize: Int,
                                     stmtCacheConfig: StmtCacheConfig,
                                     typeConvertersProviders: ImmutSeq[TypeConvertersProvider],
                                     pgTypesProviders: ImmutSeq[PgTypesProvider],
@@ -95,8 +90,6 @@ case class NettyPgConnFactoryConfig(address: InetSocketAddress,
                                     channelFactory: ChannelFactory[_ <: Channel],
                                     eventLoopGroup: EventLoopGroup,
                                     channelOptions: ImmutSeq[ChannelOptionValue[_]],
-                                    actorSystemConfig: Config,
-                                    actorMaterializerSettings: ActorMaterializerSettings,
                                     ec: ExecutionContext) {
 
   def withHost(host: String): NettyPgConnFactoryConfig = {
