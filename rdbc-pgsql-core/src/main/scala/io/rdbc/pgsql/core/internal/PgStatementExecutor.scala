@@ -16,12 +16,13 @@
 
 package io.rdbc.pgsql.core.internal
 
-import io.rdbc.pgsql.core.ArgsSource
 import io.rdbc.pgsql.core.pgstruct.Argument
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
 import io.rdbc.sapi.{RowPublisher, Timeout}
+import org.reactivestreams.Publisher
 
 import scala.concurrent.Future
+import scala.util.Try
 
 private[core] trait PgStatementExecutor {
   private[core] def statementStream(nativeSql: NativeSql, args: Vector[Argument])
@@ -30,5 +31,8 @@ private[core] trait PgStatementExecutor {
   private[core] def executeStatementForRowsAffected(nativeSql: NativeSql, args: Vector[Argument])
                                                    (implicit timeout: Timeout): Future[Long]
 
-  private[core] def subscribeToStatementArgsStream(nativeSql: NativeSql, args: ArgsSource): Future[Unit]
+  private[core]
+  def subscribeToStatementArgsStream[A](nativeStatement: PgNativeStatement,
+                                        args: Publisher[A],
+                                        argsConverter: A => Try[Vector[Argument]]): Future[Unit]
 }

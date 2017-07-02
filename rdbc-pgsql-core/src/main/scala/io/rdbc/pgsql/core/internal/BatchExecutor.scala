@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core
+package io.rdbc.pgsql.core.internal
 
-import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.sapi.TypeConverterRegistry
+import io.rdbc.pgsql.core.pgstruct.{Argument, TxStatus}
 
-sealed trait StmtCacheConfig
-object StmtCacheConfig {
-  case object Disabled extends StmtCacheConfig
-  case class Enabled(capacity: Int) extends StmtCacheConfig
+import scala.concurrent.Future
+
+private[core]
+trait BatchExecutor {
+
+  private[core] def executeBatch(nativeStmt: PgNativeStatement,
+                                 batch: Vector[Vector[Argument]],
+                                 first: Boolean): Future[TxStatus]
+
+  private[core] def completeBatch(txStatus: TxStatus): Unit
 }
-
-final case class PgConnectionConfig(pgTypes: PgTypeRegistry,
-                                    typeConverters: TypeConverterRegistry,
-                                    maxBatchSize: Int,
-                                    stmtCacheConfig: StmtCacheConfig)

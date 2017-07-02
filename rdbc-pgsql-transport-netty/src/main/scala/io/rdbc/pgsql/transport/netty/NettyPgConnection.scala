@@ -18,7 +18,6 @@ package io.rdbc.pgsql.transport.netty
 
 import java.nio.charset.Charset
 
-import akka.stream.Materializer
 import io.netty.channel.{ChannelHandlerContext, SimpleChannelInboundHandler}
 import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.pgstruct.messages.backend._
@@ -33,16 +32,14 @@ private[netty] class NettyPgConnection(id: ConnId,
                                        encoder: PgMsgEncoderHandler,
                                        ec: ExecutionContext,
                                        scheduler: TaskScheduler,
-                                       requestCanceler: RequestCanceler,
-                                       streamMaterializer: Materializer)
+                                       requestCanceler: RequestCanceler)
   extends AbstractPgConnection(
     id = id,
     config = config,
     out = out,
     ec = ec,
     scheduler = scheduler,
-    requestCanceler = requestCanceler,
-    streamMaterializer = streamMaterializer) {
+    requestCanceler = requestCanceler) {
 
   val handler = new SimpleChannelInboundHandler[PgBackendMessage] {
     def channelRead0(ctx: ChannelHandlerContext, msg: PgBackendMessage): Unit = {
