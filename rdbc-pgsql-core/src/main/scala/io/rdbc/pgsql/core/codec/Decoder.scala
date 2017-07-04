@@ -21,10 +21,12 @@ import java.nio.charset.Charset
 import _root_.scodec.bits.ByteVector
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{MsgHeader, PgBackendMessage}
 
+import scala.util.Try
+
 trait Decoder {
   protected def charset: Charset
 
-  def decodeMsg(bytes: ByteVector): Decoded[PgBackendMessage]
+  def decodeMsg(bytes: ByteVector): Try[Decoded[PgBackendMessage]]
 
-  def decodeHeader(bytes: ByteVector): Decoded[MsgHeader]
+  def decodeHeader(bytes: ByteVector): Try[Decoded[MsgHeader]]
 }

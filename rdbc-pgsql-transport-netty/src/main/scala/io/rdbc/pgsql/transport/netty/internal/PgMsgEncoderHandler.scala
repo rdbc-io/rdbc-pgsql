@@ -35,8 +35,11 @@ private[netty] class PgMsgEncoderHandler(encoderFactory: EncoderFactory)
   }
 
   def encode(ctx: ChannelHandlerContext, msg: PgFrontendMessage, out: ByteBuf): Unit = {
-    out.writeBytes(encoder.encode(msg).toArray)
-    ()
+    throwOnFailure {
+      encoder.encode(msg).map { bytes =>
+        out.writeBytes(bytes.toArray)
+      }.map(_ => ())
+    }
   }
 
   def changeCharset(charset: Charset): Unit = {

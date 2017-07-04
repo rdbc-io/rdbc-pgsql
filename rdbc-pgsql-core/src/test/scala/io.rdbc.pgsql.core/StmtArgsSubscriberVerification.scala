@@ -61,7 +61,7 @@ class StmtArgsSubscriberVerification
 
   def createSubscriber(probe: WhiteboxSubscriberProbe[String]): Subscriber[String] = {
     new StatementArgsSubscriber(
-      nativeStmt = PgNativeStatement.parse(RdbcSql("insert into tst values(0)")),
+      nativeStmt = PgNativeStatement.parse(RdbcSql("insert into tst values(0)")).get,
       bufferCapacity = 100,
       minDemandRequest = 5,
       initialTxStatus = TxStatus.Idle,

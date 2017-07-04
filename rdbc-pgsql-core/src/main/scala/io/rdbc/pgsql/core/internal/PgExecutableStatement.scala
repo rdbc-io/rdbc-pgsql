@@ -33,7 +33,9 @@ private[core] class PgExecutableStatement(executor: PgStatementExecutor,
     with Logging {
 
   def stream()(implicit timeout: Timeout): RowPublisher = traced {
-    executor.statementStream(nativeSql, params)
+    throwOnFailure {
+      executor.statementStream(nativeSql, params)
+    }
   }
 
   override def executeForRowsAffected()(implicit timeout: Timeout): Future[Long] = traced {

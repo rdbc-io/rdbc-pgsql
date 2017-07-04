@@ -17,10 +17,23 @@
 package io.rdbc.pgsql.core.internal
 
 import scala.concurrent.Future
+import scala.util.Try
+import scala.util.control.NonFatal
 
 private[core] object Compat {
 
   implicit class FutureObjectCompat(underlying: Future.type) {
     val unit: Future[Unit] = Future.successful(())
   }
+
+  implicit class TryCompat[+T](underlying: Try[T]) {
+    def fold[U](mapFailure: Throwable => U, mapSuccess: T => U): U = {
+      try {
+        mapSuccess(underlying.get)
+      } catch {
+        case NonFatal(e) => mapFailure(e)
+      }
+    }
+  }
+
 }

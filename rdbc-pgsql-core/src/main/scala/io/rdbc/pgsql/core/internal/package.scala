@@ -20,6 +20,8 @@ import io.rdbc.pgsql.core.internal.fsm.StateAction
 import io.rdbc.pgsql.core.pgstruct.TxStatus
 import io.rdbc.pgsql.core.pgstruct.messages.backend.PgBackendMessage
 
+import scala.util.Try
+
 package object internal {
   private[core] type FatalErrorNotifier = (String, Throwable) => Unit
 
@@ -34,4 +36,9 @@ package object internal {
   private[core] type ClientRequest[A] = (RequestId, TxStatus) => A
 
   private[core] type PgMsgHandler = PartialFunction[PgBackendMessage, StateAction]
+
+  @inline
+  private[core] def throwOnFailure[A](block: => Try[A]): A = {
+    block.get
+  }
 }

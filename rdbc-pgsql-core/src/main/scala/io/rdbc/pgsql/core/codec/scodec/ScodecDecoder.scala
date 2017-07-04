@@ -27,24 +27,26 @@ import io.rdbc.pgsql.core.internal.scodec.msg.backend._
 import io.rdbc.pgsql.core.internal.scodec.msg.header
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{MsgHeader, PgBackendMessage}
 
+import scala.util.{Success, Try}
+
 class ScodecDecoder(protected val charset: Charset) extends Decoder {
 
   private[this] val codec = pgBackendMessage(charset)
 
-  def decodeMsg(bytes: ByteVector): Decoded[PgBackendMessage] = {
+  def decodeMsg(bytes: ByteVector): Try[Decoded[PgBackendMessage]] = {
     decode(codec, bytes)
   }
 
-  def decodeHeader(bytes: ByteVector): Decoded[MsgHeader] = {
+  def decodeHeader(bytes: ByteVector): Try[Decoded[MsgHeader]] = {
     decode(header, bytes)
   }
 
-  private def decode[A](decoder: _root_.scodec.Decoder[A], bytes: ByteVector): Decoded[A] = {
+  private def decode[A](decoder: _root_.scodec.Decoder[A], bytes: ByteVector): Try[Decoded[A]] = {
     decoder.decode(bytes.bits) match { //TODO data copying is a major bottleneck. decide
-      case Successful(DecodeResult(msg, remainder)) => Decoded(msg, remainder.bytes)
-      case Failure(err) => throw new PgDecodeException(
+      case Successful(DecodeResult(msg, remainder)) => Success(Decoded(msg, remainder.bytes))
+      case Failure(err) => util.Failure(new PgDecodeException(
         s"Error occurred while decoding message ${bytes.toHex}: ${err.messageWithContext}"
-      )
+      ))
     }
   }
 }

@@ -126,10 +126,11 @@ class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnFactoryConf
         .handler(initializer)
         .connect().scalaFut
         .flatMap { _ =>
-          val conn = initializer.maybeConn.getOrElse(throw new PgDriverInternalErrorException(
+          initializer.maybeConn.map(Future.successful).getOrElse(Future.failed(new PgDriverInternalErrorException(
             "Channel initializer did not create a connection instance"
-          ))
-          conn.init(pgConfig.dbRole, pgConfig.dbName, pgConfig.authenticator).map(_ => conn)
+          ))).flatMap { conn =>
+            conn.init(pgConfig.dbRole, pgConfig.dbName, pgConfig.authenticator).map(_ => conn)
+          }
         }
         .recoverWith {
           case ex: RdbcException => Future.failed(ex)

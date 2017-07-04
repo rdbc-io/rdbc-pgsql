@@ -22,9 +22,12 @@ import _root_.scodec.bits.BitVector
 import _root_.scodec.codecs._
 import _root_.scodec.{Attempt, Codec, DecodeResult, Err, SizeBound}
 import io.rdbc.pgsql.core.internal.scodec._
+import io.rdbc.pgsql.core.internal.Compat._
 import io.rdbc.pgsql.core.pgstruct.TxStatus
 import io.rdbc.pgsql.core.pgstruct.messages.backend._
 import io.rdbc.pgsql.core.pgstruct.messages.backend.auth._
+
+import scala.util.Try
 
 package object backend {
 
@@ -189,10 +192,13 @@ package object backend {
     status(StatusMessage.notice).withContext("notice_status")
   }
 
-  private def status[A <: StatusMessage](creator: Map[Byte, String] => A)(implicit charset: Charset): Codec[A] = {
+  private def status[A <: StatusMessage](creator: Map[Byte, String] => Try[A])(implicit charset: Charset): Codec[A] = {
     pgHeadlessMsg {
       pgParamMap("param_key" | byte).exmap[A](
-        map => Attempt.successful(creator(map)),
+        map => creator(map).fold(
+          ex => Attempt.failure(Err(ex.getMessage)),
+          created => Attempt.successful(created)
+        ),
         _   => Attempt.failure(Err("encoding not supported"))
       ).withContext("status_msg_params")
     }

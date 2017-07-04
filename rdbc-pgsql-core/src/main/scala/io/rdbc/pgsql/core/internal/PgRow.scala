@@ -29,6 +29,8 @@ import io.rdbc.sapi.{Row, TypeConverterRegistry}
 import io.rdbc.util.Logging
 import io.rdbc.util.Preconditions._
 
+import scala.util.Failure
+
 private[core] class PgRow(rowDesc: RowDescription,
                           cols: IndexedSeq[ColValue],
                           nameMapping: Map[ColName, Int],
@@ -59,17 +61,19 @@ private[core] class PgRow(rowDesc: RowDescription,
         colDesc.format match {
           case ColFormat.Binary => Some(binaryToObj(colDesc.dataType, rawFieldVal))
           case ColFormat.Textual =>
-            throw new PgDriverInternalErrorException(
-              s"Value '$colVal' of column '$colDesc' is in textual format, which is unsupported"
-            )
+              throw new PgDriverInternalErrorException(
+                s"Value '$colVal' of column '$colDesc' is in textual format, which is unsupported"
+              )
         }
     }
   }
 
   private def binaryToObj(pgType: DataType, binaryVal: ByteVector): Any = traced {
-    pgTypes
-      .typeByOid(pgType.oid)
-      .map(_.toObj(binaryVal))
-      .getOrElse(throw new PgUnsupportedType(pgType))
+    throwOnFailure {
+      pgTypes.typeByOid(pgType.oid) match {
+        case None => Failure(new PgUnsupportedType(pgType))
+        case Some(t) => t.toObj(binaryVal)
+      }
+    }
   }
 }

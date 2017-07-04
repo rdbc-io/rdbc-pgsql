@@ -20,6 +20,7 @@ import io.netty.channel.{Channel, ChannelFuture}
 import io.netty.util.concurrent.{GenericFutureListener, Future => NettyFuture}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.Try
 
 package object internal {
 
@@ -54,5 +55,10 @@ package object internal {
     def scalaFut(implicit ec: ExecutionContext): Future[Channel] = {
       new NettyFut2Scala(channelFut).scalaFut.map(_ => channelFut.channel())
     }
+  }
+
+  @inline
+  private[netty] def throwOnFailure[A](block: => Try[A]): A = {
+    block.get
   }
 }

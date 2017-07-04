@@ -20,13 +20,15 @@ import _root_.scodec.bits.ByteVector
 import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.pgstruct.Oid
 
+import scala.util.Try
+
 trait PgType[T] {
   def typeOid: Oid
   def cls: Class[T]
   def otherClasses: Vector[Class[_]] = Vector.empty
   def name: String
 
-  def toObj(binaryVal: ByteVector)(implicit sessionParams: SessionParams): T
+  def toObj(binaryVal: ByteVector)(implicit sessionParams: SessionParams): Try[T]
 
-  def toPgBinary(obj: T)(implicit sessionParams: SessionParams): ByteVector
+  def toPgBinary(obj: T)(implicit sessionParams: SessionParams): Try[ByteVector]
 }
