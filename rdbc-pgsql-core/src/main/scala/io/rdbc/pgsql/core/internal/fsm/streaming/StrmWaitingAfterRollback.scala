@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.internal.fsm.streaming
 
-import io.rdbc.pgsql.core.PgMsgHandler
+import io.rdbc.pgsql.core.internal.PgMsgHandler
 import io.rdbc.pgsql.core.internal.fsm._
 import io.rdbc.pgsql.core.pgstruct.messages.backend.CommandComplete
 import io.rdbc.util.Logging

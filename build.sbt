@@ -36,7 +36,7 @@ lazy val rdbcPgsql = (project in file("."))
   .settings(
     publishArtifact := false
   )
-  .aggregate(core, scodec, nettyTransport)
+  .aggregate(core, nettyTransport)
 
 lazy val core = (project in file("rdbc-pgsql-core"))
   .enablePlugins(BuildInfoPlugin)
@@ -48,9 +48,9 @@ lazy val core = (project in file("rdbc-pgsql-core"))
       Library.rdbcTypeconv,
       Library.rdbcImplbase,
       Library.rdbcUtil,
-      Library.typesafeConfig,
       Library.scalaLogging,
       Library.sourcecode,
+      Library.scodecCore,
       Library.scodecBits,
       Library.stm,
       Library.logback % Test,
@@ -59,19 +59,6 @@ lazy val core = (project in file("rdbc-pgsql-core"))
     ),
     buildInfoPackage := "io.rdbc.pgsql.core"
   )
-
-lazy val scodec = (project in file("rdbc-pgsql-codec-scodec"))
-  .enablePlugins(BuildInfoPlugin)
-  .settings(commonSettings: _*)
-  .settings(
-    name := "pgsql-codec-scodec",
-    libraryDependencies ++= Vector(
-      Library.scodecBits,
-      Library.scodecCore
-    ),
-    buildInfoPackage := "io.rdbc.pgsql.scodec"
-  )
-  .dependsOn(core)
 
 lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
   .enablePlugins(BuildInfoPlugin)
@@ -89,7 +76,7 @@ lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
       Library.pgsql % Test
     ),
     buildInfoPackage := "io.rdbc.pgsql.transport.netty"
-  ).dependsOn(core, scodec)
+  ).dependsOn(core)
 
 lazy val rdbcPgsqlDoc = (project in file("rdbc-pgsql-doc"))
   .enablePlugins(TemplateReplace)

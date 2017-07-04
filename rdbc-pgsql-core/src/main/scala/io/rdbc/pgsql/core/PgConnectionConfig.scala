@@ -27,5 +27,6 @@ object StmtCacheConfig {
 
 final case class PgConnectionConfig(pgTypes: PgTypeRegistry,
                                     typeConverters: TypeConverterRegistry,
-                                    maxBatchSize: Int,
+                                    subscriberBufferCapacity: Int,
+                                    subscriberMinDemandRequestSize: Int,
                                     stmtCacheConfig: StmtCacheConfig)

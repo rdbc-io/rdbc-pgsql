@@ -18,7 +18,6 @@ package io.rdbc.pgsql.core.internal
 
 import io.rdbc._
 import io.rdbc.api.exceptions.MixedParamTypesException
-import io.rdbc.pgsql.core.RdbcSql
 import io.rdbc.pgsql.core.internal.PgNativeStatement.Params
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
 import io.rdbc.util.Logging

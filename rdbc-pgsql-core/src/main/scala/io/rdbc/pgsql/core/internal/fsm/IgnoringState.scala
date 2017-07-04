@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.internal.fsm
 
-import io.rdbc.pgsql.core.PgMsgHandler
+import io.rdbc.pgsql.core.internal.PgMsgHandler
 
 private[core] trait IgnoringState extends State with DefaultErrorHandling {
   protected val msgHandler: PgMsgHandler = {

@@ -18,8 +18,8 @@ package io.rdbc.pgsql.core.codec
 
 import java.nio.charset.Charset
 
+import _root_.scodec.bits.ByteVector
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.PgFrontendMessage
-import scodec.bits.ByteVector
 
 trait Encoder {
   protected def charset: Charset

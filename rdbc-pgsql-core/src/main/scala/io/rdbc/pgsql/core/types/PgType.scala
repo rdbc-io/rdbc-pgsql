@@ -16,9 +16,9 @@
 
 package io.rdbc.pgsql.core.types
 
+import _root_.scodec.bits.ByteVector
 import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.pgstruct.Oid
-import scodec.bits.ByteVector
 
 trait PgType[T] {
   def typeOid: Oid

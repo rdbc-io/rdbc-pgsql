@@ -30,8 +30,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 private[core] class PgStatement(stmtExecutor: PgStatementExecutor,
-                                pgTypes: PgTypeRegistry,
-                                sessionParams: SessionParams,
                                 nativeStmt: PgNativeStatement,
                                 argConverter: StmtArgConverter)
                                (implicit ec: ExecutionContext)

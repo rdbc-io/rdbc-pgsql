@@ -18,7 +18,7 @@ package io.rdbc.pgsql.core.internal.fsm.streaming
 
 import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.internal.fsm.{State, StateAction}
-import io.rdbc.pgsql.core.internal.{PgRowPublisher, PortalDescData}
+import io.rdbc.pgsql.core.internal.{PgMsgHandler, PgRowPublisher, PortalDescData}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{CommandComplete, ReadyForQuery}
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
 

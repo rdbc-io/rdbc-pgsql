@@ -83,8 +83,6 @@ abstract class AbstractPgConnection(val id: ConnId,
     }
     new PgStatement(
       stmtExecutor = this,
-      pgTypes = config.pgTypes,
-      sessionParams = sessionParams,
       nativeStmt = PgNativeStatement.parse(RdbcSql(finalSql)),
       argConverter = argConverter
     )
@@ -356,8 +354,8 @@ abstract class AbstractPgConnection(val id: ConnId,
     fsmManager.ifReadyF { (_, txStatus) =>
       val subscriber = new StatementArgsSubscriber(
         nativeStmt = nativeStatement,
-        bufferCapacity = config.maxBatchSize,
-        minDemandRequest = 10, //TODO
+        bufferCapacity = config.subscriberBufferCapacity,
+        minDemandRequest = config.subscriberMinDemandRequestSize,
         initialTxStatus = txStatus,
         batchExecutor = this,
         argConverter = argsConverter

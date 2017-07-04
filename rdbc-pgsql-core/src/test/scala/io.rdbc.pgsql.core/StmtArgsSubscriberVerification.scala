@@ -18,7 +18,7 @@ package io.rdbc.pgsql.core
 
 import java.util.concurrent.{Executors, ThreadFactory}
 
-import io.rdbc.pgsql.core.internal.{BatchExecutor, PgNativeStatement, StatementArgsSubscriber}
+import io.rdbc.pgsql.core.internal.{BatchExecutor, PgNativeStatement, RdbcSql, StatementArgsSubscriber}
 import io.rdbc.pgsql.core.pgstruct.{Argument, Oid, TxStatus}
 import org.reactivestreams.tck.SubscriberWhiteboxVerification.{SubscriberPuppet, WhiteboxSubscriberProbe}
 import org.reactivestreams.tck.{SubscriberWhiteboxVerification, TestEnvironment}
