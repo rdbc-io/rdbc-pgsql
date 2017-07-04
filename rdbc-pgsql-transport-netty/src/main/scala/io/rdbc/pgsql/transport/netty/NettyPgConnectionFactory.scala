@@ -28,11 +28,14 @@ import io.netty.handler.timeout.WriteTimeoutHandler
 import io.netty.util.concurrent.GlobalEventExecutor
 import io.rdbc.api.exceptions.RdbcException
 import io.rdbc.implbase.ConnectionFactoryPartialImpl
+import io.rdbc.pgsql.core._
+import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgUncategorizedException}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{CancelRequest, Terminate}
 import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.pgsql.core.{AbstractPgConnection, ConnId, PgConnectionConfig}
+import io.rdbc.pgsql.transport.netty.internal._
+import io.rdbc.pgsql.transport.netty.internal.Compat._
 import io.rdbc.sapi.{Timeout, TypeConverterRegistry}
 import io.rdbc.util.Logging
 import io.rdbc.util.scheduler.JdkScheduler
@@ -48,33 +51,38 @@ object NettyPgConnectionFactory extends Logging {
 
   def apply(host: String,
             port: Int,
-            username: String,
-            password: String): NettyPgConnectionFactory = {
-    apply(
-      NettyPgConnFactoryConfig(host, port, username, password)
-    )
+            authenticator: Authenticator,
+            dbRole: String,
+            dbName: String): NettyPgConnectionFactory = {
+    apply(NettyPgConnFactoryConfig(host, port, authenticator, dbRole, dbName))
   }
 
+  def apply(host: String, port: Int, username: String, password: String): NettyPgConnectionFactory = {
+    apply(NettyPgConnFactoryConfig(host, port, username, password))
+  }
 }
 
-class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
+class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnFactoryConfig)
   extends ConnectionFactoryPartialImpl
+    with PgConnectionFactory
     with Logging {
 
-  protected implicit val ec: ExecutionContext = config.ec
+  val pgConfig: PgConnFactoryConfig = nettyConfig.pgConfig
+
+  protected implicit val ec: ExecutionContext = pgConfig.ec
 
   private[this] val pgTypes = {
-    PgTypeRegistry(config.pgTypesProviders.flatMap(_.types))
+    PgTypeRegistry(pgConfig.pgTypesProviders.flatMap(_.types))
   }
 
   private[this] val typeConverters = {
     TypeConverterRegistry {
-      config.typeConvertersProviders.flatMap(_.typeConverters)
+      pgConfig.typeConvertersProviders.flatMap(_.typeConverters)
     }
   }
 
   private[this] val scheduler = {
-    new JdkScheduler(config.eventLoopGroup)
+    new JdkScheduler(nettyConfig.eventLoopGroup)
   }
 
   private[this] val openChannels = {
@@ -89,13 +97,15 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
     def maybeConn: Option[NettyPgConnection] = _maybeConn
 
     def initChannel(ch: Channel): Unit = {
-      val decoderHandler = new PgMsgDecoderHandler(config.msgDecoderFactory)
-      val encoderHandler = new PgMsgEncoderHandler(config.msgEncoderFactory)
+      val decoderHandler = new PgMsgDecoderHandler(pgConfig.msgDecoderFactory)
+      val encoderHandler = new PgMsgEncoderHandler(pgConfig.msgEncoderFactory)
 
       ch.pipeline().addLast(framingHandler)
       ch.pipeline().addLast(decoderHandler)
       ch.pipeline().addLast(encoderHandler)
-      ch.pipeline().addLast(new WriteTimeoutHandler(config.writeTimeout.toSeconds.toInt))
+      if (pgConfig.writeTimeout.value.isFinite()) {
+        ch.pipeline().addLast(new WriteTimeoutHandler(pgConfig.writeTimeout.value.toSeconds.toInt))
+      }
 
       val conn = pgConnection(ch, decoderHandler, encoderHandler)
       ch.pipeline().addLast(conn.handler)
@@ -119,7 +129,7 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
           val conn = initializer.maybeConn.getOrElse(throw new PgDriverInternalErrorException(
             "Channel initializer did not create a connection instance"
           ))
-          conn.init(config.dbRole, config.dbName, config.authenticator).map(_ => conn)
+          conn.init(pgConfig.dbRole, pgConfig.dbName, pgConfig.authenticator).map(_ => conn)
         }
         .recoverWith {
           case ex: RdbcException => Future.failed(ex)
@@ -145,12 +155,12 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
         _ <- openChannels.close().scalaFut
           .recover(warn("could not close open channels"))
 
-        _ <- config.eventLoopGroup.shutdownGracefully(0L, 0L, TimeUnit.SECONDS).scalaFut
+        _ <- nettyConfig.eventLoopGroup.shutdownGracefully(0L, 0L, TimeUnit.SECONDS).scalaFut
           .recover(warn("could not shutdown event loop group"))
       } yield ()
     } else {
       logger.warn("Shutdown request received for already shut down connection factory")
-      Future.successful(())
+      Future.unit
     }
   }
 
@@ -160,8 +170,9 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
     val connConfig = PgConnectionConfig(
       pgTypes = pgTypes,
       typeConverters = typeConverters,
-      maxBatchSize = config.maxBatchSize,
-      stmtCacheConfig = config.stmtCacheConfig
+      subscriberMinDemandRequestSize = pgConfig.subscriberMinDemandRequestSize,
+      subscriberBufferCapacity = pgConfig.subscriberBufferCapacity,
+      stmtCacheConfig = pgConfig.stmtCacheConfig
     )
 
     new NettyPgConnection(
@@ -177,18 +188,18 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
   }
 
   private def baseBootstrap(connectTimeout: Option[Timeout]): Bootstrap = traced {
-    val address = if (config.address.isUnresolved) {
-      new InetSocketAddress(config.address.getHostString, config.address.getPort)
+    val address = if (pgConfig.address.isUnresolved) {
+      new InetSocketAddress(pgConfig.address.getHostString, pgConfig.address.getPort)
     } else {
-      config.address
+      pgConfig.address
     }
 
     val bootstrap = new Bootstrap()
-      .group(config.eventLoopGroup)
-      .channelFactory(config.channelFactory)
+      .group(nettyConfig.eventLoopGroup)
+      .channelFactory(nettyConfig.channelFactory)
       .remoteAddress(address)
 
-    config.channelOptions.foreach { opt =>
+    nettyConfig.channelOptions.foreach { opt =>
       bootstrap.option(opt.option.asInstanceOf[ChannelOption[Any]], opt.value)
     }
     connectTimeout.foreach { timeout =>
@@ -207,7 +218,7 @@ class NettyPgConnectionFactory protected(val config: NettyPgConnFactoryConfig)
     baseBootstrap(connectTimeout = None)
       .handler {
         channelInitializer { ch =>
-          ch.pipeline().addLast(new PgMsgEncoderHandler(config.msgEncoderFactory))
+          ch.pipeline().addLast(new PgMsgEncoderHandler(pgConfig.msgEncoderFactory))
         }
       }
       .connect().scalaFut

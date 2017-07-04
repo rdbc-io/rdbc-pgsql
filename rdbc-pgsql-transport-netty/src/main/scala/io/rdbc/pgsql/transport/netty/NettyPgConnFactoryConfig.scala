@@ -16,55 +16,36 @@
 
 package io.rdbc.pgsql.transport.netty
 
-import java.net.InetSocketAddress
-
-import com.typesafe.config.ConfigFactory
 import io.netty.channel._
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.StmtCacheConfig
-import io.rdbc.pgsql.core.auth.{Authenticator, UsernamePasswordAuthenticator}
-import io.rdbc.pgsql.core.codec.{DecoderFactory, EncoderFactory}
+import io.rdbc.pgsql.core.PgConnFactoryConfig
+import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.types.PgTypesProvider
-import io.rdbc.pgsql.scodec.types.ScodecPgTypesProvider
-import io.rdbc.pgsql.scodec.{ScodecDecoderFactory, ScodecEncoderFactory}
 import io.rdbc.sapi.TypeConvertersProvider
-import io.rdbc.typeconv.StandardTypeConvertersProvider
-
-import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
 
 object NettyPgConnFactoryConfig {
 
-  def apply(username: String, password: String): NettyPgConnFactoryConfig = {
-    apply(new UsernamePasswordAuthenticator(username, password), username, username)
+  def apply(pgConfig: PgConnFactoryConfig): NettyPgConnFactoryConfig = {
+    NettyPgConnFactoryConfig(
+      pgConfig = pgConfig,
+      channelFactory = defaultChannelFactory,
+      eventLoopGroup = defaultEventLoopGroup,
+      channelOptions = Vector(ChannelOptionValue(ChannelOption.SO_KEEPALIVE, java.lang.Boolean.TRUE))
+    )
+  }
+
+  def apply(host: String,
+            port: Int,
+            authenticator: Authenticator,
+            dbRole: String,
+            dbName: String): NettyPgConnFactoryConfig = {
+    apply(PgConnFactoryConfig(host, port, authenticator, dbRole, dbName))
   }
 
   def apply(host: String, port: Int, username: String, password: String): NettyPgConnFactoryConfig = {
-    apply(username, password)
-      .withHost(host)
-      .withPort(port)
-  }
-
-  def apply(authenticator: Authenticator, dbRole: String, dbName: String): NettyPgConnFactoryConfig = {
-    NettyPgConnFactoryConfig(
-      address = InetSocketAddress.createUnresolved("localhost", 5432),
-      dbRole = dbRole,
-      dbName = dbName,
-      authenticator = authenticator,
-      maxBatchSize = 100,
-      stmtCacheConfig = StmtCacheConfig.Enabled(capacity = 100),
-      typeConvertersProviders = Vector(new StandardTypeConvertersProvider),
-      pgTypesProviders = Vector(new ScodecPgTypesProvider),
-      msgDecoderFactory = new ScodecDecoderFactory,
-      msgEncoderFactory = new ScodecEncoderFactory,
-      writeTimeout = 30.seconds,
-      channelFactory = defaultChannelFactory,
-      eventLoopGroup = defaultEventLoopGroup,
-      channelOptions = Vector(ChannelOptionValue(ChannelOption.SO_KEEPALIVE, java.lang.Boolean.TRUE)),
-      ec = ExecutionContext.global
-    )
+    apply(PgConnFactoryConfig(host, port, username, password))
   }
 
   private def defaultChannelFactory: ChannelFactory[_ <: SocketChannel] = {
@@ -76,57 +57,26 @@ object NettyPgConnFactoryConfig {
   }
 }
 
-case class NettyPgConnFactoryConfig(address: InetSocketAddress,
-                                    dbRole: String,
-                                    dbName: String,
-                                    authenticator: Authenticator,
-                                    maxBatchSize: Int,
-                                    stmtCacheConfig: StmtCacheConfig,
-                                    typeConvertersProviders: ImmutSeq[TypeConvertersProvider],
-                                    pgTypesProviders: ImmutSeq[PgTypesProvider],
-                                    msgDecoderFactory: DecoderFactory,
-                                    msgEncoderFactory: EncoderFactory,
-                                    writeTimeout: FiniteDuration,
+final case class NettyPgConnFactoryConfig(pgConfig: PgConnFactoryConfig,
                                     channelFactory: ChannelFactory[_ <: Channel],
                                     eventLoopGroup: EventLoopGroup,
-                                    channelOptions: ImmutSeq[ChannelOptionValue[_]],
-                                    ec: ExecutionContext) {
+                                    channelOptions: ImmutSeq[ChannelOptionValue[_]]) {
 
-  def withHost(host: String): NettyPgConnFactoryConfig = {
+  def withTypeConvertersProvider[A](typeConvertersProvider: TypeConvertersProvider): NettyPgConnFactoryConfig = {
     copy(
-      address = InetSocketAddress.createUnresolved(host, address.getPort)
+      pgConfig = pgConfig.withTypeConvertersProvider(typeConvertersProvider)
     )
   }
 
-  def withPort(port: Int): NettyPgConnFactoryConfig = {
+  def withPgTypesProvider[A](pgTypesProvider: PgTypesProvider): NettyPgConnFactoryConfig = {
     copy(
-      address = InetSocketAddress.createUnresolved(address.getHostString, port)
-    )
-  }
-
-  def withUserPassAuth(user: String, password: String): NettyPgConnFactoryConfig = {
-    copy(
-      authenticator = new UsernamePasswordAuthenticator(user, password),
-      dbRole = user,
-      dbName = user
+      pgConfig = pgConfig.withPgTypesProvider(pgTypesProvider)
     )
   }
 
   def withChannelOption[A](channelOption: ChannelOption[A], value: A): NettyPgConnFactoryConfig = {
     copy(
       channelOptions = channelOptions.toVector :+ ChannelOptionValue(channelOption, value)
-    )
-  }
-
-  def withTypeConvertersProvider[A](typeConvertersProvider: TypeConvertersProvider): NettyPgConnFactoryConfig = {
-    copy(
-      typeConvertersProviders = typeConvertersProviders.toVector :+ typeConvertersProvider
-    )
-  }
-
-  def withPgTypesProvider[A](pgTypesProvider: PgTypesProvider): NettyPgConnFactoryConfig = {
-    copy(
-      pgTypesProviders = pgTypesProviders.toVector :+ pgTypesProvider
     )
   }
 

@@ -17,9 +17,9 @@
 package io.rdbc.pgsql.core.internal
 
 import io.rdbc.api.exceptions.IllegalSessionStateException
+import io.rdbc.pgsql.core.ConnId
 import io.rdbc.pgsql.core.exception.PgDriverInternalErrorException
 import io.rdbc.pgsql.core.internal.fsm._
-import io.rdbc.pgsql.core.{ClientRequest, ConnId, RequestId}
 import io.rdbc.util.Logging
 
 import scala.concurrent.stm._

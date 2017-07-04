@@ -18,4 +18,4 @@ package io.rdbc.pgsql.transport.netty
 
 import io.netty.channel.ChannelOption
 
-case class ChannelOptionValue[T](option: ChannelOption[T], value: T)
+final case class ChannelOptionValue[T](option: ChannelOption[T], value: T)

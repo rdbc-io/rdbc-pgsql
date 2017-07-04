@@ -21,7 +21,7 @@ import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgStatusDataException}
 import io.rdbc.pgsql.core.internal.fsm.streaming._
-import io.rdbc.pgsql.core.internal.{PgRowPublisher, PortalDescData}
+import io.rdbc.pgsql.core.internal.{PgMsgHandler, PgRowPublisher, PortalDescData}
 import io.rdbc.pgsql.core.pgstruct.TxStatus
 import io.rdbc.pgsql.core.pgstruct.messages.backend._
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{Bind, Parse, PortalName}
@@ -61,7 +61,7 @@ private[core] trait State extends Logging {
     case NotificationResponse(pid, channel, payload) =>
       logger.info(
         s"Asynchronous notification in channel '$channel' " +
-        s"received from pid ${pid.value} " + payload.fold("with no payload")(s => s"with payload '$s'")
+          s"received from pid ${pid.value} " + payload.fold("with no payload")(s => s"with payload '$s'")
       )
       stay
 

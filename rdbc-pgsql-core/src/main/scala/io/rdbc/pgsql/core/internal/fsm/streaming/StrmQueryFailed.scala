@@ -17,10 +17,11 @@
 package io.rdbc.pgsql.core.internal.fsm.streaming
 
 import com.typesafe.scalalogging.StrictLogging
+import io.rdbc.pgsql.core.ChannelWriter
+import io.rdbc.pgsql.core.internal.PgMsgHandler
 import io.rdbc.pgsql.core.internal.fsm.{Idle, State, StateAction}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{CloseComplete, ReadyForQuery}
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
-import io.rdbc.pgsql.core.{ChannelWriter, PgMsgHandler}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal

@@ -16,6 +16,7 @@
 
 package io.rdbc.pgsql.core.internal
 
+import _root_.scodec.bits.ByteVector
 import io.rdbc.api.exceptions.MissingColumnException
 import io.rdbc.implbase.RowPartialImpl
 import io.rdbc.pgsql.core.SessionParams
@@ -27,7 +28,6 @@ import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.sapi.{Row, TypeConverterRegistry}
 import io.rdbc.util.Logging
 import io.rdbc.util.Preconditions._
-import scodec.bits.ByteVector
 
 private[core] class PgRow(rowDesc: RowDescription,
                           cols: IndexedSeq[ColValue],

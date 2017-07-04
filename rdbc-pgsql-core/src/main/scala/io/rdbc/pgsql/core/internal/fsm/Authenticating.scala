@@ -17,11 +17,12 @@
 package io.rdbc.pgsql.core.internal.fsm
 
 import io.rdbc.api.exceptions.AuthFailureException
+import io.rdbc.pgsql.core.ChannelWriter
 import io.rdbc.pgsql.core.auth.AuthState.{AuthComplete, AuthContinue}
 import io.rdbc.pgsql.core.auth.{AuthState, Authenticator}
+import io.rdbc.pgsql.core.internal.PgMsgHandler
 import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.pgstruct.messages.backend.auth.{AuthOk, AuthRequest}
-import io.rdbc.pgsql.core.{ChannelWriter, PgMsgHandler}
 
 import scala.concurrent.Promise
 

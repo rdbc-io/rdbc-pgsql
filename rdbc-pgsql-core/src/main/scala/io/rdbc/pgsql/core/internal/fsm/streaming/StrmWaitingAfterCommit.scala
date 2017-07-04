@@ -16,10 +16,10 @@
 
 package io.rdbc.pgsql.core.internal.fsm.streaming
 
-import io.rdbc.pgsql.core.internal.PgRowPublisher
+import io.rdbc.pgsql.core.ChannelWriter
+import io.rdbc.pgsql.core.internal.{PgMsgHandler, PgRowPublisher}
 import io.rdbc.pgsql.core.internal.fsm._
 import io.rdbc.pgsql.core.pgstruct.messages.backend.CommandComplete
-import io.rdbc.pgsql.core.{ChannelWriter, PgMsgHandler}
 
 import scala.concurrent.ExecutionContext
 

@@ -16,9 +16,7 @@
 
 package io.rdbc.pgsql
 
-import io.rdbc.pgsql.core.internal.fsm.StateAction
-import io.rdbc.pgsql.core.pgstruct.TxStatus
-import io.rdbc.pgsql.core.pgstruct.messages.backend.{BackendKeyData, PgBackendMessage}
+import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
 
 import scala.concurrent.Future
 
@@ -26,20 +24,6 @@ package object core {
 
   type RequestCanceler = BackendKeyData => Future[Unit]
 
-  case class ConnId(value: String) extends AnyVal
-
-  private[core] type FatalErrorNotifier = (String, Throwable) => Unit
-
-  private[core] case class RequestId(connId: ConnId, value: Long) {
-    override def toString: String = s"${connId.value}:$value"
-  }
-
-  private[core] case class RdbcSql(value: String) extends AnyVal
-
-  private[core] case class StmtParamName(value: String) extends AnyVal
-
-  private[core] type ClientRequest[A] = (RequestId, TxStatus) => A
-
-  private[core] type PgMsgHandler = PartialFunction[PgBackendMessage, StateAction]
+  final case class ConnId(value: String) extends AnyVal
 
 }

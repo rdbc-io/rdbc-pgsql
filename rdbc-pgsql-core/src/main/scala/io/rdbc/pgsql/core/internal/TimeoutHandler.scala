@@ -16,7 +16,6 @@
 
 package io.rdbc.pgsql.core.internal
 
-import io.rdbc.pgsql.core.RequestId
 import io.rdbc.util.Logging
 import io.rdbc.util.scheduler.{ScheduledTask, TaskScheduler}
 
