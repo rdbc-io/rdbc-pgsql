@@ -25,16 +25,18 @@ import io.rdbc.pgsql.core.internal.scodec.msg.frontend.pgFrontendMessage
 import io.rdbc.pgsql.core.exception.PgEncodeException
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
 
+import scala.util.{Success, Try}
+
 
 class ScodecEncoder(protected val charset: Charset) extends Encoder {
   private[this] val codec = pgFrontendMessage(charset)
 
-  def encode(msg: PgFrontendMessage): ByteVector = {
+  def encode(msg: PgFrontendMessage): Try[ByteVector] = {
     codec.encode(msg) match {
-      case Successful(bits) => bits.bytes
-      case Failure(err) => throw new PgEncodeException(
+      case Successful(bits) => Success(bits.bytes)
+      case Failure(err) => util.Failure(new PgEncodeException(
         s"Error occurred while encoding message '$msg': ${err.messageWithContext}"
-      )
+      ))
     }
   }
 }

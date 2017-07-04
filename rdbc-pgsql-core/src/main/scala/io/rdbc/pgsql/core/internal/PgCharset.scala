@@ -20,22 +20,22 @@ import java.nio.charset.{Charset, UnsupportedCharsetException}
 
 import io.rdbc.pgsql.core.exception.PgUnsupportedCharsetException
 
+import scala.util.{Failure, Success, Try}
+
 private[core] object PgCharset {
 
-  def toJavaCharset(pgCharset: String): Charset = {
-    try {
-      Charset.forName(toIanaName(pgCharset))
-    } catch {
+  def toJavaCharset(pgCharset: String): Try[Charset] = {
+    toIanaName(pgCharset).flatMap { ianaName =>
+      Try(Charset.forName(ianaName))
+    }.recoverWith {
       case ex: UnsupportedCharsetException =>
-        throw new PgUnsupportedCharsetException(pgCharset, ex)
+        Failure(new PgUnsupportedCharsetException(pgCharset, ex))
     }
   }
 
-  private def toIanaName(pgCharset: String): String = {
-    mapping.getOrElse(
-      pgCharset,
-      throw new PgUnsupportedCharsetException(pgCharset)
-    )
+  private def toIanaName(pgCharset: String): Try[String] = {
+    mapping.get(pgCharset).map(Success(_))
+      .getOrElse(Failure(new PgUnsupportedCharsetException(pgCharset)))
   }
 
   /** Mapping between PostgreSQL charset name and IANA charset name used by java.nio.Charset */

@@ -38,11 +38,10 @@ private[core] class PgSessionFsmManager(connId: ConnId,
   private[this] val lastRequestId = Ref(RequestId(connId, 0L))
 
   /* TODO can't make this traced, compilation fails, investigate */
-  def ifReady[A](request: ClientRequest[A]): A = {
-    val action: () => A = atomic { implicit tx =>
+  def ifReady[A](request: ClientRequest[A]): Try[A] = {
+    val action: () => Try[A] = atomic { implicit tx =>
       if (handlingTimeout()) {
-        () =>
-          throw new IllegalSessionStateException(s"Session is busy, currently cancelling timed out action")
+        () => Failure(new IllegalSessionStateException(s"Session is busy, currently cancelling timed out action"))
       } else if (ready()) {
         actionWhenReady(request)
       } else {
@@ -53,32 +52,32 @@ private[core] class PgSessionFsmManager(connId: ConnId,
   }
 
   def ifReadyF[A](request: ClientRequest[Future[A]]): Future[A] = {
-    Try(ifReady(request)) match {
+    ifReady(request) match {
       case Success(res) => res
       case Failure(ex) => Future.failed(ex)
     }
   }
 
   /* TODO can't make this traced, compilation fails, investigate */
-  private def actionWhenReady[A](request: ClientRequest[A])(implicit txn: InTxn): () => A = {
+  private def actionWhenReady[A](request: ClientRequest[A])(implicit txn: InTxn): () => Try[A] = {
     state() match {
       case Idle(txStatus) =>
         val newRequestId = prepareStateForNewRequest()
-        () => request(newRequestId, txStatus)
+        () => Success(request(newRequestId, txStatus))
 
       case state =>
         val ex = new PgDriverInternalErrorException(s"Expected connection state to be idle, actual state was $state")
         fatalErrorHandler.handleFatalError(ex.getMessage, ex)
-        () => throw ex
+        () => Failure(ex)
     }
   }
 
-  private def actionWhenNotReady[A]()(implicit txn: InTxn): () => A = traced {
+  private def actionWhenNotReady[A]()(implicit txn: InTxn): () => Try[A] = traced {
     state() match {
       case ConnectionClosed(cause) =>
-        () => throw cause
+        () => Failure(cause)
       case _ =>
-        () => throw new IllegalSessionStateException(s"Session is busy, currently processing query")
+        () => Failure(new IllegalSessionStateException(s"Session is busy, currently processing query"))
     }
   }
 

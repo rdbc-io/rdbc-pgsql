@@ -38,8 +38,11 @@ private[netty] class PgMsgDecoderHandler(decoderFactory: DecoderFactory)
   def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: ju.List[AnyRef]): Unit = {
     val bytes = new Array[Byte](in.readableBytes())
     in.readBytes(bytes)
-    out.add(decoder.decodeMsg(ByteVector.view(bytes)).msg)
-    ()
+    throwOnFailure {
+      decoder.decodeMsg(ByteVector.view(bytes)).map { decoded =>
+        out.add(decoded.msg)
+      }.map(_ => ())
+    }
   }
 
   def changeCharset(charset: Charset): Unit = {

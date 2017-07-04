@@ -70,7 +70,7 @@ class StmtArgConverter(pgTypes: PgTypeRegistry, sessionParams: SessionParams)
     //TODO document in bind null/None/Some support
     value match {
       case null | None => Success(Argument.Null(Oid.unknownDataType))
-      case NullParam(cls) => withPgType(cls)(pgType => Argument.Null(pgType.typeOid))
+      case NullParam(cls) => withPgType(cls)(pgType => Success(Argument.Null(pgType.typeOid)))
       case NotNullParam(notNullVal) => notNullToPgParamValue(notNullVal)
       case Some(notNullVal) => notNullToPgParamValue(notNullVal)
       case notNullVal => notNullToPgParamValue(notNullVal)
@@ -79,16 +79,16 @@ class StmtArgConverter(pgTypes: PgTypeRegistry, sessionParams: SessionParams)
 
   private def notNullToPgParamValue(value: Any): Try[Argument] = traced {
     withPgType(value.getClass) { pgType =>
-      val binVal = pgType.asInstanceOf[PgType[Any]].toPgBinary(value)(sessionParams)
-      Argument.Binary(binVal, pgType.typeOid)
+      pgType.asInstanceOf[PgType[Any]].toPgBinary(value)(sessionParams).map { byteVec =>
+        Argument.Binary(byteVec, pgType.typeOid)
+      }
     }
   }
 
-  private def withPgType[A, B](cls: Class[A])(body: PgType[A] => B): Try[B] = {
+  private def withPgType[A, B](cls: Class[A])(body: PgType[A] => Try[B]): Try[B] = {
     pgTypes
       .typeByClass(cls)
       .map(body)
-      .map(Success(_))
       .getOrElse(Failure(new NoSuitableConverterFoundException(cls)))
   }
 }

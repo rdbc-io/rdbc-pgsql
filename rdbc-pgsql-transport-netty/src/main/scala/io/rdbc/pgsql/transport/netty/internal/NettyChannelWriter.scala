@@ -23,6 +23,7 @@ import io.rdbc.pgsql.core.pgstruct.messages.frontend.PgFrontendMessage
 import io.rdbc.util.Logging
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Try}
 import scala.util.control.NonFatal
 
 private[netty] class NettyChannelWriter(ch: Channel)
@@ -48,13 +49,10 @@ private[netty] class NettyChannelWriter(ch: Channel)
     }
   }
 
-  def flush(): Unit = {
+  def flush(): Try[Unit] = {
     logger.trace(s"Flushing channel $ch")
-    try {
-      ch.flush()
-      ()
-    } catch {
-      case NonFatal(ex) => throw new PgChannelException(ex)
+    Try(ch.flush()).map(_ => ()).recoverWith {
+      case NonFatal(ex) => Failure(new PgChannelException(ex))
     }
   }
 }

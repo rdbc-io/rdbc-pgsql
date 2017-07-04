@@ -22,6 +22,7 @@ import io.rdbc.pgsql.core.internal.PgNativeStatement.Params
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
 import io.rdbc.util.Logging
 
+import scala.util.{Failure, Success, Try}
 import scala.util.matching.Regex
 
 private[core] object PgNativeStatement extends Logging {
@@ -69,18 +70,20 @@ private[core] object PgNativeStatement extends Logging {
     )
   }
 
-  def parse(statement: RdbcSql): PgNativeStatement = traced {
+  def parse(statement: RdbcSql): Try[PgNativeStatement] = traced {
     val matches = findParamMatches(statement)
     if (matches.named.nonEmpty && matches.positional.nonEmpty) {
-      throw new MixedParamTypesException
+      Failure(new MixedParamTypesException)
     } else {
-      if (matches.named.nonEmpty) {
-        val params = Params.Named(matches.named.map(_.value.drop(1)))
-        PgNativeStatement(toNativeSql(statement, matches.named), params)
-      } else {
-        val params = Params.Positional(matches.positional.size)
-        PgNativeStatement(toNativeSql(statement, matches.positional), params)
-      }
+      Success(
+        if (matches.named.nonEmpty) {
+          val params = Params.Named(matches.named.map(_.value.drop(1)))
+          PgNativeStatement(toNativeSql(statement, matches.named), params)
+        } else {
+          val params = Params.Positional(matches.positional.size)
+          PgNativeStatement(toNativeSql(statement, matches.positional), params)
+        }
+      )
     }
   }
 

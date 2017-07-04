@@ -23,29 +23,30 @@ import scodec.Attempt.{Failure, Successful}
 import scodec.bits.ByteVector
 
 import scala.reflect.ClassTag
+import scala.util.{Success, Try}
 
 private[types] abstract class ScodecPgType[T: ClassTag] extends PgType[T] {
 
   def decoder(implicit sessionParams: SessionParams): scodec.Decoder[T]
   def encoder(implicit sessionParams: SessionParams): scodec.Encoder[T]
 
-  def toObj(binaryVal: ByteVector)(implicit sessionParams: SessionParams): T = {
+  def toObj(binaryVal: ByteVector)(implicit sessionParams: SessionParams): Try[T] = {
     decoder.decodeValue(binaryVal.bits) match {
-      case Successful(value) => value
-      case Failure(err) => throw new PgDecodeException(
+      case Successful(value) => Success(value)
+      case Failure(err) => util.Failure(new PgDecodeException(
         s"Error decoding '${binaryVal.toHex}' of PG type '$name' as '${implicitly[ClassTag[T]]}': "
           + err.messageWithContext
-      )
+      ))
     }
   }
 
-  def toPgBinary(obj: T)(implicit sessionParams: SessionParams): ByteVector = {
+  def toPgBinary(obj: T)(implicit sessionParams: SessionParams): Try[ByteVector] = {
     encoder.encode(obj) match {
-      case Successful(value) => value.bytes
-      case Failure(err) => throw new PgDecodeException(
+      case Successful(value) => Success(value.bytes)
+      case Failure(err) => util.Failure(new PgDecodeException(
         s"Error encoding '$obj' of type '${obj.getClass}' to PG type '$name': "
           + err.messageWithContext
-      )
+      ))
     }
   }
 }

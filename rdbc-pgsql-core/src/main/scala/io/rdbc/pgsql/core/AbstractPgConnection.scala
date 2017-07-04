@@ -23,7 +23,6 @@ import io.rdbc.api.exceptions.{ConnectionClosedException, ConnectionValidationEx
 import io.rdbc.implbase.ConnectionPartialImpl
 import io.rdbc.pgsql.core.StmtCacheConfig.{Disabled, Enabled}
 import io.rdbc.pgsql.core.auth.Authenticator
-import io.rdbc.pgsql.core.exception.PgUnsupportedCharsetException
 import io.rdbc.pgsql.core.internal._
 import io.rdbc.pgsql.core.internal.Compat._
 import io.rdbc.pgsql.core.internal.cache.LruStmtCache
@@ -81,11 +80,15 @@ abstract class AbstractPgConnection(val id: ConnId,
       case KeyColumns.All => s"$sql returning *"
       case KeyColumns.Named(cols) => sql + " returning " + cols.mkString(",")
     }
-    new PgStatement(
-      stmtExecutor = this,
-      nativeStmt = PgNativeStatement.parse(RdbcSql(finalSql)),
-      argConverter = argConverter
-    )
+    throwOnFailure {
+      PgNativeStatement.parse(RdbcSql(finalSql)).map { nativeStmt =>
+        new PgStatement(
+          stmtExecutor = this,
+          nativeStmt = nativeStmt,
+          argConverter = argConverter
+        )
+      }
+    }
   }
 
   override def beginTx()(implicit timeout: Timeout): Future[Unit] = traced {
@@ -170,7 +173,7 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   override private[core]
   def statementStream(nativeSql: NativeSql, params: Vector[Argument])
-                     (implicit timeout: Timeout): RowPublisher = {
+                     (implicit timeout: Timeout): Try[RowPublisher] = {
     fsmManager.ifReady { (reqId, txStatus) =>
 
       val parseAndBind = newParseAndBind(nativeSql, params)
@@ -423,11 +426,10 @@ abstract class AbstractPgConnection(val id: ConnId,
   }
 
   private def handleCharsetChange(pgCharsetName: String)(consumer: Charset => Unit): Unit = traced {
-    try {
-      consumer(PgCharset.toJavaCharset(pgCharsetName))
-    } catch {
-      case ex: PgUnsupportedCharsetException => handleFatalError(ex.getMessage, ex)
-    }
+    PgCharset.toJavaCharset(pgCharsetName).fold(
+      ex => handleFatalError(ex.getMessage, ex),
+      charset => consumer(charset)
+    )
   }
 
   private def handleParamStatusChange(p: ParameterStatus): Unit = traced {
@@ -470,7 +472,7 @@ abstract class AbstractPgConnection(val id: ConnId,
         _ =>
           val connClosedEx = cause match {
             case ex: ConnectionClosedException => ex
-            case ex => new ConnectionClosedException("Connection closed", ex)
+            case NonFatal(ex) => new ConnectionClosedException("Connection closed", ex)
           }
           fsmManager.triggerTransition(ConnectionClosed(connClosedEx))
           out.close().recover {

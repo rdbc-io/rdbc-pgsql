@@ -27,6 +27,7 @@ import org.reactivestreams.{Subscriber, Subscription}
 
 import scala.concurrent.stm._
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 private[core]
@@ -82,7 +83,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
   }
 
   private def handleArgConversionError(): PartialFunction[Throwable, Unit] = {
-    case ex =>
+    case NonFatal(ex) =>
       val publisherAlreadyErrored = atomic { implicit tx =>
         if (!publisherErrored()) {
           publisherErrored() = true
