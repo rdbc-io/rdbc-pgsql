@@ -39,6 +39,7 @@ private[netty] class PgMsgDecoderHandler(decoderFactory: DecoderFactory)
     val bytes = new Array[Byte](in.readableBytes())
     in.readBytes(bytes)
     out.add(decoder.decodeMsg(ByteVector.view(bytes)).msg)
+    ()
   }
 
   def changeCharset(charset: Charset): Unit = {

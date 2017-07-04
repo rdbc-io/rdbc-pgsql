@@ -219,6 +219,7 @@ class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnFactoryConf
       .handler {
         channelInitializer { ch =>
           ch.pipeline().addLast(new PgMsgEncoderHandler(pgConfig.msgEncoderFactory))
+          ()
         }
       }
       .connect().scalaFut

@@ -43,7 +43,7 @@ private[msg] object ColValueCodec extends Codec[ColValue] {
   }
 
   def encode(value: ColValue): Attempt[BitVector] = value match {
-    case ColValue.Null => int32.unit(nullLength).encode(Unit)
+    case ColValue.Null => int32.unit(nullLength).encode(())
     case ColValue.NotNull(data) => variableSizeBytes(int32, bytes).encode(data)
   }
 }

@@ -52,6 +52,7 @@ private[netty] class NettyChannelWriter(ch: Channel)
     logger.trace(s"Flushing channel $ch")
     try {
       ch.flush()
+      ()
     } catch {
       case NonFatal(ex) => throw new PgChannelException(ex)
     }

@@ -396,6 +396,7 @@ abstract class AbstractPgConnection(val id: ConnId,
   override private[core]
   def completeBatch(txStatus: TxStatus): Unit = {
     fsmManager.triggerTransition(Idle(txStatus))
+    ()
   }
 
   override private[core] def handleWriteError(cause: Throwable): Unit = traced {
