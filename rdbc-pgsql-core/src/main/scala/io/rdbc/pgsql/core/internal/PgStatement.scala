@@ -18,10 +18,8 @@ package io.rdbc.pgsql.core.internal
 
 import io.rdbc.ImmutIndexedSeq
 import io.rdbc.api.exceptions._
-import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.internal.PgNativeStatement.Params.{Named, Positional}
 import io.rdbc.pgsql.core.pgstruct.Argument
-import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.sapi._
 import io.rdbc.util.Logging
 import org.reactivestreams.Publisher

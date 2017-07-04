@@ -48,7 +48,7 @@ package object msg {
   }
 
   private[msg] def pgSingletonHeadlessMsg[A <: PgMessage](singleton: A): Codec[A] = {
-    int32.withContext("header_length").unit(4).xmap[A](_ => singleton, _ => Unit)
+    int32.withContext("header_length").unit(4).xmap[A](_ => singleton, _ => ())
   }
 
   private[msg] def pgParamMap[K](keyCodec: Codec[K])(implicit charset: Charset): Codec[Map[K, String]] = {

@@ -77,6 +77,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
         executeIfCan()
         requestMore()
       }.recover(handleArgConversionError())
+      ()
     }
   }
 
@@ -121,7 +122,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
     }
     if (demand > 0) {
       logger.debug(s"Requesting $demand elements")
-      subscription.foreach(_.request(demand))
+      subscription.foreach(_.request(demand.toLong))
     }
   }
 
@@ -186,6 +187,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
       batchExecutor.completeBatch(lastTxStatus)
       donePromise.failure(t)
     }
+    ()
   }
 
   def onComplete(): Unit = traced {
@@ -196,6 +198,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
         donePromise.success(())
       }
     }
+    ()
   }
 
   private def requestDemand()(implicit txn: InTxn): Int = {
