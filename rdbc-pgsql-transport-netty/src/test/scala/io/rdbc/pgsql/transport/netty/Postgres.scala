@@ -78,6 +78,6 @@ object Postgres {
         "--lc-ctype=en_US.UTF-8"
       )
     )
-    new PostgresProcess(postgres, NettyPgConnectionFactory(host, port, user, pass))
+    new PostgresProcess(postgres, NettyPgConnectionFactory(NettyPgConnFactoryConfig.defaults(host, port, user, pass)))
   }
 }

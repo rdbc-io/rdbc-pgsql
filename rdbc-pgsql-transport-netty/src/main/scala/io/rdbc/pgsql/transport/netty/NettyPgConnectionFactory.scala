@@ -29,7 +29,6 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import io.rdbc.api.exceptions.RdbcException
 import io.rdbc.implbase.ConnectionFactoryPartialImpl
 import io.rdbc.pgsql.core._
-import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgUncategorizedException}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{CancelRequest, Terminate}
@@ -49,17 +48,6 @@ object NettyPgConnectionFactory extends Logging {
     new NettyPgConnectionFactory(config)
   }
 
-  def apply(host: String,
-            port: Int,
-            authenticator: Authenticator,
-            dbRole: String,
-            dbName: String): NettyPgConnectionFactory = {
-    apply(NettyPgConnFactoryConfig(host, port, authenticator, dbRole, dbName))
-  }
-
-  def apply(host: String, port: Int, username: String, password: String): NettyPgConnectionFactory = {
-    apply(NettyPgConnFactoryConfig(host, port, username, password))
-  }
 }
 
 class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnFactoryConfig)
@@ -129,7 +117,7 @@ class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnFactoryConf
           initializer.maybeConn.map(Future.successful).getOrElse(Future.failed(new PgDriverInternalErrorException(
             "Channel initializer did not create a connection instance"
           ))).flatMap { conn =>
-            conn.init(pgConfig.dbRole, pgConfig.dbName, pgConfig.authenticator).map(_ => conn)
+            conn.init(pgConfig.dbUser, pgConfig.dbName, pgConfig.authenticator).map(_ => conn)
           }
         }
         .recoverWith {
