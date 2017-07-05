@@ -31,37 +31,92 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 object PgConnFactoryConfig {
-  def apply(host: String,
-            port: Int,
-            authenticator: Authenticator,
-            dbRole: String,
-            dbName: String): PgConnFactoryConfig = {
+
+  object Defaults {
+    val subscriberBufferCapacity: Int = 100
+    val subscriberMinDemandRequestSize: Int = 10
+    val stmtCacheConfig: StmtCacheConfig = StmtCacheConfig.Enabled(capacity = 100)
+    val typeConvertersProviders: ImmutSeq[TypeConvertersProvider] = Vector(new StandardTypeConvertersProvider)
+    val pgTypesProviders: ImmutSeq[PgTypesProvider] = Vector(new ScodecPgTypesProvider)
+    val msgDecoderFactory: DecoderFactory = new ScodecDecoderFactory
+    val msgEncoderFactory: EncoderFactory = new ScodecEncoderFactory
+    val writeTimeout: Timeout = Timeout(10.seconds)
+    val ec: ExecutionContext = ExecutionContext.global
+  }
+
+  def apply(host: String, port: Int, username: String, password: String)
+           (dbUser: String = username,
+            dbName: String = username,
+            subscriberBufferCapacity: Int = Defaults.subscriberBufferCapacity,
+            subscriberMinDemandRequestSize: Int = Defaults.subscriberMinDemandRequestSize,
+            stmtCacheConfig: StmtCacheConfig = Defaults.stmtCacheConfig,
+            typeConvertersProviders: ImmutSeq[TypeConvertersProvider] = Defaults.typeConvertersProviders,
+            pgTypesProviders: ImmutSeq[PgTypesProvider] = Defaults.pgTypesProviders,
+            msgDecoderFactory: DecoderFactory = Defaults.msgDecoderFactory,
+            msgEncoderFactory: EncoderFactory = Defaults.msgEncoderFactory,
+            writeTimeout: Timeout = Defaults.writeTimeout,
+            ec: ExecutionContext = Defaults.ec
+           ): PgConnFactoryConfig = {
     PgConnFactoryConfig(
       address = InetSocketAddress.createUnresolved(host, port),
-      dbRole = dbRole,
+      dbUser = dbUser,
       dbName = dbName,
-      authenticator = authenticator,
-      subscriberBufferCapacity = 100,
-      subscriberMinDemandRequestSize = 10,
-      stmtCacheConfig = StmtCacheConfig.Enabled(capacity = 100),
-      typeConvertersProviders = Vector(new StandardTypeConvertersProvider),
-      pgTypesProviders = Vector(new ScodecPgTypesProvider),
-      msgDecoderFactory = new ScodecDecoderFactory,
-      msgEncoderFactory = new ScodecEncoderFactory,
-      writeTimeout = Timeout(10.seconds),
-      ec = ExecutionContext.global
+      authenticator = new UsernamePasswordAuthenticator(username, password),
+      typeConvertersProviders = typeConvertersProviders,
+      pgTypesProviders = pgTypesProviders,
+      subscriberBufferCapacity = subscriberBufferCapacity,
+      subscriberMinDemandRequestSize = subscriberMinDemandRequestSize,
+      stmtCacheConfig = stmtCacheConfig,
+      msgDecoderFactory = msgDecoderFactory,
+      msgEncoderFactory = msgEncoderFactory,
+      writeTimeout = writeTimeout,
+      ec = ec
     )
   }
 
-  def apply(host: String, port: Int, username: String, password: String): PgConnFactoryConfig = {
-    apply(host, port, new UsernamePasswordAuthenticator(username, password),
-      dbRole = username, dbName = username
+  def withCustomAuth(host: String, port: Int, authenticator: Authenticator, dbUser: String, dbName: String)
+                    (subscriberBufferCapacity: Int = Defaults.subscriberBufferCapacity,
+                     subscriberMinDemandRequestSize: Int = Defaults.subscriberMinDemandRequestSize,
+                     stmtCacheConfig: StmtCacheConfig = Defaults.stmtCacheConfig,
+                     typeConvertersProviders: ImmutSeq[TypeConvertersProvider] = Defaults.typeConvertersProviders,
+                     pgTypesProviders: ImmutSeq[PgTypesProvider] = Defaults.pgTypesProviders,
+                     msgDecoderFactory: DecoderFactory = Defaults.msgDecoderFactory,
+                     msgEncoderFactory: EncoderFactory = Defaults.msgEncoderFactory,
+                     writeTimeout: Timeout = Defaults.writeTimeout,
+                     ec: ExecutionContext = Defaults.ec
+                    ): PgConnFactoryConfig = {
+    PgConnFactoryConfig(
+      address = InetSocketAddress.createUnresolved(host, port),
+      dbUser = dbUser,
+      dbName = dbName,
+      authenticator = authenticator,
+      typeConvertersProviders = typeConvertersProviders,
+      pgTypesProviders = pgTypesProviders,
+      subscriberBufferCapacity = subscriberBufferCapacity,
+      subscriberMinDemandRequestSize = subscriberMinDemandRequestSize,
+      stmtCacheConfig = stmtCacheConfig,
+      msgDecoderFactory = msgDecoderFactory,
+      msgEncoderFactory = msgEncoderFactory,
+      writeTimeout = writeTimeout,
+      ec = ec
     )
+  }
+
+  def defaults(host: String, port: Int, username: String, password: String): PgConnFactoryConfig = {
+    apply(host, port, username, password)()
+  }
+
+  def defaultsWithCustomAuth(host: String,
+                             port: Int,
+                             authenticator: Authenticator,
+                             dbRole: String,
+                             dbName: String): PgConnFactoryConfig = {
+    withCustomAuth(host, port, authenticator, dbRole, dbName)()
   }
 }
 
 final case class PgConnFactoryConfig(address: InetSocketAddress,
-                                     dbRole: String,
+                                     dbUser: String,
                                      dbName: String,
                                      authenticator: Authenticator,
                                      typeConvertersProviders: ImmutSeq[TypeConvertersProvider],
@@ -72,18 +127,4 @@ final case class PgConnFactoryConfig(address: InetSocketAddress,
                                      msgDecoderFactory: DecoderFactory,
                                      msgEncoderFactory: EncoderFactory,
                                      writeTimeout: Timeout,
-                                     ec: ExecutionContext) {
-
-  def withTypeConvertersProvider[A](typeConvertersProvider: TypeConvertersProvider): PgConnFactoryConfig = {
-    copy(
-      typeConvertersProviders = typeConvertersProviders.toVector :+ typeConvertersProvider
-    )
-  }
-
-  def withPgTypesProvider[A](pgTypesProvider: PgTypesProvider): PgConnFactoryConfig = {
-    copy(
-      pgTypesProviders = pgTypesProviders.toVector :+ pgTypesProvider
-    )
-  }
-
-}
+                                     ec: ExecutionContext)

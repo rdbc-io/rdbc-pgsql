@@ -19,3 +19,13 @@ package io.rdbc.pgsql.transport.netty
 import io.netty.channel.ChannelOption
 
 final case class ChannelOptionValue[T](option: ChannelOption[T], value: T)
+
+object ChannelOptions {
+
+  implicit final class ArrowAssoc[A](private val option: ChannelOption[A])
+    extends AnyVal {
+    @inline def ->(value: A): ChannelOptionValue[A] = {
+      ChannelOptionValue(option, value)
+    }
+  }
+}
