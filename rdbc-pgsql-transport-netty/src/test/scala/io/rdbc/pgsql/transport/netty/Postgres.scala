@@ -22,6 +22,8 @@ import de.flapdoodle.embed.process.distribution.IVersion
 import de.flapdoodle.embed.process.io.progress.StandardConsoleProgressListener
 import de.flapdoodle.embed.process.runtime.Network
 import de.flapdoodle.embed.process.store.PostgresArtifactStoreBuilder
+import io.rdbc.pgsql.core.auth.Auth
+import io.rdbc.pgsql.transport.netty.NettyPgConnectionFactory.Config
 import io.rdbc.sapi.Timeout
 import io.rdbc.test._
 import ru.yandex.qatools.embed.postgresql.config.{PostgresDownloadConfigBuilder, RuntimeConfigBuilder}
@@ -78,6 +80,8 @@ object Postgres {
         "--lc-ctype=en_US.UTF-8"
       )
     )
-    new PostgresProcess(postgres, NettyPgConnectionFactory(NettyPgConnFactoryConfig.defaults(host, port, user, pass)))
+    new PostgresProcess(postgres, NettyPgConnectionFactory(
+      Config(host, port, Auth.password(user, pass))
+    ))
   }
 }

@@ -16,10 +16,9 @@
 
 package io.rdbc.pgsql.core
 
-import java.net.InetSocketAddress
-
 import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.auth.{Authenticator, UsernamePasswordAuthenticator}
+import io.rdbc.pgsql.core.PgConnFactoryConfig.Defaults
+import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.codec.scodec.{ScodecDecoderFactory, ScodecEncoderFactory}
 import io.rdbc.pgsql.core.codec.{DecoderFactory, EncoderFactory}
 import io.rdbc.pgsql.core.types.PgTypesProvider
@@ -31,7 +30,6 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 object PgConnFactoryConfig {
-
   object Defaults {
     val subscriberBufferCapacity: Int = 100
     val subscriberMinDemandRequestSize: Int = 10
@@ -43,88 +41,19 @@ object PgConnFactoryConfig {
     val writeTimeout: Timeout = Timeout(10.seconds)
     val ec: ExecutionContext = ExecutionContext.global
   }
-
-  def apply(host: String, port: Int, username: String, password: String)
-           (dbUser: String = username,
-            dbName: String = username,
-            subscriberBufferCapacity: Int = Defaults.subscriberBufferCapacity,
-            subscriberMinDemandRequestSize: Int = Defaults.subscriberMinDemandRequestSize,
-            stmtCacheConfig: StmtCacheConfig = Defaults.stmtCacheConfig,
-            typeConvertersProviders: ImmutSeq[TypeConvertersProvider] = Defaults.typeConvertersProviders,
-            pgTypesProviders: ImmutSeq[PgTypesProvider] = Defaults.pgTypesProviders,
-            msgDecoderFactory: DecoderFactory = Defaults.msgDecoderFactory,
-            msgEncoderFactory: EncoderFactory = Defaults.msgEncoderFactory,
-            writeTimeout: Timeout = Defaults.writeTimeout,
-            ec: ExecutionContext = Defaults.ec
-           ): PgConnFactoryConfig = {
-    PgConnFactoryConfig(
-      address = InetSocketAddress.createUnresolved(host, port),
-      dbUser = dbUser,
-      dbName = dbName,
-      authenticator = new UsernamePasswordAuthenticator(username, password),
-      typeConvertersProviders = typeConvertersProviders,
-      pgTypesProviders = pgTypesProviders,
-      subscriberBufferCapacity = subscriberBufferCapacity,
-      subscriberMinDemandRequestSize = subscriberMinDemandRequestSize,
-      stmtCacheConfig = stmtCacheConfig,
-      msgDecoderFactory = msgDecoderFactory,
-      msgEncoderFactory = msgEncoderFactory,
-      writeTimeout = writeTimeout,
-      ec = ec
-    )
-  }
-
-  def withCustomAuth(host: String, port: Int, authenticator: Authenticator, dbUser: String, dbName: String)
-                    (subscriberBufferCapacity: Int = Defaults.subscriberBufferCapacity,
-                     subscriberMinDemandRequestSize: Int = Defaults.subscriberMinDemandRequestSize,
-                     stmtCacheConfig: StmtCacheConfig = Defaults.stmtCacheConfig,
-                     typeConvertersProviders: ImmutSeq[TypeConvertersProvider] = Defaults.typeConvertersProviders,
-                     pgTypesProviders: ImmutSeq[PgTypesProvider] = Defaults.pgTypesProviders,
-                     msgDecoderFactory: DecoderFactory = Defaults.msgDecoderFactory,
-                     msgEncoderFactory: EncoderFactory = Defaults.msgEncoderFactory,
-                     writeTimeout: Timeout = Defaults.writeTimeout,
-                     ec: ExecutionContext = Defaults.ec
-                    ): PgConnFactoryConfig = {
-    PgConnFactoryConfig(
-      address = InetSocketAddress.createUnresolved(host, port),
-      dbUser = dbUser,
-      dbName = dbName,
-      authenticator = authenticator,
-      typeConvertersProviders = typeConvertersProviders,
-      pgTypesProviders = pgTypesProviders,
-      subscriberBufferCapacity = subscriberBufferCapacity,
-      subscriberMinDemandRequestSize = subscriberMinDemandRequestSize,
-      stmtCacheConfig = stmtCacheConfig,
-      msgDecoderFactory = msgDecoderFactory,
-      msgEncoderFactory = msgEncoderFactory,
-      writeTimeout = writeTimeout,
-      ec = ec
-    )
-  }
-
-  def defaults(host: String, port: Int, username: String, password: String): PgConnFactoryConfig = {
-    apply(host, port, username, password)()
-  }
-
-  def defaultsWithCustomAuth(host: String,
-                             port: Int,
-                             authenticator: Authenticator,
-                             dbRole: String,
-                             dbName: String): PgConnFactoryConfig = {
-    withCustomAuth(host, port, authenticator, dbRole, dbName)()
-  }
 }
 
-final case class PgConnFactoryConfig(address: InetSocketAddress,
-                                     dbUser: String,
-                                     dbName: String,
-                                     authenticator: Authenticator,
-                                     typeConvertersProviders: ImmutSeq[TypeConvertersProvider],
-                                     pgTypesProviders: ImmutSeq[PgTypesProvider],
-                                     subscriberBufferCapacity: Int,
-                                     subscriberMinDemandRequestSize: Int,
-                                     stmtCacheConfig: StmtCacheConfig,
-                                     msgDecoderFactory: DecoderFactory,
-                                     msgEncoderFactory: EncoderFactory,
-                                     writeTimeout: Timeout,
-                                     ec: ExecutionContext)
+final case class PgConnFactoryConfig
+(host: String,
+ port: Int,
+ authenticator: Authenticator,
+ dbName: Option[String] = None,
+ subscriberBufferCapacity: Int = Defaults.subscriberBufferCapacity,
+ subscriberMinDemandRequestSize: Int = Defaults.subscriberMinDemandRequestSize,
+ stmtCacheConfig: StmtCacheConfig = Defaults.stmtCacheConfig,
+ typeConvertersProviders: ImmutSeq[TypeConvertersProvider] = Defaults.typeConvertersProviders,
+ pgTypesProviders: ImmutSeq[PgTypesProvider] = Defaults.pgTypesProviders,
+ msgDecoderFactory: DecoderFactory = Defaults.msgDecoderFactory,
+ msgEncoderFactory: EncoderFactory = Defaults.msgEncoderFactory,
+ writeTimeout: Timeout = Defaults.writeTimeout,
+ ec: ExecutionContext = Defaults.ec)
