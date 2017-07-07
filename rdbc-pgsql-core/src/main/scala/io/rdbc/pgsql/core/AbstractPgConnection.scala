@@ -128,18 +128,20 @@ abstract class AbstractPgConnection(val id: ConnId,
     doRelease("Connection released by client (forced)")
   }
 
-  def init(dbUser: String, dbName: String, authenticator: Authenticator): Future[Unit] = traced {
+  def init(dbName: Option[String], authenticator: Authenticator): Future[Unit] = traced {
     argsNotNull()
     logger.debug(s"Initializing connection")
     val initPromise = Promise[BackendKeyData]
     fsmManager.triggerTransition(State.authenticating(initPromise, authenticator)(out))
 
-    out.writeAndFlush(Startup(dbUser, dbName)).recoverWith(writeFailureHandler).flatMap { _ =>
-      initPromise.future.map { returnedBkd =>
-        maybeBackendKeyData = Some(returnedBkd)
-        ()
+    out.writeAndFlush(Startup(authenticator.username, dbName.getOrElse(authenticator.username)))
+      .recoverWith(writeFailureHandler)
+      .flatMap { _ =>
+        initPromise.future.map { returnedBkd =>
+          maybeBackendKeyData = Some(returnedBkd)
+          ()
+        }
       }
-    }
   }
 
   protected def handleClientCharsetChange(charset: Charset): Unit

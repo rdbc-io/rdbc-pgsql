@@ -17,12 +17,13 @@
 package io.rdbc.pgsql.core.auth
 
 import io.rdbc.pgsql.core.auth.AuthState.AuthComplete
-import io.rdbc.pgsql.core.pgstruct.messages.backend.auth.{AuthBackendMessage, AuthRequestCleartext, AuthRequestMd5}
+import io.rdbc.pgsql.core.pgstruct.messages.backend.auth._
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.PasswordMessage
 
 import scala.collection.immutable
 
-class UsernamePasswordAuthenticator(val username: String, val password: String) extends Authenticator {
+class PasswordAuthenticator private[auth](val username: String, val password: String)
+  extends Authenticator {
 
   def authenticate(authReqMessage: AuthBackendMessage): AuthState = authReqMessage match {
     case req: AuthRequestMd5 =>
@@ -39,5 +40,5 @@ class UsernamePasswordAuthenticator(val username: String, val password: String) 
     }
   }
 
-  override val toString = s"UsernamePasswordAuthenticator(username=$username, password=***)"
+  override val toString = s"PasswordAuthenticator(username=$username, password=***)"
 }

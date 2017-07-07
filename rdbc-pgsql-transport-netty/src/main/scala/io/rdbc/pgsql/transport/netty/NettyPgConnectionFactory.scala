@@ -23,34 +23,30 @@ import java.util.concurrent.atomic.AtomicBoolean
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel._
 import io.netty.channel.group.DefaultChannelGroup
+import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder
 import io.netty.handler.timeout.WriteTimeoutHandler
 import io.netty.util.concurrent.GlobalEventExecutor
+import io.rdbc.ImmutSeq
 import io.rdbc.api.exceptions.RdbcException
 import io.rdbc.implbase.ConnectionFactoryPartialImpl
 import io.rdbc.pgsql.core._
+import io.rdbc.pgsql.core.auth.Authenticator
+import io.rdbc.pgsql.core.codec.{DecoderFactory, EncoderFactory}
 import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgUncategorizedException}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{CancelRequest, Terminate}
-import io.rdbc.pgsql.core.types.PgTypeRegistry
+import io.rdbc.pgsql.core.types.{PgTypeRegistry, PgTypesProvider}
 import io.rdbc.pgsql.transport.netty.internal._
 import io.rdbc.pgsql.transport.netty.internal.Compat._
-import io.rdbc.sapi.{Timeout, TypeConverterRegistry}
+import io.rdbc.sapi.{Timeout, TypeConverterRegistry, TypeConvertersProvider}
 import io.rdbc.util.Logging
 import io.rdbc.util.scheduler.JdkScheduler
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
-object NettyPgConnectionFactory extends Logging {
-
-  def apply(config: NettyPgConnFactoryConfig): NettyPgConnectionFactory = {
-    new NettyPgConnectionFactory(config)
-  }
-
-}
-
-class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnFactoryConfig)
+class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnectionFactory.Config)
   extends ConnectionFactoryPartialImpl
     with PgConnectionFactory
     with Logging {
@@ -117,7 +113,7 @@ class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnFactoryConf
           initializer.maybeConn.map(Future.successful).getOrElse(Future.failed(new PgDriverInternalErrorException(
             "Channel initializer did not create a connection instance"
           ))).flatMap { conn =>
-            conn.init(pgConfig.dbUser, pgConfig.dbName, pgConfig.authenticator).map(_ => conn)
+            conn.init(pgConfig.dbName, pgConfig.authenticator).map(_ => conn)
           }
         }
         .recoverWith {
@@ -177,12 +173,7 @@ class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnFactoryConf
   }
 
   private def baseBootstrap(connectTimeout: Option[Timeout]): Bootstrap = traced {
-    val address = if (pgConfig.address.isUnresolved) {
-      new InetSocketAddress(pgConfig.address.getHostString, pgConfig.address.getPort)
-    } else {
-      pgConfig.address
-    }
-
+    val address = new InetSocketAddress(pgConfig.host, pgConfig.port)
     val bootstrap = new Bootstrap()
       .group(nettyConfig.eventLoopGroup)
       .channelFactory(nettyConfig.channelFactory)
@@ -243,4 +234,74 @@ class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnFactoryConf
       def initChannel(ch: Channel): Unit = f(ch)
     }
   }
+}
+
+object NettyPgConnectionFactory extends Logging {
+
+  object Config {
+
+    import PgConnFactoryConfig.{Defaults => PgDefaults}
+
+    object Defaults {
+      val channelFactory: ChannelFactory[_ <: Channel] = new NioChannelFactory
+      def eventLoopGroup: EventLoopGroup = new NioEventLoopGroup
+      val channelOptions: ImmutSeq[ChannelOptionValue[_]] = {
+        Vector(ChannelOptionValue(ChannelOption.SO_KEEPALIVE, java.lang.Boolean.TRUE))
+      }
+    }
+
+    def apply(host: String,
+              port: Int,
+              authenticator: Authenticator,
+              dbName: Option[String] = None,
+              subscriberBufferCapacity: Int = PgDefaults.subscriberBufferCapacity,
+              subscriberMinDemandRequestSize: Int = PgDefaults.subscriberMinDemandRequestSize,
+              stmtCacheConfig: StmtCacheConfig = PgDefaults.stmtCacheConfig,
+              typeConvertersProviders: ImmutSeq[TypeConvertersProvider] = PgDefaults.typeConvertersProviders,
+              pgTypesProviders: ImmutSeq[PgTypesProvider] = PgDefaults.pgTypesProviders,
+              msgDecoderFactory: DecoderFactory = PgDefaults.msgDecoderFactory,
+              msgEncoderFactory: EncoderFactory = PgDefaults.msgEncoderFactory,
+              writeTimeout: Timeout = PgDefaults.writeTimeout,
+              ec: ExecutionContext = PgDefaults.ec,
+              channelFactory: ChannelFactory[_ <: Channel] = Defaults.channelFactory,
+              eventLoopGroup: EventLoopGroup = Defaults.eventLoopGroup,
+              channelOptions: ImmutSeq[ChannelOptionValue[_]] = Defaults.channelOptions
+             ): Config = {
+
+      val pgConfig = PgConnFactoryConfig(
+        host = host,
+        port = port,
+        dbName = dbName,
+        authenticator = authenticator,
+        typeConvertersProviders = typeConvertersProviders,
+        pgTypesProviders = pgTypesProviders,
+        subscriberBufferCapacity = subscriberBufferCapacity,
+        subscriberMinDemandRequestSize = subscriberMinDemandRequestSize,
+        stmtCacheConfig = stmtCacheConfig,
+        msgDecoderFactory = msgDecoderFactory,
+        msgEncoderFactory = msgEncoderFactory,
+        writeTimeout = writeTimeout,
+        ec = ec
+      )
+
+      Config(
+        pgConfig = pgConfig,
+        channelFactory = channelFactory,
+        eventLoopGroup = eventLoopGroup,
+        channelOptions = channelOptions
+      )
+    }
+  }
+
+
+  final case class Config(pgConfig: PgConnFactoryConfig,
+                          channelFactory: ChannelFactory[_ <: Channel],
+                          eventLoopGroup: EventLoopGroup,
+                          channelOptions: ImmutSeq[ChannelOptionValue[_]])
+
+
+  def apply(config: Config): NettyPgConnectionFactory = {
+    new NettyPgConnectionFactory(config)
+  }
+
 }

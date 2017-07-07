@@ -16,21 +16,8 @@
 
 package io.rdbc.pgsql.core.auth
 
-import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.pgstruct.messages.backend.auth.AuthBackendMessage
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.PgFrontendMessage
-
-trait Authenticator {
-  def username: String
-  def authenticate(authReqMessage: AuthBackendMessage): AuthState
-  def supports(authReqMessage: AuthBackendMessage): Boolean
-}
-
-sealed trait AuthState {
-  def responses: ImmutSeq[PgFrontendMessage]
-}
-
-object AuthState {
-  final case class AuthContinue(responses: ImmutSeq[PgFrontendMessage]) extends AuthState
-  final case class AuthComplete(responses: ImmutSeq[PgFrontendMessage]) extends AuthState
+object Auth {
+  def password(username: String, password: String): PasswordAuthenticator = {
+    new PasswordAuthenticator(username, password)
+  }
 }
