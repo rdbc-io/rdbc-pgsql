@@ -30,7 +30,6 @@ class PasswordAuthenticator private[auth](val username: String, val password: St
       AuthComplete(immutable.Seq(PasswordMessage.md5(username, password, req.salt)))
     case AuthRequestCleartext =>
       AuthComplete(immutable.Seq(PasswordMessage.cleartext(password)))
-    //TODO more username password mechanisms
   }
 
   def supports(authReqMessage: AuthBackendMessage): Boolean = {
