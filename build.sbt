@@ -83,6 +83,7 @@ lazy val rdbcPgsqlDoc = (project in file("rdbc-pgsql-doc"))
   .settings(
     publishArtifact := false,
     mkdocsVariables := Map(
-      "version" -> version.value
+      "version" -> version.value,
+      "rdbc_version" -> Library.rdbcScalaApi.revision
     )
   )
