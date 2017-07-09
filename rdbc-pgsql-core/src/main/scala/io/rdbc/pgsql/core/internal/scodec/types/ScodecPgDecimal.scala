@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.core.internal.scodec.types
 
 import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.types.PgDecimal
+import io.rdbc.pgsql.core.types.PgNumeric
 import io.rdbc.sapi.SqlNumeric
 import scodec.Attempt.Failure
 import scodec._
@@ -165,6 +165,6 @@ private[types] object PgDecimalCodec extends Codec[SqlNumeric] {
   }
 }
 
-private[core] object ScodecPgDecimal extends ScodecPgType[SqlNumeric] with PgDecimal with CommonCodec[SqlNumeric] {
+private[core] object ScodecPgNumeric extends ScodecPgType[SqlNumeric] with PgNumeric with CommonCodec[SqlNumeric] {
   def codec(implicit sessionParams: SessionParams): Codec[SqlNumeric] = PgDecimalCodec
 }
