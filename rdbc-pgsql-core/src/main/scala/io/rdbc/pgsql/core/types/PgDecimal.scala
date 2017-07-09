@@ -19,8 +19,8 @@ package io.rdbc.pgsql.core.types
 import io.rdbc.pgsql.core.pgstruct.Oid
 import io.rdbc.sapi.SqlNumeric
 
-trait PgDecimal extends PgType[SqlNumeric] {
+trait PgNumeric extends PgType[SqlNumeric] {
   val typeOid = Oid(1700)
   val cls = classOf[SqlNumeric]
-  val name = "decimal"
+  val name = "numeric"
 }

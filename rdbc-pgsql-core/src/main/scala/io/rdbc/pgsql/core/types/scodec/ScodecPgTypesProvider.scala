@@ -29,7 +29,7 @@ class ScodecPgTypesProvider extends PgTypesProvider {
       ScodecPgInt8,
       ScodecPgFloat4,
       ScodecPgFloat8,
-      ScodecPgDecimal,
+      ScodecPgNumeric,
       ScodecPgTime,
       ScodecPgDate,
       ScodecPgTimestamp,
