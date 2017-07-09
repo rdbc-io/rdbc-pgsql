@@ -4,6 +4,14 @@ site_dir: target
 strict: true
 pages:
     - Introduction: index.md
+    - Scala API user guide:
+      - Installation: scala/installation.md
+      - Constructing connection factory: scala/connection_factory.md
+      - Authentication: scala/authentication.md
+      - Data types: scala/data_types.md
+      - Exceptions: scala/exceptions.md
+    - Java API user guide: java/java.md
+    - Developer guide: developer.md
 theme: material
 
 copyright: Copyright &copy; 2016-2017 rdbc contributors
