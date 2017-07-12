@@ -30,8 +30,8 @@ Following table lists mapping between Scala and supported PostgreSQL types.
 |---------------------------|--------------------------|--------------|
 | char                      | CHAR/NCHAR               | `String`     |
 | varchar                   | VARCHAR/NVARCHAR         | `String`     |
-| text                      | ??? CLOB                 | `String`     |
-| bytea                     | ??? BLOB VARBINARY       | `Array[Byte]`|
+| text                      | CLOB                     | `String`     |
+| bytea                     | BLOB                     | `Array[Byte]`|
 | bool                      | BOOLEAN                  | `Boolean`|
 | numeric                   | NUMERIC                  | [`io.rdbc.sapi.SqlNumeric`]()|
 | float4                    | REAL                     | `Float`|
