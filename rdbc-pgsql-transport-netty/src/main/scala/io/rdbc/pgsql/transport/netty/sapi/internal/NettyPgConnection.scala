@@ -58,4 +58,6 @@ private[netty] class NettyPgConnection(id: ConnId,
   protected def handleServerCharsetChange(charset: Charset): Unit = {
     decoder.changeCharset(charset)
   }
+
+  override def toString: String = s"NettyPgConnection(${id.value})"
 }

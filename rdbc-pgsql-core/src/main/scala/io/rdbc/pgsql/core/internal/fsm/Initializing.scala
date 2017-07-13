@@ -22,7 +22,8 @@ import io.rdbc.pgsql.core.pgstruct.messages.backend.{BackendKeyData, ReadyForQue
 
 import scala.concurrent.Promise
 
-class Initializing(initPromise: Promise[BackendKeyData])
+private[core]
+class Initializing private[fsm](initPromise: Promise[BackendKeyData])
   extends State
     with NonFatalErrorsAreFatal {
 
