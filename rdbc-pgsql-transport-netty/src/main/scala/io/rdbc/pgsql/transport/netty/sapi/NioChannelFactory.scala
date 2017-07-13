@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.auth
+package io.rdbc.pgsql.transport.netty.sapi
 
-object Auth {
-  def password(username: String, password: String): PasswordAuthenticator = {
-    new PasswordAuthenticator(username, password)
-  }
+import io.netty.channel.ChannelFactory
+import io.netty.channel.socket.nio.NioSocketChannel
+
+class NioChannelFactory extends ChannelFactory[NioSocketChannel] {
+  def newChannel(): NioSocketChannel = new NioSocketChannel()
 }

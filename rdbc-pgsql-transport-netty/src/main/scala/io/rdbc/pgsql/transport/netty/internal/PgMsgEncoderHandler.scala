@@ -27,7 +27,7 @@ import io.rdbc.pgsql.core.pgstruct.messages.frontend.PgFrontendMessage
 import io.rdbc.util.Logging
 
 private[netty] class PgMsgEncoderHandler(encoderFactory: EncoderFactory)
-    extends MessageToByteEncoder[PgFrontendMessage]
+  extends MessageToByteEncoder[PgFrontendMessage]
     with Logging {
 
   @volatile private[this] var encoder: Encoder = {

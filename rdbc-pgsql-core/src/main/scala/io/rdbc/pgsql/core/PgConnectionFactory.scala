@@ -16,6 +16,7 @@
 
 package io.rdbc.pgsql.core
 
+import io.rdbc.pgsql.core.config.sapi.PgConnFactoryConfig
 import io.rdbc.sapi.ConnectionFactory
 
 trait PgConnectionFactory extends ConnectionFactory {

@@ -22,7 +22,7 @@ import io.rdbc.pgsql.core.pgstruct.messages.frontend.PasswordMessage
 
 import scala.collection.immutable
 
-class PasswordAuthenticator private[auth](val username: String, val password: String)
+class PasswordAuthenticator private[core](val username: String, val password: String)
   extends Authenticator {
 
   def authenticate(authReqMessage: AuthBackendMessage): AuthState = authReqMessage match {

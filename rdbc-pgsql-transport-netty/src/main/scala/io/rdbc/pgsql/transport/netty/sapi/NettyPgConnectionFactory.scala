@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.transport.netty
+package io.rdbc.pgsql.transport.netty.sapi
 
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
@@ -33,6 +33,7 @@ import io.rdbc.implbase.ConnectionFactoryPartialImpl
 import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.codec.{DecoderFactory, EncoderFactory}
+import io.rdbc.pgsql.core.config.sapi.{PgConnFactoryConfig, StmtCacheConfig}
 import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgUncategorizedException}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{CancelRequest, Terminate}
@@ -244,7 +245,9 @@ object NettyPgConnectionFactory extends Logging {
 
     object Defaults {
       val channelFactory: ChannelFactory[_ <: Channel] = new NioChannelFactory
+
       def eventLoopGroup: EventLoopGroup = new NioEventLoopGroup
+
       val channelOptions: ImmutSeq[ChannelOptionValue[_]] = {
         Vector(ChannelOptionValue(ChannelOption.SO_KEEPALIVE, java.lang.Boolean.TRUE))
       }
