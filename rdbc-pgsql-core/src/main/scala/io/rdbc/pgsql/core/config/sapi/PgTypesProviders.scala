@@ -14,14 +14,11 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core
+package io.rdbc.pgsql.core.config.sapi
 
-import io.rdbc.pgsql.core.config.sapi.StmtCacheConfig
-import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.sapi.TypeConverterRegistry
+import io.rdbc.pgsql.core.types.PgTypesProvider
+import io.rdbc.pgsql.core.types.scodec.ScodecPgTypesProvider
 
-final case class PgConnectionConfig(pgTypes: PgTypeRegistry,
-                                    typeConverters: TypeConverterRegistry,
-                                    subscriberBufferCapacity: Int,
-                                    subscriberMinDemandRequestSize: Int,
-                                    stmtCacheConfig: StmtCacheConfig)
+object PgTypesProviders {
+  val scodec: PgTypesProvider = new ScodecPgTypesProvider()
+}

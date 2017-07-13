@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import io.rdbc.api.exceptions.{ConnectionClosedException, ConnectionValidationException, IllegalSessionStateException}
 import io.rdbc.implbase.ConnectionPartialImpl
-import io.rdbc.pgsql.core.StmtCacheConfig.{Disabled, Enabled}
+import io.rdbc.pgsql.core.config.sapi.StmtCacheConfig.{Disabled, Enabled}
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.internal._
 import io.rdbc.pgsql.core.internal.Compat._

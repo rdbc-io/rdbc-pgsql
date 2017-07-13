@@ -22,8 +22,9 @@ import de.flapdoodle.embed.process.distribution.IVersion
 import de.flapdoodle.embed.process.io.progress.StandardConsoleProgressListener
 import de.flapdoodle.embed.process.runtime.Network
 import de.flapdoodle.embed.process.store.PostgresArtifactStoreBuilder
-import io.rdbc.pgsql.core.auth.Auth
-import io.rdbc.pgsql.transport.netty.NettyPgConnectionFactory.Config
+import io.rdbc.pgsql.core.config.sapi.Auth
+import io.rdbc.pgsql.transport.netty.sapi.NettyPgConnectionFactory
+import io.rdbc.pgsql.transport.netty.sapi.NettyPgConnectionFactory.Config
 import io.rdbc.sapi.Timeout
 import io.rdbc.test._
 import ru.yandex.qatools.embed.postgresql.config.{PostgresDownloadConfigBuilder, RuntimeConfigBuilder}
@@ -65,6 +66,7 @@ object Postgres {
               .defaultsForCommand(Command.Postgres)
               .progressListener(new StandardConsoleProgressListener() {
                 override def progress(label: String, percent: Int): Unit = ()
+
                 override def info(label: String, message: String): Unit = ()
               })
               .build

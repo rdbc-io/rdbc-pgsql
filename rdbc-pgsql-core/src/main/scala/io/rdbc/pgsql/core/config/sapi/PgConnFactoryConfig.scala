@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core
+package io.rdbc.pgsql.core.config.sapi
 
 import io.rdbc.ImmutSeq
-import io.rdbc.pgsql.core.PgConnFactoryConfig.Defaults
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.codec.scodec.{ScodecDecoderFactory, ScodecEncoderFactory}
 import io.rdbc.pgsql.core.codec.{DecoderFactory, EncoderFactory}
+import io.rdbc.pgsql.core.config.sapi.PgConnFactoryConfig.Defaults
 import io.rdbc.pgsql.core.types.PgTypesProvider
 import io.rdbc.pgsql.core.types.scodec.ScodecPgTypesProvider
 import io.rdbc.sapi.{Timeout, TypeConvertersProvider}
@@ -31,6 +31,7 @@ import scala.concurrent.duration._
 
 object PgConnFactoryConfig {
   object Defaults {
+    val dbName: Option[String] = None
     val subscriberBufferCapacity: Int = 100
     val subscriberMinDemandRequestSize: Int = 10
     val stmtCacheConfig: StmtCacheConfig = StmtCacheConfig.Enabled(capacity = 100)
@@ -47,7 +48,7 @@ final case class PgConnFactoryConfig
 (host: String,
  port: Int,
  authenticator: Authenticator,
- dbName: Option[String] = None,
+ dbName: Option[String] = Defaults.dbName,
  subscriberBufferCapacity: Int = Defaults.subscriberBufferCapacity,
  subscriberMinDemandRequestSize: Int = Defaults.subscriberMinDemandRequestSize,
  stmtCacheConfig: StmtCacheConfig = Defaults.stmtCacheConfig,

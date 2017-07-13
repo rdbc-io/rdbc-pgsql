@@ -14,14 +14,10 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core
+package io.rdbc.pgsql.core.config.sapi
 
-import io.rdbc.pgsql.core.config.sapi.StmtCacheConfig
-import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.sapi.TypeConverterRegistry
-
-final case class PgConnectionConfig(pgTypes: PgTypeRegistry,
-                                    typeConverters: TypeConverterRegistry,
-                                    subscriberBufferCapacity: Int,
-                                    subscriberMinDemandRequestSize: Int,
-                                    stmtCacheConfig: StmtCacheConfig)
+sealed trait StmtCacheConfig
+object StmtCacheConfig {
+  case object Disabled extends StmtCacheConfig
+  case class Enabled(capacity: Int) extends StmtCacheConfig
+}
