@@ -66,7 +66,6 @@ object Postgres {
               .defaultsForCommand(Command.Postgres)
               .progressListener(new StandardConsoleProgressListener() {
                 override def progress(label: String, percent: Int): Unit = ()
-
                 override def info(label: String, message: String): Unit = ()
               })
               .build

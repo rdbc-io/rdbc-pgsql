@@ -32,7 +32,7 @@ class ExecutingBatch private[fsm](batchPromise: Promise[TxStatus])
     case _: DataRow => stay
     case EmptyQueryResponse | _: CommandComplete => stay
     case ReadyForQuery(txStatus) =>
-      batchPromise.success(txStatus)
+      goto(State.waitingForNextBatch).andThenF(batchPromise.success(txStatus))
       stay
   }
 

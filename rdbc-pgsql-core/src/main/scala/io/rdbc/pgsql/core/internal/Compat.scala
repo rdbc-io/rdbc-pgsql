@@ -16,14 +16,26 @@
 
 package io.rdbc.pgsql.core.internal
 
-import scala.concurrent.Future
-import scala.util.Try
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
 private[core] object Compat {
 
   implicit class FutureObjectCompat(underlying: Future.type) {
     val unit: Future[Unit] = Future.successful(())
+  }
+
+  implicit class FutureCompat[+T](underlying: Future[T]) {
+
+    def transformWith[S](f: Try[T] => Future[S])
+                        (implicit executor: ExecutionContext): Future[S] = {
+      underlying.flatMap { res =>
+        f(Success(res))
+      }.recoverWith { case ex =>
+        f(Failure(ex))
+      }
+    }
   }
 
   implicit class TryCompat[+T](underlying: Try[T]) {
