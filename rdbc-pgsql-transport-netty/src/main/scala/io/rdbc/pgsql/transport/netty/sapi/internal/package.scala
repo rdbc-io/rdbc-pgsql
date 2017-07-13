@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.transport.netty
+package io.rdbc.pgsql.transport.netty.sapi
 
 import io.netty.channel.{Channel, ChannelFuture}
 import io.netty.util.concurrent.{GenericFutureListener, Future => NettyFuture}
