@@ -20,7 +20,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import io.rdbc.pgsql.core.pgstruct.{Argument, TxStatus}
 import io.rdbc.pgsql.core.internal.Compat._
-import io.rdbc.util.Futures._
 import io.rdbc.util.Logging
 import io.rdbc.util.Preconditions._
 import org.reactivestreams.{Subscriber, Subscription}
@@ -52,7 +51,9 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
   private val executedBefore = Ref(false)
   private val lastExecution = Ref(Future.unit)
 
-  private val publisherErrored = Ref(false)
+  private val streamFailed = Ref(false)
+  private val publisherCompleted = Ref(false)
+  private val donePromiseCompleted = Ref(false)
 
   private val executingCount = Ref(0)
   private val remainingRequested = Ref(0)
@@ -69,44 +70,36 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
     notNull(elem)
     logger.trace(s"Element received: '$elem'")
     if (!canceled.single()) {
-      logger.trace(s"Element '$elem' rejected because subscription has already been canceled")
       argConverter(elem).map { args =>
         atomic { implicit tx =>
           buffer() = buffer() :+ args
           remainingRequested() = remainingRequested() - 1
         }
-        executeIfCan()
+        executeIfCan(None)
         requestMore()
       }.recover(handleArgConversionError())
       ()
+    } else {
+      logger.trace(s"Element '$elem' rejected because subscription has already been canceled")
     }
   }
 
   private def handleArgConversionError(): PartialFunction[Throwable, Unit] = {
     case NonFatal(ex) =>
-      val publisherAlreadyErrored = atomic { implicit tx =>
-        if (!publisherErrored()) {
-          publisherErrored() = true
-          false
-        } else true
-      }
-
-      if (!publisherAlreadyErrored) {
-        logWarnException("Cancelling subscription because of arg converter error", ex)
-        cancelSubscription()
+      if (failStream()) {
+        logWarnException("Failing stream because of arg converter error", ex)
         lastExecution.single().foreach { _ =>
-          batchExecutor.completeBatch(lastTxStatus)
-          donePromise.failure(ex)
+          tryCompleting(Failure(ex))
         }
       } else {
-        logWarnException("Swallowing arg conversion error because publisher already errored", ex)
+        logWarnException("Swallowing arg conversion error because stream already failed", ex)
       }
   }
 
   def onSubscribe(s: Subscription): Unit = traced {
     notNull(s)
     if (subscribed.compareAndSet(false, true)) {
-      logger.debug(s"Subscribtion $s successfully subscribed")
+      logger.debug(s"Subscribtion $s accepted")
       subscription = Some(s)
       requestMore()
     } else {
@@ -131,9 +124,9 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
                        firstBatch: Boolean,
                        promise: Promise[Unit])
 
-  private def prepareExecution(): Option[Execution] = traced {
+  private def prepareExecution(maybeCurrentPromise: Option[Promise[Unit]]): Option[Execution] = traced {
     atomic { implicit tx =>
-      if (!publisherErrored() && connIdle() && buffer().nonEmpty) {
+      if (!streamFailed() && connIdle() && buffer().nonEmpty) {
         val batch = buffer()
         executingCount() = batch.size
         buffer() = Vector.empty
@@ -143,61 +136,64 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
           true
         } else false
 
-        val execution = Execution(batch, firstBatch, Promise[Unit])
-        lastExecution() = execution.promise.future
+        val execution = maybeCurrentPromise match {
+          case Some(currentPromise) =>
+            Execution(batch, firstBatch, currentPromise)
+          case None =>
+            val execution = Execution(batch, firstBatch, Promise[Unit])
+            lastExecution() = execution.promise.future
+            execution
+        }
 
         Some(execution)
       } else None
     }
   }
 
-  private def executeIfCan(): Future[Unit] = traced {
-    val maybeExecution = prepareExecution()
+  private def executeIfCan(maybeCurrentPromise: Option[Promise[Unit]]): Future[Unit] = traced {
+    val maybeExecution = prepareExecution(maybeCurrentPromise)
 
     maybeExecution.map { case Execution(batch, firstBatch, promise) =>
       logger.debug(s"Executing batch of size ${batch.size}")
-      batchExecutor.executeBatch(nativeStmt, batch, first = firstBatch).andThen {
+      batchExecutor.executeBatch(nativeStmt, batch, first = firstBatch).transformWith {
         case Success(txStatus) =>
           lastTxStatus = txStatus
           atomic { implicit tx =>
             connIdle() = true
             executingCount() = 0
           }
-          promise.success(())
           requestMore()
-          executeIfCan()
+          executeIfCan(Some(promise))
 
         case Failure(ex) =>
           logWarnException("Batch execution failed", ex)
-          promise.failure(ex)
-          if (!publisherErrored.single()) {
-            cancelSubscription()
-            donePromise.failure(ex)
-          } else {
-            logWarnException("Swallowing batch execution error because publisher failed already", ex)
+          if (!failStream()) {
+            logWarnException("Swallowing batch execution error because stream already failed", ex)
           }
-      }.flatMap(_ => promise.future)
+          tryCompleting(Failure(ex))
+          Future.failed(ex)
+      }.andThen { case res =>
+        promise.complete(res)
+      }
     }.getOrElse(Future.unit)
   }
 
   def onError(t: Throwable): Unit = traced {
     notNull(t)
     logWarnException("Publisher signalled error", t)
-    publisherErrored.single() = true
-    lastExecution.single().andThen { case _ =>
-      batchExecutor.completeBatch(lastTxStatus)
-      donePromise.failure(t)
+    if (failStream(doCancel = false)) {
+      lastExecution.single().andThen { case _ =>
+        tryCompleting(Failure(t))
+      }
     }
     ()
   }
 
   def onComplete(): Unit = traced {
     logger.debug("Publisher completed")
-    lastExecution.single().andThenF { case _ =>
-      executeIfCan().andThen { case _ =>
-        batchExecutor.completeBatch(lastTxStatus)
-        donePromise.success(())
-      }
+    publisherCompleted.single() = true
+    lastExecution.single().andThen { case _ =>
+      tryCompleting(Success(()))
     }
     ()
   }
@@ -209,11 +205,9 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
     } else 0
   }
 
-  private def cancelSubscription(): Unit = traced {
+  private def cancelSubscription()(implicit txn: InTxn): Unit = traced {
     subscription.foreach(_.cancel())
-    atomic { implicit tx =>
-      canceled() = true
-    }
+    canceled() = true
   }
 
   private def logWarnException(msg: String, ex: Throwable): Unit = {
@@ -221,6 +215,38 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
       logger.warn(msg, ex)
     } else {
       logger.warn(s"$msg: ${ex.getMessage}")
+    }
+  }
+
+  private def tryCompleting(res: Try[Unit]): Unit = traced {
+    val doComplete = atomic { implicit tx =>
+      if (!donePromiseCompleted()) {
+        donePromiseCompleted() = true
+        true
+      } else false
+    }
+    if (doComplete) {
+      batchExecutor.completeBatch(lastTxStatus)
+      donePromise.complete(res)
+    } else {
+      logger.debug(
+        s"Attempted to complete stream promise with $res " +
+        s"but the promise is already completed with ${donePromise.future.value}"
+      )
+    }
+  }
+
+  private def failStream(doCancel: Boolean = true): Boolean = {
+    atomic { implicit tx =>
+      if (streamFailed()) {
+        false
+      } else {
+        streamFailed() = true
+        if (doCancel) {
+          cancelSubscription()
+        }
+        true
+      }
     }
   }
 

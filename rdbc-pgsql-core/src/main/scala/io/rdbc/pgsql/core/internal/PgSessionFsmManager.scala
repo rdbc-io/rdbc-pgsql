@@ -20,6 +20,7 @@ import io.rdbc.api.exceptions.IllegalSessionStateException
 import io.rdbc.pgsql.core.ConnId
 import io.rdbc.pgsql.core.exception.PgDriverInternalErrorException
 import io.rdbc.pgsql.core.internal.fsm._
+import io.rdbc.pgsql.core.pgstruct.TxStatus
 import io.rdbc.util.Logging
 
 import scala.concurrent.stm._
@@ -90,23 +91,40 @@ private[core] class PgSessionFsmManager(connId: ConnId,
   }
 
   def triggerTransition(newState: State, afterTransition: Option[() => Future[Unit]] = None): Boolean = traced {
-    val transitioned = atomic { implicit tx =>
+    triggerTransitionInternal(newState, _ => true, afterTransition)
+  }
+
+  private[this] def triggerTransitionInternal(newState: State,
+                                              condition: State => Boolean,
+                                              afterTransition: Option[() => Future[Unit]]): Boolean = traced {
+    val (transitioned, oldState) = atomic { implicit tx =>
       state() match {
-        case ConnectionClosed(_) => false
-        case _ =>
+        case ConnectionClosed(_) => (false, state())
+        case _ if condition(state()) =>
           newState match {
             case Idle(_) => ready() = true
             case ConnectionClosed(_) => ready() = false
             case _ => ()
           }
+          val oldState = state()
           state() = newState
-          true
+          (true, oldState)
+
+        case _ => (false, state())
       }
     }
     if (transitioned) {
       logger.debug(s"Transitioned to state '$newState'")
       newState match {
-        case Idle(_) => readyPromise.single().success(())
+        case Idle(_) =>
+          oldState match {
+            case Idle(_) =>
+              val ex = new PgDriverInternalErrorException(s"Can't transition from Idle state to Idle state")
+              fatalErrorHandler.handleFatalError(ex.getMessage, ex)
+
+            case _ => readyPromise.single().success(())
+          }
+
         case _ => ()
       }
       runAfterTransition(afterTransition)
@@ -138,6 +156,14 @@ private[core] class PgSessionFsmManager(connId: ConnId,
   }
 
   def currentState: State = traced(state.single())
+
+  def completeBatch(txStatus: TxStatus): Unit = traced {
+    triggerTransitionInternal(
+      newState = Idle(txStatus),
+      condition = state => state.isInstanceOf[WaitingForNextBatch],
+      afterTransition = None
+    )
+  }
 
   def readyFuture: Future[Unit] = traced(readyPromise.single().future)
 

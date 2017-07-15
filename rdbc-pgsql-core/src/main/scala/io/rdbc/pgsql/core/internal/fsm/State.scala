@@ -110,6 +110,8 @@ private[core] object State extends Logging {
     new ExecutingBatch(promise)
   }
 
+  val waitingForNextBatch: WaitingForNextBatch = new WaitingForNextBatch
+
   def executingWriteOnly(parsePromise: Promise[Unit],
                          resultPromise: Promise[Long]): ExecutingWriteOnly = {
     new ExecutingWriteOnly(parsePromise, resultPromise)

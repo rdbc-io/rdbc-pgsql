@@ -357,6 +357,8 @@ abstract class AbstractPgConnection(val id: ConnId,
                                         argsSource: Publisher[A],
                                         argsConverter: A => Try[Vector[Argument]]): Future[Unit] = {
     fsmManager.ifReadyF { (_, txStatus) =>
+      logger.debug(s"Subscribing to arguments stream for statement '$nativeStatement'")
+      fsmManager.triggerTransition(State.waitingForNextBatch)
       val subscriber = new StatementArgsSubscriber(
         nativeStmt = nativeStatement,
         bufferCapacity = config.subscriberBufferCapacity,
@@ -400,7 +402,7 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   override private[core]
   def completeBatch(txStatus: TxStatus): Unit = {
-    fsmManager.triggerTransition(Idle(txStatus))
+    fsmManager.completeBatch(txStatus)
     ()
   }
 
