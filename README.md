@@ -11,6 +11,4 @@ languages.
 
 ## Documentation
 
-Documentation on the driver is currently work in progress. However, most of the time
-you'll be using the driver via the API which is already documented [here](http://rdbc.io).
-    
+See the documentation at [http://docs.pgsql.rdbc.io](http://docs.pgsql.rdbc.io/).
