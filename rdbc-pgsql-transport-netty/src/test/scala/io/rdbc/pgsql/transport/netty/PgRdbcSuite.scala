@@ -35,9 +35,9 @@ class PgRdbcSuite extends RdbcSuite with BeforeAndAfterAll {
 
   protected def connection(): Connection = postgres.connFact.connection().get
 
-  protected val intDataTypeName = "int4"
-  protected val intDataTypeId = "23"
-  protected val arbitraryDataType: String = intDataTypeName
+  protected lazy val intDataTypeName = "int4"
+  protected lazy val intDataTypeId = "23"
+  protected lazy val arbitraryDataType: String = intDataTypeName
 
   protected def slowStatement(time: FiniteDuration): String = s"select pg_sleep(${time.toSeconds})"
 }

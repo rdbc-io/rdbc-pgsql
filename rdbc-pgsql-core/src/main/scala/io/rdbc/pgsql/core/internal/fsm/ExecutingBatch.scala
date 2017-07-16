@@ -33,7 +33,6 @@ class ExecutingBatch private[fsm](batchPromise: Promise[TxStatus])
     case EmptyQueryResponse | _: CommandComplete => stay
     case ReadyForQuery(txStatus) =>
       goto(State.waitingForNextBatch).andThenF(batchPromise.success(txStatus))
-      stay
   }
 
   protected def onFatalError(ex: Throwable): Unit = traced {

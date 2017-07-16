@@ -88,7 +88,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
     case NonFatal(ex) =>
       if (failStream()) {
         logWarnException("Failing stream because of arg converter error", ex)
-        lastExecution.single().foreach { _ =>
+        lastExecution.single().andThen { case _ =>
           tryCompleting(Failure(ex))
         }
       } else {
@@ -157,6 +157,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
       logger.debug(s"Executing batch of size ${batch.size}")
       batchExecutor.executeBatch(nativeStmt, batch, first = firstBatch).transformWith {
         case Success(txStatus) =>
+          logger.trace("Batch execution succeeded")
           lastTxStatus = txStatus
           atomic { implicit tx =>
             connIdle() = true
@@ -173,6 +174,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
           tryCompleting(Failure(ex))
           Future.failed(ex)
       }.andThen { case res =>
+        logger.trace(s"Completing current execution with $res")
         promise.complete(res)
       }
     }.getOrElse(Future.unit)
@@ -193,7 +195,9 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
     logger.debug("Publisher completed")
     publisherCompleted.single() = true
     lastExecution.single().andThen { case _ =>
-      tryCompleting(Success(()))
+      if (!streamFailed.single()) {
+        tryCompleting(Success(()))
+      }
     }
     ()
   }
