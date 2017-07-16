@@ -78,14 +78,14 @@ private[core] class PgStatement(stmtExecutor: PgStatementExecutor,
     }
   }
 
-  def streamArgs(argsPublisher: Publisher[Map[String, Any]]): Future[Unit] = traced {
+  def streamArgs(argsPublisher: Publisher[_ <: Map[String, Any]]): Future[Unit] = traced {
     stmtExecutor.subscribeToStatementArgsStream(
       nativeStmt, argsPublisher,
       argsConverter = namedArgsToPgArgs
     )
   }
 
-  def streamArgsByIdx(argsPublisher: Publisher[ImmutIndexedSeq[Any]]): Future[Unit] = traced {
+  def streamArgsByIdx(argsPublisher: Publisher[_ <: ImmutIndexedSeq[Any]]): Future[Unit] = traced {
     stmtExecutor.subscribeToStatementArgsStream(
       nativeStmt, argsPublisher,
       argsConverter = positionalArgsToPgArgs
