@@ -4,7 +4,7 @@ sudo: false
 jdk:
 - openjdk8
 scala:
-- 2.12.2
+- 2.12.3
 - 2.11.11
 script: sbt ++$TRAVIS_SCALA_VERSION clean scalastyle test:scalastyle coverage test coverageReport
 after_success: bash <(curl -s https://codecov.io/bash)
@@ -24,4 +24,3 @@ env:
   matrix:
     - PG_VER=V9_6
     - PG_VER=V9_5
-    - PG_VER=V9_4
