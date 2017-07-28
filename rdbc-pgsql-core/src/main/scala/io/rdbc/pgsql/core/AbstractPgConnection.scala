@@ -69,7 +69,7 @@ abstract class AbstractPgConnection(val id: ConnId,
     case Enabled(capacity) => Some(LruStmtCache.empty(capacity))
   }
 
-  override def watchForIdle: Future[this.type] = fsmManager.readyFuture.map(_ => this)
+  override def watchForIdle: Future[Unit] = fsmManager.readyFuture
 
   override def statement(sql: String, options: StatementOptions): Statement = traced {
     argsNotNull()
