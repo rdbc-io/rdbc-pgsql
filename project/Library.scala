@@ -15,6 +15,8 @@ object Library {
   val nettyHandler = "io.netty" % "netty-handler" % "4.1.13.Final"
   val stm = "org.scala-stm" %% "scala-stm" % "0.8"
 
+  val pgsqljdbc = "org.postgresql" % "postgresql" % "42.1.3"
+
   val logback = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val rdbcTests = "io.rdbc" %% "rdbc-tests" % rdbcVersion
   val scalatest = "org.scalatest" %% "scalatest" % "3.0.3"

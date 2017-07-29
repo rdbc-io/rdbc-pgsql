@@ -1,0 +1,3 @@
+ignore:
+  - "rdbc-pgsql-doc"
+  - "rdbc-pgsql-bench"
