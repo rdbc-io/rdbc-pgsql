@@ -36,7 +36,7 @@ lazy val rdbcPgsql = (project in file("."))
   .settings(
     publishArtifact := false
   )
-  .aggregate(core, nettyTransport)
+  .aggregate(core, nettyTransport, bench)
 
 lazy val core = (project in file("rdbc-pgsql-core"))
   .enablePlugins(BuildInfoPlugin)
@@ -78,7 +78,7 @@ lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
     buildInfoPackage := "io.rdbc.pgsql.transport.netty"
   ).dependsOn(core)
 
-lazy val rdbcPgsqlDoc = (project in file("rdbc-pgsql-doc"))
+lazy val doc = (project in file("rdbc-pgsql-doc"))
   .enablePlugins(TemplateReplace)
   .settings(
     publishArtifact := false,
@@ -87,3 +87,14 @@ lazy val rdbcPgsqlDoc = (project in file("rdbc-pgsql-doc"))
       "rdbc_version" -> Library.rdbcScalaApi.revision
     )
   )
+
+lazy val bench = (project in file("rdbc-pgsql-bench"))
+  .enablePlugins(JmhPlugin)
+  .settings(commonSettings: _*)
+  .settings(
+    name := "pgsql-bench",
+    publishArtifact := false,
+    libraryDependencies ++= Vector(
+      Library.pgsqljdbc
+    )
+  ).dependsOn(core, nettyTransport)
