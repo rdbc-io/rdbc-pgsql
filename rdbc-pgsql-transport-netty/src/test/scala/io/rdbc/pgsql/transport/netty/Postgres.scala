@@ -26,7 +26,7 @@ import io.rdbc.pgsql.core.config.sapi.Auth
 import io.rdbc.pgsql.transport.netty.sapi.NettyPgConnectionFactory
 import io.rdbc.pgsql.transport.netty.sapi.NettyPgConnectionFactory.Config
 import io.rdbc.sapi.Timeout
-import io.rdbc.test._
+import io.rdbc.tck._
 import ru.yandex.qatools.embed.postgresql.config.{PostgresDownloadConfigBuilder, RuntimeConfigBuilder}
 import ru.yandex.qatools.embed.postgresql.distribution.Version
 import ru.yandex.qatools.embed.postgresql.distribution.Version.Main.PRODUCTION

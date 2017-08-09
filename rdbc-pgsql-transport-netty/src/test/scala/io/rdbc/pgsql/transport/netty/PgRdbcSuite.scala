@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.transport.netty
 
 import io.rdbc.sapi.Connection
-import io.rdbc.test._
+import io.rdbc.tck._
 import org.scalatest.BeforeAndAfterAll
 
 import scala.concurrent.duration.FiniteDuration
