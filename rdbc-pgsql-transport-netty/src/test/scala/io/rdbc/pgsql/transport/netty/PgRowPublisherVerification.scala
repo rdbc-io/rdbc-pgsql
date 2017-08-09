@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.transport.netty
 
 import io.rdbc.sapi.Connection
-import io.rdbc.test._
+import io.rdbc.tck._
 import org.reactivestreams.tck.TestEnvironment
 import org.testng.annotations.{AfterClass, BeforeClass}
 
