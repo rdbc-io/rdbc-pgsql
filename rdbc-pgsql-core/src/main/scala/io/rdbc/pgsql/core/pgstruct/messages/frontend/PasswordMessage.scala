@@ -22,29 +22,27 @@ import scodec.bits.ByteVector
 
 object PasswordMessage {
 
+  private val PasswordEncoding = "US-ASCII"
+
   def md5(username: String, password: String, salt: ByteVector): PasswordMessage = {
-    //TODO optimize this happy data copying
-    val md5 = MessageDigest.getInstance("MD5")
-    md5.update(password.getBytes("US-ASCII"))
-    md5.update(username.getBytes("US-ASCII"))
+    val md5Digest = MessageDigest.getInstance("MD5")
+    md5Digest.update(password.getBytes(PasswordEncoding))
+    md5Digest.update(username.getBytes(PasswordEncoding))
+    val passUserMd5: Array[Byte] = md5Digest.digest()
 
-    val digest: Array[Byte] = md5.digest()
-    val hexBytes = bytesToHex(digest).getBytes("US-ASCII")
-    md5.update(hexBytes)
-    md5.update(salt.toArray)
+    val passUserMd5HexBytes = bytesToHex(passUserMd5).getBytes(PasswordEncoding)
+    md5Digest.update(passUserMd5HexBytes)
+    md5Digest.update(salt.toArray)
+    val finalMd5 = md5Digest.digest()
 
-    val digest2 = md5.digest()
-
-    val hex2 = bytesToHex(digest2)
-
-    val md5String = "md5" + hex2
-    val credentials = Array.concat(md5String.getBytes("US-ASCII"), Array(0.toByte)) //TODO optimize
+    val finalMd5String = "md5" + bytesToHex(finalMd5)
+    val credentials = Array.concat(finalMd5String.getBytes(PasswordEncoding), Array(0.toByte))
 
     PasswordMessage(ByteVector.view(credentials))
   }
 
   def cleartext(password: String): PasswordMessage = {
-    PasswordMessage(ByteVector.view(password.getBytes("US-ASCII"))) //TODO US-ASCII?
+    PasswordMessage(ByteVector.view(password.getBytes(PasswordEncoding)))
   }
 
   private def bytesToHex(bytes: Array[Byte]): String = {
