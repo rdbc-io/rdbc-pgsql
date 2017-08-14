@@ -9,7 +9,7 @@ lazy val commonSettings = Vector(
   organization := "io.rdbc.pgsql",
   organizationName := "rdbc contributors",
   scalaVersion := "2.12.3",
-  crossScalaVersions := Vector("2.11.11"),
+  crossScalaVersions := Vector(scalaVersion.value, "2.11.11"),
 
   licenses := Vector(
     "Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.html")
