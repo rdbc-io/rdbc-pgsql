@@ -41,7 +41,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
     with Logging {
 
   check(minDemandRequest, minDemandRequest <= bufferCapacity,
-    "min demand request has to be less or equal to buffer capacity"
+    "has to be less or equal to buffer capacity"
   ) //TODO move this check to config?
 
   private val donePromise = Promise[Unit]
@@ -75,7 +75,12 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
           buffer() = buffer() :+ args
           remainingRequested() = remainingRequested() - 1
         }
-        executeIfCan(None)
+        executeIfCan(None).foreach { maybeExecution =>
+          maybeExecution.foreach { execution =>
+            logger.trace(s"Completing current execution with success")
+            execution.promise.success(())
+          }
+        }
         requestMore()
       }.recover(handleArgConversionError())
       ()
@@ -99,11 +104,11 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
   def onSubscribe(s: Subscription): Unit = traced {
     notNull(s)
     if (subscribed.compareAndSet(false, true)) {
-      logger.debug(s"Subscribtion $s accepted")
+      logger.debug(s"Subscription $s accepted")
       subscription = Some(s)
       requestMore()
     } else {
-      logger.debug(s"Rejecting subscribtion $s")
+      logger.debug(s"Rejecting subscription $s")
       s.cancel()
     }
   }
@@ -150,7 +155,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
     }
   }
 
-  private def executeIfCan(maybeCurrentPromise: Option[Promise[Unit]]): Future[Unit] = traced {
+  private def executeIfCan(maybeCurrentPromise: Option[Promise[Unit]]): Future[Option[Execution]] = traced {
     val maybeExecution = prepareExecution(maybeCurrentPromise)
 
     maybeExecution.map { case Execution(batch, firstBatch, promise) =>
@@ -164,20 +169,19 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
             executingCount() = 0
           }
           requestMore()
-          executeIfCan(Some(promise))
+          executeIfCan(Some(promise)).map(_ => maybeExecution)
 
         case Failure(ex) =>
           logWarnException("Batch execution failed", ex)
           if (!failStream()) {
             logWarnException("Swallowing batch execution error because stream already failed", ex)
           }
+          logger.trace(s"Completing current execution with $ex")
+          promise.failure(ex)
           tryCompleting(Failure(ex))
           Future.failed(ex)
-      }.andThen { case res =>
-        logger.trace(s"Completing current execution with $res")
-        promise.complete(res)
       }
-    }.getOrElse(Future.unit)
+    }.getOrElse(Future.successful(None))
   }
 
   def onError(t: Throwable): Unit = traced {
@@ -235,7 +239,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
     } else {
       logger.debug(
         s"Attempted to complete stream promise with $res " +
-        s"but the promise is already completed with ${donePromise.future.value}"
+          s"but the promise is already completed with ${donePromise.future.value}"
       )
     }
   }
