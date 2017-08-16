@@ -17,12 +17,14 @@
 package io.rdbc.pgsql.core.internal
 
 import io.rdbc.implbase.ExecutableStatementPartialImpl
+import io.rdbc.pgsql.core.exception.PgDriverInternalErrorException
 import io.rdbc.pgsql.core.pgstruct.Argument
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
 import io.rdbc.sapi.{ExecutableStatement, RowPublisher, Timeout}
 import io.rdbc.util.Logging
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
 
 private[core] class PgExecutableStatement(executor: PgStatementExecutor,
                                           nativeSql: NativeSql,
@@ -33,8 +35,12 @@ private[core] class PgExecutableStatement(executor: PgStatementExecutor,
     with Logging {
 
   def stream()(implicit timeout: Timeout): RowPublisher = traced {
-    throwOnFailure {
+    try {
       executor.statementStream(nativeSql, params)
+    } catch {
+      case NonFatal(ex) => new FailedPgRowPublisher(
+        new PgDriverInternalErrorException("Stream creation failed", ex)
+      )
     }
   }
 

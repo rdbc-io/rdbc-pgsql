@@ -26,6 +26,7 @@ import io.rdbc.pgsql.core.pgstruct.messages.backend.{DataRow, RowDescription}
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.sapi.{ColumnMetadata, Row, RowMetadata, RowPublisher, TypeConverterRegistry, Warning}
+import io.rdbc.util.Preconditions.notNull
 import io.rdbc.util.Logging
 import io.rdbc.util.scheduler.ScheduledTask
 import org.reactivestreams.{Subscriber, Subscription}
@@ -153,6 +154,7 @@ private[core] object PgRowPublisher {
       publisherState() = newState
     }
   }
+
 }
 
 private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[PortalDescData],
@@ -198,19 +200,16 @@ private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[Por
   }
 
   def subscribe(s: Subscriber[_ >: Row]): Unit = {
-    if (s == null) {
-      throw new NullPointerException("Subscriber cannot be null") //spec 1.9
+    notNull(s)
+    if (subscriber.compareAndSet(None, Some(s))) {
+      s.onSubscribe(RowSubscription)
     } else {
-      if (subscriber.compareAndSet(None, Some(s))) {
-        s.onSubscribe(RowSubscription)
-      } else {
-        s.onSubscribe(DummySubscription) //spec 1.9
-        s.onError(
-          new PgSubscriptionRejectedException(
-            "This publisher can be subscribed only once, " +
-              "it has already been subscribed by other subscriber.")
-        )
-      }
+      s.onSubscribe(DummySubscription) //spec 1.9
+      s.onError(
+        new PgSubscriptionRejectedException(
+          "This publisher can be subscribed only once, " +
+            "it has already been subscribed by other subscriber.")
+      )
     }
   }
 

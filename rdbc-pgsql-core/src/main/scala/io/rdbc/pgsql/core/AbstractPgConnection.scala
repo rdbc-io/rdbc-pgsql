@@ -175,7 +175,7 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   override private[core]
   def statementStream(nativeSql: NativeSql, params: Vector[Argument])
-                     (implicit timeout: Timeout): Try[RowPublisher] = {
+                     (implicit timeout: Timeout): RowPublisher = {
     fsmManager.ifReady { (reqId, txStatus) =>
 
       val parseAndBind = newParseAndBind(nativeSql, params)
@@ -204,7 +204,10 @@ abstract class AbstractPgConnection(val id: ConnId,
       fsmManager.triggerTransition(State.Streaming.waitingForSubscriber)
 
       publisher
-    }
+    }.fold(
+      ex => new FailedPgRowPublisher(ex),
+      identity
+    )
   }
 
   private def updateStmtCacheIfNeeded(maybeParse: Option[Parse],
