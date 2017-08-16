@@ -26,7 +26,7 @@ import scala.util.Try
 
 private[core] trait PgStatementExecutor {
   private[core] def statementStream(nativeSql: NativeSql, args: Vector[Argument])
-                                   (implicit timeout: Timeout): Try[RowPublisher]
+                                   (implicit timeout: Timeout): RowPublisher
 
   private[core] def executeStatementForRowsAffected(nativeSql: NativeSql, args: Vector[Argument])
                                                    (implicit timeout: Timeout): Future[Long]
