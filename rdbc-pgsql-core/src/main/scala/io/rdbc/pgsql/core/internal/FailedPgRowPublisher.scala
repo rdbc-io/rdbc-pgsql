@@ -16,6 +16,9 @@
 
 package io.rdbc.pgsql.core.internal
 
+import java.util.concurrent.atomic.AtomicBoolean
+
+import io.rdbc.pgsql.core.exception.PgSubscriptionRejectedException
 import io.rdbc.sapi.{Row, RowPublisher}
 import io.rdbc.util.Preconditions.notNull
 import org.reactivestreams.{Subscriber, Subscription}
@@ -25,21 +28,34 @@ import scala.concurrent.Future
 class FailedPgRowPublisher(failure: Throwable)
   extends RowPublisher {
 
+  private[this] val subscribed = new AtomicBoolean(false)
+  private[this] val failedFuture = Future.failed(failure)
+
   object DummySubscription extends Subscription {
     def cancel(): Unit = ()
 
     def request(n: Long): Unit = ()
   }
 
-  val rowsAffected: Future[Nothing] = Future.failed(failure)
+  val rowsAffected: Future[Nothing] = failedFuture
 
-  val warnings: Future[Nothing] = Future.failed(failure)
+  val warnings: Future[Nothing] = failedFuture
 
-  val metadata: Future[Nothing] = Future.failed(failure)
+  val metadata: Future[Nothing] = failedFuture
+
+  val done: Future[Nothing] = failedFuture
 
   def subscribe(s: Subscriber[_ >: Row]): Unit = {
     notNull(s)
     s.onSubscribe(DummySubscription)
-    s.onError(failure)
+    if (subscribed.compareAndSet(false, true)) {
+      s.onError(failure)
+    } else {
+      s.onError(
+        new PgSubscriptionRejectedException(
+          "This publisher can be subscribed to only once, " +
+            "it has already been subscribed by other subscriber.")
+      )
+    }
   }
 }

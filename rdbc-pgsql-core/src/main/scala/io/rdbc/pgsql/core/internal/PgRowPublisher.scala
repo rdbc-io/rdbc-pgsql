@@ -175,6 +175,7 @@ private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[Por
   private[this] val neverExecuted = new AtomicBoolean(true)
   @volatile private[this] var timeoutScheduledTask = Option.empty[ScheduledTask]
   private[this] val concurrentState = new ConcurrentState()
+  private[this] val donePromise = Promise[Unit]
 
   import concurrentState._
 
@@ -207,7 +208,7 @@ private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[Por
       s.onSubscribe(DummySubscription) //spec 1.9
       s.onError(
         new PgSubscriptionRejectedException(
-          "This publisher can be subscribed only once, " +
+          "This publisher can be subscribed to only once, " +
             "it has already been subscribed by other subscriber.")
       )
     }
@@ -259,12 +260,14 @@ private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[Por
     cancelTimeoutTask()
     setComplete()
     subscriber.get().foreach(_.onComplete())
+    donePromise.success(())
   }
 
   def failure(ex: Throwable): Unit = {
     cancelTimeoutTask()
     setErrored()
     subscriber.get().foreach(_.onError(ex))
+    donePromise.failure(ex)
   }
 
   private def tryQuerying(): Unit = {
@@ -327,4 +330,6 @@ private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[Por
       RowMetadata(columnsMetadata)
     }
   }
+
+  override val done: Future[Unit] = donePromise.future
 }
