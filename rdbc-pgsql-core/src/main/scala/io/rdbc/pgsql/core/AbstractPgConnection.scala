@@ -130,7 +130,7 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   def init(dbName: Option[String], authenticator: Authenticator): Future[Unit] = traced {
     argsNotNull()
-    logger.debug(s"Initializing connection")
+    logger.debug("Initializing connection")
     val initPromise = Promise[BackendKeyData]
     fsmManager.triggerTransition(State.authenticating(initPromise, authenticator)(out))
 

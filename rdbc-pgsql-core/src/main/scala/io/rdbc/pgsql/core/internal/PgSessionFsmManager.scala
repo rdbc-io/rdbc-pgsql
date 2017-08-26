@@ -97,7 +97,7 @@ private[core] class PgSessionFsmManager(connId: ConnId,
   private[this] def triggerTransitionInternal(newState: State,
                                               condition: State => Boolean,
                                               afterTransition: Option[() => Future[Unit]]): Boolean = traced {
-    val (transitioned, oldState) = atomic { implicit tx =>
+    val (transitionMade, oldState) = atomic { implicit tx =>
       state() match {
         case ConnectionClosed(_) => (false, state())
         case _ if condition(state()) =>
@@ -113,13 +113,13 @@ private[core] class PgSessionFsmManager(connId: ConnId,
         case _ => (false, state())
       }
     }
-    if (transitioned) {
-      logger.debug(s"Transitioned to state '$newState'")
+    if (transitionMade) {
+      logger.debug(s"Entered state '$newState'")
       newState match {
         case Idle(_) =>
           oldState match {
             case Idle(_) =>
-              val ex = new PgDriverInternalErrorException(s"Can't transition from Idle state to Idle state")
+              val ex = new PgDriverInternalErrorException(s"Can't make a transition from Idle state to Idle state")
               fatalErrorHandler.handleFatalError(ex.getMessage, ex)
 
             case _ => readyPromise.single().success(())
@@ -129,7 +129,7 @@ private[core] class PgSessionFsmManager(connId: ConnId,
       }
       runAfterTransition(afterTransition)
     }
-    transitioned
+    transitionMade
   }
 
   private def runAfterTransition(afterTransition: Option[() => Future[Unit]]): Unit = {
