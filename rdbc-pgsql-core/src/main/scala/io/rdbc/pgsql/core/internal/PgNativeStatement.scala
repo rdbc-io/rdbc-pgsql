@@ -27,10 +27,16 @@ import scala.util.matching.Regex
 
 private[core] object PgNativeStatement extends Logging {
 
-  sealed trait Params
+  sealed trait Params {
+    def isEmpty: Boolean
+  }
   object Params {
-    case class Named(names: ImmutIndexedSeq[String]) extends Params
-    case class Positional(count: Int) extends Params
+    case class Named(names: ImmutIndexedSeq[String]) extends Params {
+      val isEmpty: Boolean = names.isEmpty
+    }
+    case class Positional(count: Int) extends Params {
+      val isEmpty: Boolean = count == 0
+    }
   }
 
   private case class ParamMatch(value: String, start: Int, end: Int)
