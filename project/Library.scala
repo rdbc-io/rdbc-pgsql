@@ -12,14 +12,14 @@ object Library {
   val scodecCore = "org.scodec" %% "scodec-core" % "1.10.3"
   val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2"
   val sourcecode = "com.lihaoyi" %% "sourcecode" % "0.1.4"
-  val nettyHandler = "io.netty" % "netty-handler" % "4.1.14.Final"
+  val nettyHandler = "io.netty" % "netty-handler" % "4.1.15.Final"
   val stm = "org.scala-stm" %% "scala-stm" % "0.8"
 
   val pgsqljdbc = "org.postgresql" % "postgresql" % "42.1.4"
 
   val logback = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val rdbcTck = "io.rdbc" %% "rdbc-tck" % rdbcVersion
-  val scalatest = "org.scalatest" %% "scalatest" % "3.0.3"
-  val pgsql = "ru.yandex.qatools.embed" % "postgresql-embedded" % "2.3"
+  val scalatest = "org.scalatest" %% "scalatest" % "3.0.4"
+  val pgsql = "ru.yandex.qatools.embed" % "postgresql-embedded" % "2.4"
   val reactiveStreamsTck = "org.reactivestreams" % "reactive-streams-tck" % "1.0.1"
 }
