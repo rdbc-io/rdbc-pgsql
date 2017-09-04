@@ -55,6 +55,7 @@ lazy val core = (project in file("rdbc-pgsql-core"))
       Library.stm,
       Library.logback % Test,
       Library.scalatest % Test,
+      Library.scalamock % Test,
       Library.reactiveStreamsTck % Test
     ),
     buildInfoPackage := "io.rdbc.pgsql.core"

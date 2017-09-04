@@ -20,6 +20,7 @@ object Library {
   val logback = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val rdbcTck = "io.rdbc" %% "rdbc-tck" % rdbcVersion
   val scalatest = "org.scalatest" %% "scalatest" % "3.0.4"
+  val scalamock = "org.scalamock" %% "scalamock-scalatest-support" % "3.6.0"
   val pgsql = "ru.yandex.qatools.embed" % "postgresql-embedded" % "2.4"
   val reactiveStreamsTck = "org.reactivestreams" % "reactive-streams-tck" % "1.0.1"
 }
