@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.core.internal
+package io.rdbc.pgsql.core.internal.fsm.manager
 
 import io.rdbc.api.exceptions.IllegalSessionStateException
 import io.rdbc.pgsql.core.ConnId
 import io.rdbc.pgsql.core.exception.PgDriverInternalErrorException
 import io.rdbc.pgsql.core.internal.fsm._
+import io.rdbc.pgsql.core.internal.{ClientRequest, FatalErrorHandler, RequestId}
 import io.rdbc.pgsql.core.pgstruct.TxStatus
 import io.rdbc.util.Logging
 
@@ -32,11 +33,11 @@ private[core] class PgSessionFsmManager(connId: ConnId,
                                         fatalErrorHandler: FatalErrorHandler
                                        )(implicit val ec: ExecutionContext)
   extends Logging {
-  private[this] val ready = Ref(false)
-  private[this] val handlingTimeout = Ref(false)
-  private[this] val state: Ref[State] = Ref(State.uninitialized: State)
-  private[this] val readyPromise = Ref(Promise[Unit])
-  private[this] val lastRequestId = Ref(RequestId(connId, 0L))
+  private[manager] val ready = Ref(false)
+  private[manager] val handlingTimeout = Ref(false)
+  private[manager] val state: Ref[State] = Ref(State.uninitialized: State)
+  private[manager] val readyPromise = Ref(Promise[Unit])
+  private[manager] val lastRequestId = Ref(RequestId(connId, 0L))
 
   /* TODO can't make this traced, compilation fails, investigate */
   def ifReady[A](request: ClientRequest[A]): Try[A] = {

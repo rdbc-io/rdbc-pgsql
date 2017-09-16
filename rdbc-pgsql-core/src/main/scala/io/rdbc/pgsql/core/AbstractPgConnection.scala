@@ -28,6 +28,7 @@ import io.rdbc.pgsql.core.internal.Compat._
 import io.rdbc.pgsql.core.internal.cache.LruStmtCache
 import io.rdbc.pgsql.core.internal.fsm.StateAction.{Fatal, Goto, Stay}
 import io.rdbc.pgsql.core.internal.fsm._
+import io.rdbc.pgsql.core.internal.fsm.manager.PgSessionFsmManager
 import io.rdbc.pgsql.core.internal.fsm.streaming.{StrmBeginningTx, StrmWaitingForDescribe}
 import io.rdbc.pgsql.core.pgstruct.messages.backend.{SessionParamKey, _}
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
