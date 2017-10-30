@@ -12,7 +12,7 @@ object Library {
   val scodecCore = "org.scodec" %% "scodec-core" % "1.10.3"
   val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2"
   val sourcecode = "com.lihaoyi" %% "sourcecode" % "0.1.4"
-  val nettyHandler = "io.netty" % "netty-handler" % "4.1.15.Final"
+  val nettyHandler = "io.netty" % "netty-handler" % "4.1.16.Final"
   val stm = "org.scala-stm" %% "scala-stm" % "0.8"
 
   val pgsqljdbc = "org.postgresql" % "postgresql" % "42.1.4"
