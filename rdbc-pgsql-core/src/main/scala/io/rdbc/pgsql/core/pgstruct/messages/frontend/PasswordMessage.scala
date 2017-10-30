@@ -42,7 +42,8 @@ object PasswordMessage {
   }
 
   def cleartext(password: String): PasswordMessage = {
-    PasswordMessage(ByteVector.view(password.getBytes(PasswordEncoding)))
+    val passNulTerminated = Array.concat(password.getBytes(PasswordEncoding), Array(0.toByte))
+    PasswordMessage(ByteVector.view(passNulTerminated))
   }
 
   private def bytesToHex(bytes: Array[Byte]): String = {
