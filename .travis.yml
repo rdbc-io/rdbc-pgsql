@@ -4,14 +4,13 @@ sudo: false
 jdk:
 - openjdk8
 scala:
-- 2.12.3
+- 2.12.4
 - 2.11.11
 script: sbt ++$TRAVIS_SCALA_VERSION clean scalastyle test:scalastyle coverage test coverageReport
 after_success: bash <(curl -s https://codecov.io/bash)
 cache:
   directories:
   - "$HOME/.ivy2/cache"
-  - "$HOME/.coursier/cache"
   - "$HOME/.sbt/boot/"
   - "$HOME/.embedpostgresql"
 before_cache:
@@ -19,8 +18,8 @@ before_cache:
 - find $HOME/.sbt -name "*.lock" -delete
 env:
   global:
-    - CI=true #to decrease coursier verbosity
     - DEFAULT_TIMEOUT_MILLIS=300 #Reactive Streams testkit timeout for async ops
   matrix:
     - PG_VER=V9_6
     - PG_VER=V9_5
+
