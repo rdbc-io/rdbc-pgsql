@@ -32,9 +32,9 @@ for detailed information on API usage and general rdbc concepts.
 
 ## Supported PostrgreSQL versions
 
-The driver aims to support three latest stable PostgreSQL versions. Currently
-it means supporting PostgreSQL 9.6.x, 9.5.x and 9.4.x. The driver is tested
-against only these three versions but in fact, it should work with all versions 
+The driver aims to support two latest stable PostgreSQL versions. Currently
+it means supporting PostgreSQL 10.x and 9.6.x. The driver is tested
+against only these two versions but in fact, it should work with all versions 
 since 7.4.
 
 ## Getting help
