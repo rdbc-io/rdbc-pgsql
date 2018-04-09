@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.exception
 
-import io.rdbc.api.exceptions.TimeoutException
+import io.rdbc.sapi.exceptions.TimeoutException
 import io.rdbc.pgsql.core.pgstruct.StatusData
 
 class PgTimeoutException(val pgStatusData: StatusData)

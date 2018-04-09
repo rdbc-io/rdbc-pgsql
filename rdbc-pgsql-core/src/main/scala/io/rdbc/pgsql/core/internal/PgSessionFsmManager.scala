@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.internal
 
-import io.rdbc.api.exceptions.IllegalSessionStateException
+import io.rdbc.sapi.exceptions.IllegalSessionStateException
 import io.rdbc.pgsql.core.ConnId
 import io.rdbc.pgsql.core.exception.PgDriverInternalErrorException
 import io.rdbc.pgsql.core.internal.fsm._

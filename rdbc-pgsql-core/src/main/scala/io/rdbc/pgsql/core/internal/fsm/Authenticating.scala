@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.internal.fsm
 
-import io.rdbc.api.exceptions.AuthFailureException
+import io.rdbc.sapi.exceptions.AuthFailureException
 import io.rdbc.pgsql.core.ChannelWriter
 import io.rdbc.pgsql.core.auth.AuthState.{AuthComplete, AuthContinue}
 import io.rdbc.pgsql.core.auth.{AuthState, Authenticator}
