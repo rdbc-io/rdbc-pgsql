@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.exception
 
-import io.rdbc.api.exceptions.UnsupportedDbTypeException
+import io.rdbc.sapi.exceptions.UnsupportedDbTypeException
 import io.rdbc.pgsql.core.pgstruct.DataType
 
 class PgUnsupportedType(dataType: DataType)

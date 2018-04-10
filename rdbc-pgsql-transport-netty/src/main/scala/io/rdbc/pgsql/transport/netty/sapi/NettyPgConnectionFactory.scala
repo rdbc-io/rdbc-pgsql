@@ -28,7 +28,7 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder
 import io.netty.handler.timeout.WriteTimeoutHandler
 import io.netty.util.concurrent.GlobalEventExecutor
 import io.rdbc.ImmutSeq
-import io.rdbc.api.exceptions.RdbcException
+import io.rdbc.sapi.exceptions.RdbcException
 import io.rdbc.implbase.ConnectionFactoryPartialImpl
 import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.auth.Authenticator

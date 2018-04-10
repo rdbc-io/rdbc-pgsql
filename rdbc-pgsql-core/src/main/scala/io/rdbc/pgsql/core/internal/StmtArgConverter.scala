@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.core.internal
 
 import io.rdbc.ImmutIndexedSeq
-import io.rdbc.api.exceptions.{MissingParamValException, NoSuchParamException, NoSuitableConverterFoundException}
+import io.rdbc.sapi.exceptions.{MissingParamValException, NoSuchParamException, NoSuitableConverterFoundException}
 import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.internal.PgNativeStatement.Params
 import io.rdbc.pgsql.core.internal.PgNativeStatement.Params.Named

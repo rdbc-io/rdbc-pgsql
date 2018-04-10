@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.core.internal
 
 import _root_.scodec.bits.ByteVector
-import io.rdbc.api.exceptions.MissingColumnException
+import io.rdbc.sapi.exceptions.MissingColumnException
 import io.rdbc.implbase.RowPartialImpl
 import io.rdbc.pgsql.core.SessionParams
 import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgUnsupportedType}

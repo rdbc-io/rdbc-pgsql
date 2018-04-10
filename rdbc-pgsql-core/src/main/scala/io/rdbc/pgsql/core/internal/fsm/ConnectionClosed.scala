@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.internal.fsm
 
-import io.rdbc.api.exceptions.ConnectionClosedException
+import io.rdbc.sapi.exceptions.ConnectionClosedException
 
 private[core]
 final case class ConnectionClosed private[fsm](cause: ConnectionClosedException)

@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.internal.fsm
 
-import io.rdbc.api.exceptions.ConnectionClosedException
+import io.rdbc.sapi.exceptions.ConnectionClosedException
 import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgStatusDataException}

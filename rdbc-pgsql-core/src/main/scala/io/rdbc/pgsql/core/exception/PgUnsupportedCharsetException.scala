@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.exception
 
-import io.rdbc.api.exceptions.RdbcException
+import io.rdbc.sapi.exceptions.RdbcException
 
 class PgUnsupportedCharsetException(pgCharsetName: String, cause: Option[Throwable])
   extends RdbcException(s"PostgreSQL charset '$pgCharsetName' is not supported", cause) {

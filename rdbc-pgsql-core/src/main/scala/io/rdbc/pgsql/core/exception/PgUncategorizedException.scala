@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.exception
 
-import io.rdbc.api.exceptions.UncategorizedRdbcException
+import io.rdbc.sapi.exceptions.UncategorizedRdbcException
 
 class PgUncategorizedException(msg: String, cause: Option[Throwable])
   extends UncategorizedRdbcException(msg, cause) {

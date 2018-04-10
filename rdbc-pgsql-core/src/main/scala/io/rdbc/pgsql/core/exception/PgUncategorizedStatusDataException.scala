@@ -16,9 +16,9 @@
 
 package io.rdbc.pgsql.core.exception
 
-import io.rdbc.api.exceptions._
+import io.rdbc.sapi.exceptions._
 import io.rdbc.pgsql.core.pgstruct.StatusData
 
 class PgUncategorizedStatusDataException(val pgStatusData: StatusData)
-    extends UncategorizedRdbcException(pgStatusData.shortInfo)
+    extends UncategorizedRdbcException(pgStatusData.shortInfo, None)
     with PgStatusDataException

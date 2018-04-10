@@ -19,7 +19,7 @@ package io.rdbc.pgsql.core
 import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicInteger
 
-import io.rdbc.api.exceptions.{ConnectionClosedException, ConnectionValidationException, IllegalSessionStateException}
+import io.rdbc.sapi.exceptions.{ConnectionClosedException, ConnectionValidationException, IllegalSessionStateException}
 import io.rdbc.implbase.ConnectionPartialImpl
 import io.rdbc.pgsql.core.config.sapi.StmtCacheConfig.{Disabled, Enabled}
 import io.rdbc.pgsql.core.auth.Authenticator
@@ -479,7 +479,7 @@ abstract class AbstractPgConnection(val id: ConnId,
         _ =>
           val connClosedEx = cause match {
             case ex: ConnectionClosedException => ex
-            case NonFatal(ex) => new ConnectionClosedException("Connection closed", ex)
+            case NonFatal(ex) => new ConnectionClosedException("Connection closed", Some(ex))
           }
           fsmManager.triggerTransition(ConnectionClosed(connClosedEx))
           out.close().recover {

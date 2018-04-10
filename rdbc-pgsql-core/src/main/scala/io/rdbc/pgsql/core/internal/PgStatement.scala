@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.core.internal
 
 import io.rdbc.ImmutIndexedSeq
-import io.rdbc.api.exceptions._
+import io.rdbc.sapi.exceptions._
 import io.rdbc.pgsql.core.internal.PgNativeStatement.Params.{Named, Positional}
 import io.rdbc.pgsql.core.pgstruct.Argument
 import io.rdbc.sapi._
