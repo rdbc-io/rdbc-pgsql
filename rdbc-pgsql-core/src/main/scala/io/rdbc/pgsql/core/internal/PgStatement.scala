@@ -22,6 +22,7 @@ import io.rdbc.pgsql.core.internal.PgNativeStatement.Params.{Named, Positional}
 import io.rdbc.pgsql.core.pgstruct.Argument
 import io.rdbc.sapi._
 import io.rdbc.util.Logging
+import io.rdbc.util.Preconditions._
 import org.reactivestreams.Publisher
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -37,11 +38,13 @@ private[core] class PgStatement(stmtExecutor: PgStatementExecutor,
   //TODO try to limit exceptions to public methods only - scan the code
 
   def bind(args: (String, Any)*): ExecutableStatement = traced {
+    checkNotNull(args)
     val pgArgs = namedArgsToPgArgs(Map(args: _*)).get
     pgParametrizedStatement(pgArgs)
   }
 
   def bindByIdx(args: Any*): ExecutableStatement = traced {
+    checkNotNull(args)
     val pgArgs = positionalArgsToPgArgs(args.toVector).get
     pgParametrizedStatement(pgArgs)
   }
@@ -79,6 +82,7 @@ private[core] class PgStatement(stmtExecutor: PgStatementExecutor,
   }
 
   def streamArgs(argsPublisher: Publisher[_ <: Map[String, Any]]): Future[Unit] = traced {
+    checkNotNull(argsPublisher)
     stmtExecutor.subscribeToStatementArgsStream(
       nativeStmt, argsPublisher,
       argsConverter = namedArgsToPgArgs
@@ -86,6 +90,7 @@ private[core] class PgStatement(stmtExecutor: PgStatementExecutor,
   }
 
   def streamArgsByIdx(argsPublisher: Publisher[_ <: ImmutIndexedSeq[Any]]): Future[Unit] = traced {
+    checkNotNull(argsPublisher)
     stmtExecutor.subscribeToStatementArgsStream(
       nativeStmt, argsPublisher,
       argsConverter = positionalArgsToPgArgs

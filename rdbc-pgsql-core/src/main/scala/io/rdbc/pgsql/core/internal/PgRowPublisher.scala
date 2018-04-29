@@ -26,7 +26,7 @@ import io.rdbc.pgsql.core.pgstruct.messages.backend.{DataRow, RowDescription}
 import io.rdbc.pgsql.core.pgstruct.messages.frontend._
 import io.rdbc.pgsql.core.types.PgTypeRegistry
 import io.rdbc.sapi.{ColumnMetadata, Row, RowMetadata, RowPublisher, TypeConverterRegistry, Warning}
-import io.rdbc.util.Preconditions.notNull
+import io.rdbc.util.Preconditions.checkNotNull
 import io.rdbc.util.Logging
 import io.rdbc.util.scheduler.ScheduledTask
 import org.reactivestreams.{Subscriber, Subscription}
@@ -150,7 +150,7 @@ private[core] object PgRowPublisher {
     }
 
     private def setState(newState: PublisherState)(implicit txn: InTxn): Unit = {
-      logger.debug(s"Publisher transitioning from $publisherState to $newState")
+      logger.debug(s"Publisher transitioning from ${publisherState()} to $newState")
       publisherState() = newState
     }
   }
@@ -201,7 +201,7 @@ private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[Por
   }
 
   def subscribe(s: Subscriber[_ >: Row]): Unit = {
-    notNull(s)
+    checkNotNull(s)
     if (subscriber.compareAndSet(None, Some(s))) {
       s.onSubscribe(RowSubscription)
     } else {

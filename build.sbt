@@ -36,7 +36,7 @@ lazy val rdbcPgsql = (project in file("."))
   .settings(
     publishArtifact := false
   )
-  .aggregate(core, nettyTransport, bench)
+  .aggregate(core, nettyTransport, coreJava, bench)
 
 lazy val core = (project in file("rdbc-pgsql-core"))
   .enablePlugins(BuildInfoPlugin)
@@ -60,23 +60,37 @@ lazy val core = (project in file("rdbc-pgsql-core"))
     buildInfoPackage := "io.rdbc.pgsql.core"
   )
 
+lazy val coreJava = (project in file("rdbc-pgsql-core-java"))
+  .enablePlugins(BuildInfoPlugin)
+  .settings(commonSettings: _*)
+  .settings(
+    name := "pgsql-core-java",
+    libraryDependencies ++= Vector(
+      Library.immutables % Provided
+    ),
+    buildInfoPackage := "io.rdbc.pgsql.core.japi"
+  ).dependsOn(core)
+
 lazy val nettyTransport = (project in file("rdbc-pgsql-transport-netty"))
   .enablePlugins(BuildInfoPlugin)
   .settings(commonSettings: _*)
   .settings(
     name := "pgsql-transport-netty",
     libraryDependencies ++= Vector(
+      Library.rdbcJavaApi,
       Library.nettyHandler,
       Library.rdbcTypeconv,
       Library.rdbcUtil,
+      Library.rdbcJavaAdapter,
       Library.scalaLogging,
+      Library.immutables % Provided,
       Library.logback % Test,
       Library.rdbcTck % Test,
       Library.scalatest % Test,
       Library.pgsql % Test
     ),
     buildInfoPackage := "io.rdbc.pgsql.transport.netty"
-  ).dependsOn(core)
+  ).dependsOn(core, coreJava)
 
 lazy val doc = (project in file("rdbc-pgsql-doc"))
   .enablePlugins(TemplateReplace)

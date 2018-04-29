@@ -14,13 +14,16 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.transport.netty.internal
+package io.rdbc.pgsql.core.config.japi;
 
-import scala.concurrent.Future
+import io.rdbc.pgsql.core.types.PgTypesProvider;
 
-private[netty] object Compat {
+public class PgTypesProviders {
 
-  implicit class FutureObjectCompat(underlying: Future.type) {
-    val unit: Future[Unit] = Future.successful(())
-  }
+    public static PgTypesProvider scodec() {
+        return io.rdbc.pgsql.core.config.sapi.PgTypesProviders.scodec();
+    }
+
+    private PgTypesProviders() {
+    }
 }

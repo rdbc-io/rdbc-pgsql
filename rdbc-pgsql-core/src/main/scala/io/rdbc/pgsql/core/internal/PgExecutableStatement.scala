@@ -22,6 +22,7 @@ import io.rdbc.pgsql.core.pgstruct.Argument
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
 import io.rdbc.sapi.{ExecutableStatement, RowPublisher, Timeout}
 import io.rdbc.util.Logging
+import io.rdbc.util.Preconditions._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
@@ -35,6 +36,7 @@ private[core] class PgExecutableStatement(executor: PgStatementExecutor,
     with Logging {
 
   def stream()(implicit timeout: Timeout): RowPublisher = traced {
+    checkNotNull(timeout)
     try {
       executor.statementStream(nativeSql, params)
     } catch {
@@ -45,6 +47,7 @@ private[core] class PgExecutableStatement(executor: PgStatementExecutor,
   }
 
   override def executeForRowsAffected()(implicit timeout: Timeout): Future[Long] = traced {
+    checkNotNull(timeout)
     executor.executeStatementForRowsAffected(nativeSql, params)
   }
 }

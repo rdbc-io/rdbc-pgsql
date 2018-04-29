@@ -67,7 +67,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
   val done: Future[Unit] = donePromise.future
 
   def onNext(elem: T): Unit = traced {
-    notNull(elem)
+    checkNotNull(elem)
     logger.trace(s"Element received: '$elem'")
     if (!canceled.single()) {
       argConverter(elem).map { args =>
@@ -102,7 +102,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
   }
 
   def onSubscribe(s: Subscription): Unit = traced {
-    notNull(s)
+    checkNotNull(s)
     if (subscribed.compareAndSet(false, true)) {
       logger.debug(s"Subscription $s accepted")
       subscription = Some(s)
@@ -185,7 +185,7 @@ class StatementArgsSubscriber[T](nativeStmt: PgNativeStatement,
   }
 
   def onError(t: Throwable): Unit = traced {
-    notNull(t)
+    checkNotNull(t)
     logWarnException("Publisher signalled error", t)
     if (failStream(doCancel = false)) {
       lastExecution.single().andThen { case _ =>

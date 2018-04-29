@@ -42,7 +42,7 @@ private[core] class PgRow(rowDesc: RowDescription,
     with Logging {
 
   protected def any(name: String): Option[Any] = traced {
-    argsNotNull()
+    checkNotNull(name)
     checkNonEmptyString(name)
     nameMapping.get(ColName(name)) match {
       case Some(idx) => any(idx)
@@ -51,7 +51,7 @@ private[core] class PgRow(rowDesc: RowDescription,
   }
 
   protected def any(idx: Int): Option[Any] = traced {
-    argsNotNull()
+    checkNotNull(idx)
     check(idx, idx >= 0, "has to be >= 0")
     val colVal = cols(idx)
     colVal match {

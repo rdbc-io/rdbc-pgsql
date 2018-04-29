@@ -38,8 +38,8 @@ import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgUncategor
 import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.pgstruct.messages.frontend.{CancelRequest, Terminate}
 import io.rdbc.pgsql.core.types.{PgTypeRegistry, PgTypesProvider}
-import io.rdbc.pgsql.transport.netty.internal._
-import io.rdbc.pgsql.transport.netty.internal.Compat._
+import io.rdbc.pgsql.transport.netty.sapi.internal._
+import io.rdbc.pgsql.transport.netty.sapi.internal.Compat._
 import io.rdbc.sapi.{Timeout, TypeConverterRegistry, TypeConvertersProvider}
 import io.rdbc.util.Logging
 import io.rdbc.util.scheduler.JdkScheduler

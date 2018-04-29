@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.rdbc.pgsql.transport.netty.internal
+package io.rdbc.pgsql.transport.netty.sapi.internal
 
 import io.netty.channel.Channel
 import io.rdbc.pgsql.core.ChannelWriter

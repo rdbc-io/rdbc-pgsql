@@ -72,7 +72,8 @@ abstract class AbstractPgConnection(val id: ConnId,
   override def watchForIdle: Future[Unit] = fsmManager.readyFuture
 
   override def statement(sql: String, options: StatementOptions): Statement = traced {
-    argsNotNull()
+    checkNotNull(sql)
+    checkNotNull(options)
     checkNonEmptyString(sql)
     val StatementOptions(keyColumns) = options
     val finalSql = keyColumns match {
@@ -92,22 +93,22 @@ abstract class AbstractPgConnection(val id: ConnId,
   }
 
   override def beginTx()(implicit timeout: Timeout): Future[Unit] = traced {
-    argsNotNull()
+    checkNotNull(timeout)
     simpleQueryIgnoreResult(NativeSql("BEGIN"))
   }
 
   override def commitTx()(implicit timeout: Timeout): Future[Unit] = traced {
-    argsNotNull()
+    checkNotNull(timeout)
     simpleQueryIgnoreResult(NativeSql("COMMIT"))
   }
 
   override def rollbackTx()(implicit timeout: Timeout): Future[Unit] = traced {
-    argsNotNull()
+    checkNotNull(timeout)
     simpleQueryIgnoreResult(NativeSql("ROLLBACK"))
   }
 
   override def validate()(implicit timeout: Timeout): Future[Unit] = traced {
-    argsNotNull()
+    checkNotNull(timeout)
     simpleQueryIgnoreResult(NativeSql("")).recoverWith {
       case ex: IllegalSessionStateException => Future.failed(ex)
       case NonFatal(ex) => Future.failed(new ConnectionValidationException(ex))
@@ -129,7 +130,8 @@ abstract class AbstractPgConnection(val id: ConnId,
   }
 
   def init(dbName: Option[String], authenticator: Authenticator): Future[Unit] = traced {
-    argsNotNull()
+    checkNotNull(dbName)
+    checkNotNull(authenticator)
     logger.debug("Initializing connection")
     val initPromise = Promise[BackendKeyData]
     fsmManager.triggerTransition(State.authenticating(initPromise, authenticator)(out))
@@ -149,7 +151,7 @@ abstract class AbstractPgConnection(val id: ConnId,
   protected def handleServerCharsetChange(charset: Charset): Unit
 
   protected final def handleBackendMessage(msg: PgBackendMessage): Unit = traced {
-    //argsNotNull()
+    checkNotNull(msg)
     logger.trace(s"Handling backend message $msg")
     msg match {
       case paramStatus: ParameterStatus => handleParamStatusChange(paramStatus)
@@ -166,7 +168,8 @@ abstract class AbstractPgConnection(val id: ConnId,
   }
 
   override protected[core] final def handleFatalError(msg: String, cause: Throwable): Unit = traced {
-    argsNotNull()
+    checkNotNull(msg)
+    checkNotNull(cause)
     checkNonEmptyString(msg)
     logger.error(msg, cause)
     doRelease(cause)
@@ -174,11 +177,11 @@ abstract class AbstractPgConnection(val id: ConnId,
   }
 
   override private[core]
-  def statementStream(nativeSql: NativeSql, params: Vector[Argument])
+  def statementStream(nativeSql: NativeSql, args: Vector[Argument])
                      (implicit timeout: Timeout): RowPublisher = {
     fsmManager.ifReady { (reqId, txStatus) =>
 
-      val parseAndBind = newParseAndBind(nativeSql, params)
+      val parseAndBind = newParseAndBind(nativeSql, args)
 
       val preparePortalFun = (publisher: PgRowPublisher) => {
         val msgs@ParseAndBind(parse, _) = parseAndBind
@@ -329,12 +332,12 @@ abstract class AbstractPgConnection(val id: ConnId,
   }
 
   override private[core] def executeStatementForRowsAffected(nativeSql: NativeSql,
-                                                             params: Vector[Argument])(
-                                                              implicit timeout: Timeout): Future[Long] = traced {
+                                                             args: Vector[Argument])
+                                                            (implicit timeout: Timeout): Future[Long] = traced {
     fsmManager.ifReadyF { (reqId, _) =>
       logger.debug(s"Executing write-only statement '$nativeSql'")
 
-      val ParseAndBind(parse, bind) = newParseAndBind(nativeSql, params)
+      val ParseAndBind(parse, bind) = newParseAndBind(nativeSql, args)
 
       val parsePromise = Promise[Unit]
       val resultPromise = Promise[Long]
@@ -501,7 +504,7 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   private def newTimeoutHandler(reqId: RequestId,
                                 timeout: Timeout): Option[TimeoutHandler] = traced {
-    if (timeout.value.isFinite()) {
+    if (timeout.value < Timeout.MaxFiniteTimeout.value) {
       val duration = FiniteDuration(timeout.value.length, timeout.value.unit)
       Some(new TimeoutHandler(scheduler, duration, timeoutAction = () => {
         val shouldCancel = fsmManager.startHandlingTimeout(reqId)

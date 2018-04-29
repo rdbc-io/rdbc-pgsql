@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import io.rdbc.pgsql.core.exception.PgSubscriptionRejectedException
 import io.rdbc.sapi.{Row, RowPublisher}
-import io.rdbc.util.Preconditions.notNull
+import io.rdbc.util.Preconditions.checkNotNull
 import org.reactivestreams.{Subscriber, Subscription}
 
 import scala.concurrent.Future
@@ -46,7 +46,7 @@ class FailedPgRowPublisher(failure: Throwable)
   val done: Future[Nothing] = failedFuture
 
   def subscribe(s: Subscriber[_ >: Row]): Unit = {
-    notNull(s)
+    checkNotNull(s)
     s.onSubscribe(DummySubscription)
     if (subscribed.compareAndSet(false, true)) {
       s.onError(failure)
