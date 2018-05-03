@@ -21,8 +21,8 @@ import io.rdbc.pgsql.core.ChannelWriter
 import io.rdbc.pgsql.core.auth.AuthState.{AuthComplete, AuthContinue}
 import io.rdbc.pgsql.core.auth.{AuthState, Authenticator}
 import io.rdbc.pgsql.core.internal.PgMsgHandler
-import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
-import io.rdbc.pgsql.core.pgstruct.messages.backend.auth.{AuthOk, AuthRequest}
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.BackendKeyData
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.auth.{AuthOk, AuthRequest}
 
 import scala.concurrent.Promise
 

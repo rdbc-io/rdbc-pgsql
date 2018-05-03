@@ -16,15 +16,11 @@
 
 package io.rdbc.pgsql.core.config.sapi
 
-import io.rdbc.ImmutSeq
 import io.rdbc.pgsql.core.auth.Authenticator
-import io.rdbc.pgsql.core.codec.scodec.{ScodecDecoderFactory, ScodecEncoderFactory}
-import io.rdbc.pgsql.core.codec.{DecoderFactory, EncoderFactory}
 import io.rdbc.pgsql.core.config.sapi.PgConnFactoryConfig.Defaults
-import io.rdbc.pgsql.core.types.PgTypesProvider
-import io.rdbc.pgsql.core.types.scodec.ScodecPgTypesProvider
-import io.rdbc.sapi.{Timeout, TypeConvertersProvider}
-import io.rdbc.typeconv.StandardTypeConvertersProvider
+import io.rdbc.pgsql.core.typeconv.{BuiltInTypeConverters, BuiltInTypeMappings, PartialTypeConverter, TypeMapping}
+import io.rdbc.pgsql.core.types.{BuiltInCodecs, PgType, PgVal, PgValCodec}
+import io.rdbc.sapi.Timeout
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -35,11 +31,10 @@ object PgConnFactoryConfig {
     val subscriberBufferCapacity: Int = 100
     val subscriberMinDemandRequestSize: Int = 10
     val stmtCacheConfig: StmtCacheConfig = StmtCacheConfig.Enabled(capacity = 100)
-    val typeConvertersProviders: ImmutSeq[TypeConvertersProvider] = Vector(new StandardTypeConvertersProvider)
-    val pgTypesProviders: ImmutSeq[PgTypesProvider] = Vector(new ScodecPgTypesProvider)
-    val msgDecoderFactory: DecoderFactory = new ScodecDecoderFactory
-    val msgEncoderFactory: EncoderFactory = new ScodecEncoderFactory
     val writeTimeout: Timeout = Timeout(10.seconds)
+    val typeConverters: Vector[PartialTypeConverter[_]] = BuiltInTypeConverters
+    val typeMappings: Vector[TypeMapping[_, _ <: PgType[_ <: PgVal[_]]]] = BuiltInTypeMappings
+    val typeCodecs: Vector[PgValCodec[_ <: PgVal[_]]] = BuiltInCodecs
     val ec: ExecutionContext = ExecutionContext.global
   }
 }
@@ -52,9 +47,8 @@ final case class PgConnFactoryConfig
  subscriberBufferCapacity: Int = Defaults.subscriberBufferCapacity,
  subscriberMinDemandRequestSize: Int = Defaults.subscriberMinDemandRequestSize,
  stmtCacheConfig: StmtCacheConfig = Defaults.stmtCacheConfig,
- typeConvertersProviders: ImmutSeq[TypeConvertersProvider] = Defaults.typeConvertersProviders,
- pgTypesProviders: ImmutSeq[PgTypesProvider] = Defaults.pgTypesProviders,
- msgDecoderFactory: DecoderFactory = Defaults.msgDecoderFactory,
- msgEncoderFactory: EncoderFactory = Defaults.msgEncoderFactory,
  writeTimeout: Timeout = Defaults.writeTimeout,
+ typeConverters: Vector[PartialTypeConverter[_]],
+ typeMappings: Vector[TypeMapping[_, _ <: PgType[_ <: PgVal[_]]]],
+ typeCodecs: Vector[PgValCodec[_ <: PgVal[_]]],
  ec: ExecutionContext = Defaults.ec)

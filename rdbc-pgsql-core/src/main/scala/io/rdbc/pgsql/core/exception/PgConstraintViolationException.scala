@@ -16,8 +16,8 @@
 
 package io.rdbc.pgsql.core.exception
 
+import io.rdbc.pgsql.core.internal.protocol.StatusData
 import io.rdbc.sapi.exceptions.ConstraintViolationException
-import io.rdbc.pgsql.core.pgstruct.StatusData
 
 class PgConstraintViolationException(val pgStatusData: StatusData)
   extends ConstraintViolationException(

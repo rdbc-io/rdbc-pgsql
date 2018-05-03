@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.internal
 
-import io.rdbc.pgsql.core.pgstruct.{Argument, TxStatus}
+import io.rdbc.pgsql.core.internal.protocol.{Argument, TxStatus}
 
 import scala.concurrent.Future
 

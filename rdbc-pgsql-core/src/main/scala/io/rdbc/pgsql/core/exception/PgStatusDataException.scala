@@ -16,8 +16,8 @@
 
 package io.rdbc.pgsql.core.exception
 
+import io.rdbc.pgsql.core.internal.protocol.StatusData
 import io.rdbc.sapi.exceptions.RdbcException
-import io.rdbc.pgsql.core.pgstruct.StatusData
 
 trait PgStatusDataException extends Throwable {
   def pgStatusData: StatusData

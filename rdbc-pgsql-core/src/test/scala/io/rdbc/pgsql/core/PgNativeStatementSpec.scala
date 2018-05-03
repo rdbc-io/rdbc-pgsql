@@ -18,8 +18,8 @@ package io.rdbc.pgsql.core
 
 import io.rdbc.sapi.exceptions.MixedParamTypesException
 import io.rdbc.pgsql.core.internal.PgNativeStatement.Params
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.NativeSql
 import io.rdbc.pgsql.core.internal.{PgNativeStatement, RdbcSql}
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
 import org.scalatest.Inside
 
 class PgNativeStatementSpec

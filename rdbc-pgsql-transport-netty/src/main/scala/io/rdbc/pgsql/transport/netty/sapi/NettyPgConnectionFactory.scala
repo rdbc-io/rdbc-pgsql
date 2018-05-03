@@ -28,19 +28,20 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder
 import io.netty.handler.timeout.WriteTimeoutHandler
 import io.netty.util.concurrent.GlobalEventExecutor
 import io.rdbc.ImmutSeq
-import io.rdbc.sapi.exceptions.RdbcException
 import io.rdbc.implbase.ConnectionFactoryPartialImpl
-import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.auth.Authenticator
-import io.rdbc.pgsql.core.codec.{DecoderFactory, EncoderFactory}
 import io.rdbc.pgsql.core.config.sapi.{PgConnFactoryConfig, StmtCacheConfig}
 import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgUncategorizedException}
-import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.{CancelRequest, Terminate}
-import io.rdbc.pgsql.core.types.{PgTypeRegistry, PgTypesProvider}
+import io.rdbc.pgsql.core.internal.protocol.codec.{MessageDecoderFactory, MessageEncoderFactory}
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.BackendKeyData
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.{CancelRequest, Terminate}
+import io.rdbc.pgsql.core.typeconv._
+import io.rdbc.pgsql.core.types._
+import io.rdbc.pgsql.core.{StmtArgsConverter, _}
 import io.rdbc.pgsql.transport.netty.sapi.internal._
 import io.rdbc.pgsql.transport.netty.sapi.internal.Compat._
-import io.rdbc.sapi.{Timeout, TypeConverterRegistry, TypeConvertersProvider}
+import io.rdbc.sapi.Timeout
+import io.rdbc.sapi.exceptions.RdbcException
 import io.rdbc.util.Logging
 import io.rdbc.util.scheduler.JdkScheduler
 
@@ -55,16 +56,6 @@ class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnectionFacto
   val pgConfig: PgConnFactoryConfig = nettyConfig.pgConfig
 
   protected implicit val ec: ExecutionContext = pgConfig.ec
-
-  private[this] val pgTypes = {
-    PgTypeRegistry(pgConfig.pgTypesProviders.flatMap(_.types))
-  }
-
-  private[this] val typeConverters = {
-    TypeConverterRegistry {
-      pgConfig.typeConvertersProviders.flatMap(_.typeConverters)
-    }
-  }
 
   private[this] val scheduler = {
     new JdkScheduler(nettyConfig.eventLoopGroup)
@@ -82,8 +73,8 @@ class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnectionFacto
     def maybeConn: Option[NettyPgConnection] = _maybeConn
 
     def initChannel(ch: Channel): Unit = {
-      val decoderHandler = new PgMsgDecoderHandler(pgConfig.msgDecoderFactory)
-      val encoderHandler = new PgMsgEncoderHandler(pgConfig.msgEncoderFactory)
+      val decoderHandler = new PgMsgDecoderHandler(MessageDecoderFactory.default)
+      val encoderHandler = new PgMsgEncoderHandler(MessageEncoderFactory.default)
 
       ch.pipeline().addLast(framingHandler)
       ch.pipeline().addLast(decoderHandler)
@@ -154,12 +145,13 @@ class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnectionFacto
                            decoderHandler: PgMsgDecoderHandler,
                            encoderHandler: PgMsgEncoderHandler): NettyPgConnection = traced {
     val connConfig = PgConnectionConfig(
-      pgTypes = pgTypes,
-      typeConverters = typeConverters,
       subscriberMinDemandRequestSize = pgConfig.subscriberMinDemandRequestSize,
       subscriberBufferCapacity = pgConfig.subscriberBufferCapacity,
       stmtCacheConfig = pgConfig.stmtCacheConfig
     )
+
+    val typeConv = TypeConverter.fromPartials(pgConfig.typeConverters)
+    val typeCodec = AnyPgValCodec.fromCodecs(pgConfig.typeCodecs)
 
     new NettyPgConnection(
       id = ConnId(ch.id().asShortText()),
@@ -169,7 +161,19 @@ class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnectionFacto
       encoder = encoderHandler,
       ec = ec,
       scheduler = scheduler,
-      requestCanceler = abortRequest
+      requestCanceler = abortRequest,
+      stmtArgsConverter = {
+        val typeMapping = TypeMappingRegistry.fromMappings(pgConfig.typeMappings)
+        new StmtArgsConverter(AnyArgToPgArgConverter.of(
+          typeConverter = typeConv,
+          typeMapping = typeMapping,
+          typeCodec = typeCodec)
+        )
+      },
+      colValueToObjConverter = ColValueToObjConverter.fromCodecAndTypeconv(
+        codec = typeCodec,
+        converter = typeConv
+      )
     )
   }
 
@@ -199,7 +203,7 @@ class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnectionFacto
     baseBootstrap(connectTimeout = None)
       .handler {
         channelInitializer { ch =>
-          ch.pipeline().addLast(new PgMsgEncoderHandler(pgConfig.msgEncoderFactory))
+          ch.pipeline().addLast(new PgMsgEncoderHandler(MessageEncoderFactory.default))
           ()
         }
       }
@@ -260,15 +264,14 @@ object NettyPgConnectionFactory extends Logging {
               subscriberBufferCapacity: Int = PgDefaults.subscriberBufferCapacity,
               subscriberMinDemandRequestSize: Int = PgDefaults.subscriberMinDemandRequestSize,
               stmtCacheConfig: StmtCacheConfig = PgDefaults.stmtCacheConfig,
-              typeConvertersProviders: ImmutSeq[TypeConvertersProvider] = PgDefaults.typeConvertersProviders,
-              pgTypesProviders: ImmutSeq[PgTypesProvider] = PgDefaults.pgTypesProviders,
-              msgDecoderFactory: DecoderFactory = PgDefaults.msgDecoderFactory,
-              msgEncoderFactory: EncoderFactory = PgDefaults.msgEncoderFactory,
               writeTimeout: Timeout = PgDefaults.writeTimeout,
               ec: ExecutionContext = PgDefaults.ec,
               channelFactory: ChannelFactory[_ <: Channel] = Defaults.channelFactory,
               eventLoopGroup: EventLoopGroup = Defaults.eventLoopGroup,
-              channelOptions: ImmutSeq[ChannelOptionValue[_]] = Defaults.channelOptions
+              channelOptions: ImmutSeq[ChannelOptionValue[_]] = Defaults.channelOptions,
+              typeConverters: Vector[PartialTypeConverter[_]] = PgDefaults.typeConverters,
+              typeMappings: Vector[TypeMapping[_, _ <: PgType[_ <: PgVal[_]]]] = PgDefaults.typeMappings,
+              typeCodecs: Vector[PgValCodec[_ <: PgVal[_]]] = PgDefaults.typeCodecs
              ): Config = {
 
       val pgConfig = PgConnFactoryConfig(
@@ -276,14 +279,13 @@ object NettyPgConnectionFactory extends Logging {
         port = port,
         dbName = dbName,
         authenticator = authenticator,
-        typeConvertersProviders = typeConvertersProviders,
-        pgTypesProviders = pgTypesProviders,
         subscriberBufferCapacity = subscriberBufferCapacity,
         subscriberMinDemandRequestSize = subscriberMinDemandRequestSize,
         stmtCacheConfig = stmtCacheConfig,
-        msgDecoderFactory = msgDecoderFactory,
-        msgEncoderFactory = msgEncoderFactory,
         writeTimeout = writeTimeout,
+        typeConverters = typeConverters,
+        typeMappings = typeMappings,
+        typeCodecs = typeCodecs,
         ec = ec
       )
 

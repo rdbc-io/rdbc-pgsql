@@ -28,10 +28,10 @@ import static org.immutables.value.Value.Style;
 public interface ChannelOptionValue<T> {
 
     @Parameter
-    ChannelOption<T> option();
+    ChannelOption<T> getOption();
 
     @Parameter
-    T value();
+    T getValue();
 
     static <U> ChannelOptionValue<U> of(ChannelOption<U> option, U value) {
         return ImmutableChannelOptionValue.of(option, value);

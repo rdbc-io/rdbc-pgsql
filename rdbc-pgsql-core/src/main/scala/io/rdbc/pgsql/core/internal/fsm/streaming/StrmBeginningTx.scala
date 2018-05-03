@@ -18,9 +18,9 @@ package io.rdbc.pgsql.core.internal.fsm.streaming
 
 import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.internal.fsm.{State, StateAction}
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.{CommandComplete, ReadyForQuery}
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.{Bind, DescribePortal, Parse, Sync}
 import io.rdbc.pgsql.core.internal.{PgMsgHandler, PgRowPublisher, PortalDescData}
-import io.rdbc.pgsql.core.pgstruct.messages.backend.{CommandComplete, ReadyForQuery}
-import io.rdbc.pgsql.core.pgstruct.messages.frontend._
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal

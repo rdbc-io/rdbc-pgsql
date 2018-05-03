@@ -20,7 +20,7 @@ import io.rdbc.sapi.exceptions.IllegalSessionStateException
 import io.rdbc.pgsql.core.ConnId
 import io.rdbc.pgsql.core.exception.PgDriverInternalErrorException
 import io.rdbc.pgsql.core.internal.fsm._
-import io.rdbc.pgsql.core.pgstruct.TxStatus
+import io.rdbc.pgsql.core.internal.protocol.TxStatus
 import io.rdbc.util.Logging
 
 import scala.concurrent.stm._

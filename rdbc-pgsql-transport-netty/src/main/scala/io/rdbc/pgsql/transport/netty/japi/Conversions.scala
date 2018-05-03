@@ -41,8 +41,8 @@ private[japi] object Conversions {
 
   implicit class JavaCacheConfigToScala(val value: StmtCacheConfig) extends AnyVal {
     def asScala: SStmtCacheConfig = {
-      if (value.enabled()) {
-        SStmtCacheConfig.Enabled(value.capacity())
+      if (value.isEnabled()) {
+        SStmtCacheConfig.Enabled(value.getCapacity())
       } else {
         SStmtCacheConfig.Disabled
       }

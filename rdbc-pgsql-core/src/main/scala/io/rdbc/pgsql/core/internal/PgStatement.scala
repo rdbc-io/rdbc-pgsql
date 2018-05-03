@@ -17,9 +17,10 @@
 package io.rdbc.pgsql.core.internal
 
 import io.rdbc.ImmutIndexedSeq
+import io.rdbc.pgsql.core.StmtArgsConverter
 import io.rdbc.sapi.exceptions._
 import io.rdbc.pgsql.core.internal.PgNativeStatement.Params.{Named, Positional}
-import io.rdbc.pgsql.core.pgstruct.Argument
+import io.rdbc.pgsql.core.internal.protocol.Argument
 import io.rdbc.sapi._
 import io.rdbc.util.Logging
 import io.rdbc.util.Preconditions._
@@ -30,7 +31,7 @@ import scala.util.{Failure, Success, Try}
 
 private[core] class PgStatement(stmtExecutor: PgStatementExecutor,
                                 nativeStmt: PgNativeStatement,
-                                argConverter: StmtArgConverter)
+                                argConverter: StmtArgsConverter)
                                (implicit ec: ExecutionContext)
   extends Statement
     with Logging {
@@ -60,7 +61,7 @@ private[core] class PgStatement(stmtExecutor: PgStatementExecutor,
         }
 
       case namedParams: Named =>
-        argConverter.convertNamedArgs(namedArgs, namedParams)
+        argConverter.convertNamedArgs(namedArgs, namedParams)(stmtExecutor.sessionParams)
     }
   }
 
@@ -77,7 +78,7 @@ private[core] class PgStatement(stmtExecutor: PgStatementExecutor,
     } else if (posArgs.size > size) {
       Failure(new TooManyParamsException(provided = posArgs.size, expected = size))
     } else {
-      argConverter.convertPositionalArgs(posArgs.toVector)
+      argConverter.convertPositionalArgs(posArgs.toVector)(stmtExecutor.sessionParams)
     }
   }
 

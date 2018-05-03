@@ -22,9 +22,8 @@ object SessionParams {
   private val DefaultCharset = Charset.forName("US-ASCII")
 
   val default = SessionParams(
-    clientCharset = DefaultCharset,
-    serverCharset = DefaultCharset
+    clientCharset = DefaultCharset
   )
 }
 
-final case class SessionParams(clientCharset: Charset, serverCharset: Charset)
+final case class SessionParams(clientCharset: Charset)

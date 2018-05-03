@@ -24,7 +24,6 @@ import io.rdbc.pgsql.transport.netty.sapi.{
   ChannelOptionValue => SChannelOptionValue,
   NettyPgConnectionFactory => SNettyPgConnectionFactory
 }
-import io.rdbc.typeconv.StandardTypeConvertersProvider
 
 import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
@@ -34,32 +33,28 @@ object ScalaToJavaNettyPgConnectionFactory {
   def create(config: Config): NettyPgConnectionFactory = {
 
     val sConfig = SConfig.apply(
-      host = config.host(),
-      port = config.port(),
-      authenticator = config.authenticator(),
-      dbName = config.dbName().asScala,
-      subscriberBufferCapacity = config.subscriberBufferCapacity(),
-      subscriberMinDemandRequestSize = config.subscriberMinDemandRequestSize(),
-      stmtCacheConfig = config.cacheConfig().asScala,
-      typeConvertersProviders = Vector(new StandardTypeConvertersProvider),
-      pgTypesProviders = config.pgTypesProviders().asScala.toVector,
-      msgDecoderFactory = config.msgDecoderFactory(),
-      msgEncoderFactory = config.msgEncoderFactory(),
-      writeTimeout = config.writeTimeout().asScala,
-      ec = config.executionContext(),
-      channelFactory = config.channelFactory(),
-      eventLoopGroup = config.eventLoopGroup(),
-      channelOptions = config.channelOptions().asScala.map { jopt =>
+      host = config.getHost(),
+      port = config.getPort(),
+      authenticator = config.getAuthenticator(),
+      dbName = config.getDbName().asScala,
+      subscriberBufferCapacity = config.getSubscriberBufferCapacity(),
+      subscriberMinDemandRequestSize = config.getSubscriberMinDemandRequestSize(),
+      stmtCacheConfig = config.getCacheConfig().asScala,
+      writeTimeout = config.getWriteTimeout().asScala,
+      ec = config.getExecutionContext(),
+      channelFactory = config.getChannelFactory(),
+      eventLoopGroup = config.getEventLoopGroup(), //TODO new converters
+      channelOptions = config.getChannelOptions().asScala.map { jopt =>
         SChannelOptionValue[Any](
-          jopt.option().asInstanceOf[ChannelOption[Any]],
-          jopt.value()
+          jopt.getOption().asInstanceOf[ChannelOption[Any]],
+          jopt.getValue()
         )
       }.toVector
     )
 
     val underlying = SNettyPgConnectionFactory.apply(sConfig)
 
-    new NettyPgConnectionFactory(underlying, config.executionContext())
+    new NettyPgConnectionFactory(underlying, config.getExecutionContext())
   }
 
 }

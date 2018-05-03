@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.core
 
 import io.rdbc._
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.PgFrontendMessage
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.PgFrontendMessage
 
 import scala.concurrent.Future
 import scala.util.Try

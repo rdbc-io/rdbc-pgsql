@@ -18,8 +18,8 @@ package io.rdbc.pgsql.core.internal
 
 import io.rdbc.implbase.ExecutableStatementPartialImpl
 import io.rdbc.pgsql.core.exception.PgDriverInternalErrorException
-import io.rdbc.pgsql.core.pgstruct.Argument
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
+import io.rdbc.pgsql.core.internal.protocol.Argument
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.NativeSql
 import io.rdbc.sapi.{ExecutableStatement, RowPublisher, Timeout}
 import io.rdbc.util.Logging
 import io.rdbc.util.Preconditions._

@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.core.internal.fsm
 
 import io.rdbc.pgsql.core.internal.PgMsgHandler
-import io.rdbc.pgsql.core.pgstruct.messages.backend.ReadyForQuery
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.ReadyForQuery
 
 private[core]
 class WaitingForReady private[fsm](onIdle: => Unit, onFailure: Throwable => Unit)

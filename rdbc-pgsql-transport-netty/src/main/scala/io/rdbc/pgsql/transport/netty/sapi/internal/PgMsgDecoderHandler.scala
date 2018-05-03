@@ -24,15 +24,15 @@ import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.ByteToMessageDecoder
 import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.codec.{Decoder, DecoderFactory}
+import io.rdbc.pgsql.core.internal.protocol.codec.{MessageDecoder, MessageDecoderFactory}
 import scodec.bits.ByteVector
 
-private[netty] class PgMsgDecoderHandler(decoderFactory: DecoderFactory)
+private[netty] class PgMsgDecoderHandler(decoderFactory: MessageDecoderFactory)
   extends ByteToMessageDecoder
     with StrictLogging {
 
-  @volatile private[this] var decoder: Decoder = {
-    decoderFactory.decoder(SessionParams.default.serverCharset)
+  @volatile private[this] var decoder: MessageDecoder = {
+    decoderFactory.decoder(SessionParams.default.clientCharset)
   }
 
   def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: ju.List[AnyRef]): Unit = {

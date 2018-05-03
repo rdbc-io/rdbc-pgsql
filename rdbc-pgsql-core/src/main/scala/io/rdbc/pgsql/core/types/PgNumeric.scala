@@ -16,11 +16,15 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.pgstruct.Oid
-import io.rdbc.sapi.SqlNumeric
+import io.rdbc.pgsql.core.Oid
+import io.rdbc.sapi.DecimalNumber
 
-trait PgNumeric extends PgType[SqlNumeric] {
-  val typeOid = Oid(1700)
-  val cls = classOf[SqlNumeric]
+case object PgNumericType extends PgType[PgNumeric] {
+  val oid = Oid(1700)
+  val valCls = classOf[PgNumeric]
   val name = "numeric"
+}
+
+final case class PgNumeric(value: DecimalNumber) extends PgVal[DecimalNumber] {
+  val typ = PgNumericType
 }

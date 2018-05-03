@@ -16,12 +16,16 @@
 
 package io.rdbc.pgsql.core.types
 
-import java.time.Instant
+import java.time.ZonedDateTime
 
-import io.rdbc.pgsql.core.pgstruct.Oid
+import io.rdbc.pgsql.core.Oid
 
-trait PgTimestampTz extends PgType[Instant] {
-  val typeOid = Oid(1184)
-  val cls = classOf[Instant]
+case object PgTimestampTzType extends PgType[PgTimestampTz] {
+  val oid = Oid(1184)
+  val valCls = classOf[PgTimestampTz]
   val name = "timestamptz"
+}
+
+final case class PgTimestampTz(value: ZonedDateTime) extends PgVal[ZonedDateTime] {
+  val typ = PgTimestampTzType
 }

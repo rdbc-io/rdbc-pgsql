@@ -16,19 +16,14 @@
 
 package io.rdbc.pgsql.core.types
 
-import _root_.scodec.bits.ByteVector
-import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.pgstruct.Oid
+import io.rdbc.pgsql.core.Oid
 
-import scala.util.Try
+trait PgType[T <: PgVal[_]] {
+  def oid: Oid
 
-trait PgType[T] {
-  def typeOid: Oid
-  def cls: Class[T]
-  def otherClasses: Vector[Class[_]] = Vector.empty
   def name: String
 
-  def toObj(binaryVal: ByteVector)(implicit sessionParams: SessionParams): Try[T]
+  type ValType = T
 
-  def toPgBinary(obj: T)(implicit sessionParams: SessionParams): Try[ByteVector]
+  def valCls: Class[T]
 }

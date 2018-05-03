@@ -18,9 +18,9 @@ package io.rdbc.pgsql.core.internal.fsm.streaming
 
 import io.rdbc.pgsql.core.ChannelWriter
 import io.rdbc.pgsql.core.internal.fsm.{State, StateAction}
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.ReadyForQuery
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.{ClosePortal, Sync}
 import io.rdbc.pgsql.core.internal.{PgMsgHandler, PgRowPublisher}
-import io.rdbc.pgsql.core.pgstruct.messages.backend.ReadyForQuery
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.{ClosePortal, Sync}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal

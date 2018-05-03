@@ -22,12 +22,11 @@ import io.rdbc.ImmutSeq
 import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.exception.PgSubscriptionRejectedException
 import io.rdbc.pgsql.core.internal.PgRowPublisher.PublisherState.{Cancelling, IdleReadyToPull}
-import io.rdbc.pgsql.core.pgstruct.messages.backend.{DataRow, RowDescription}
-import io.rdbc.pgsql.core.pgstruct.messages.frontend._
-import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.sapi.{ColumnMetadata, Row, RowMetadata, RowPublisher, TypeConverterRegistry, Warning}
-import io.rdbc.util.Preconditions.checkNotNull
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.{DataRow, RowDescription}
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend._
+import io.rdbc.sapi.{ColumnMetadata, Row, RowMetadata, RowPublisher, Warning}
 import io.rdbc.util.Logging
+import io.rdbc.util.Preconditions.checkNotNull
 import io.rdbc.util.scheduler.ScheduledTask
 import org.reactivestreams.{Subscriber, Subscription}
 
@@ -157,10 +156,9 @@ private[core] object PgRowPublisher {
 
 }
 
-private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[PortalDescData],
+private[core] class PgRowPublisher(preparePortal: PgRowPublisher => Future[PortalDescData],
                                    val portalName: Option[PortalName],
-                                   pgTypes: PgTypeRegistry,
-                                   typeConverters: TypeConverterRegistry,
+                                   colValConverter: ColValueToObjConverter,
                                    sessionParams: SessionParams,
                                    maybeTimeoutHandler: Option[TimeoutHandler],
                                    @volatile private[this] var fatalErrorNotifier: FatalErrorNotifier)
@@ -226,8 +224,7 @@ private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[Por
         rowDesc = rowDesc,
         cols = dataRow.colValues,
         nameMapping = nameIdxMapping,
-        typeConverters = typeConverters,
-        pgTypes = pgTypes,
+        colValConverter = colValConverter,
         sessionParams = sessionParams
       )
       decrementDemand()
@@ -323,8 +320,7 @@ private[core] class PgRowPublisher(preparePortal: (PgRowPublisher) => Future[Por
       val columnsMetadata = rowDesc.colDescs.map { colDesc =>
         ColumnMetadata(
           name = colDesc.name.value,
-          dbTypeId = colDesc.dataType.oid.value.toString,
-          cls = pgTypes.typeByOid(colDesc.dataType.oid).map(_.cls)
+          dbTypeId = colDesc.dataType.oid.value.toString
         )
       }
       RowMetadata(columnsMetadata)

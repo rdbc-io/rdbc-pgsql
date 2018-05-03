@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.core.internal.fsm
 
 import io.rdbc.pgsql.core.internal.PgMsgHandler
-import io.rdbc.pgsql.core.pgstruct.messages.backend.CloseComplete
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.CloseComplete
 
 import scala.concurrent.Promise
 

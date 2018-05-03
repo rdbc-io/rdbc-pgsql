@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql
 
-import io.rdbc.pgsql.core.pgstruct.messages.backend.BackendKeyData
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.BackendKeyData
 
 import scala.concurrent.Future
 

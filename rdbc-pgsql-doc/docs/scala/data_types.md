@@ -26,21 +26,21 @@ PostgreSQL type names.
 
 Following table lists mapping between Scala and supported PostgreSQL types.
 
-| PostgreSQL name           | Standard name            | Scala type   |
-|---------------------------|--------------------------|--------------|
-| char                      | CHAR/NCHAR               | `String`     |
-| varchar                   | VARCHAR/NVARCHAR         | `String`     |
-| text                      | CLOB                     | `String`     |
-| bytea                     | BLOB                     | `Array[Byte]`|
-| bool                      | BOOLEAN                  | `Boolean`|
-| numeric                   | NUMERIC                  | [`io.rdbc.sapi.SqlNumeric`]()|
-| float4                    | REAL                     | `Float`|
-| float8                    | FLOAT                    | `Double`|
-| int2                      | SMALLINT                 | `Short`|
-| int4                      | INTEGER                  | `Int`|
-| int8                      | BIGINT                   | `Long`|
-| date                      | DATE                     | `java.time.LocalDate`|
-| time                      | TIME                     | `java.time.LocalTime`|
-| timestamp                 | TIMESTAMP                | `java.time.LocalDateTime` |
-| timestamp with time zone  | TIMESTAMP WITH TIME ZONE | `java.time.Instant`|
-| uuid                      | *none*                   | `java.util.UUID` |
+| PostgreSQL name           | Scala type   |
+|---------------------------|--------------|
+| char                      | `String`     |
+| varchar                   | `String`     |
+| text                      | `String`     |
+| bytea                     | `scodec.bits.ByteVector`|
+| bool                      | `Boolean`|
+| numeric                   | [`io.rdbc.sapi.DecimalNumber`]()|
+| float4                    | `Float`|
+| float8                    | `Double`|
+| int2                      | `Short`|
+| int4                      | `Int`|
+| int8                      | `Long`|
+| date                      | `java.time.LocalDate`|
+| time                      | `java.time.LocalTime`|
+| timestamp                 | `java.time.Instant` |
+| timestamp with time zone  | `java.time.ZonedDateTime`|
+| uuid                      | `java.util.UUID` |

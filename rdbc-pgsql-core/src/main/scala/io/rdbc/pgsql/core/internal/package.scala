@@ -17,8 +17,8 @@
 package io.rdbc.pgsql.core
 
 import io.rdbc.pgsql.core.internal.fsm.StateAction
-import io.rdbc.pgsql.core.pgstruct.TxStatus
-import io.rdbc.pgsql.core.pgstruct.messages.backend.PgBackendMessage
+import io.rdbc.pgsql.core.internal.protocol.TxStatus
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.PgBackendMessage
 
 import scala.util.Try
 

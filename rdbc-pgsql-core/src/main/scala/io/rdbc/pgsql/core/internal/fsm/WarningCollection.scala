@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.internal.fsm
 
-import io.rdbc.pgsql.core.pgstruct.messages.backend.{PgBackendMessage, StatusMessage}
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.{PgBackendMessage, StatusMessage}
 
 import scala.util.control.NonFatal
 

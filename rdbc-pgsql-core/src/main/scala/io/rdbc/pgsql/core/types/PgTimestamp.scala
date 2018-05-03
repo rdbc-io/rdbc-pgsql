@@ -16,12 +16,16 @@
 
 package io.rdbc.pgsql.core.types
 
-import java.time.LocalDateTime
+import java.time.Instant
 
-import io.rdbc.pgsql.core.pgstruct.Oid
+import io.rdbc.pgsql.core.Oid
 
-trait PgTimestamp extends PgType[LocalDateTime] {
-  val typeOid = Oid(1114)
-  val cls = classOf[LocalDateTime]
+case object PgTimestampType extends PgType[PgTimestamp] {
+  val oid = Oid(1114)
+  val valCls = classOf[PgTimestamp]
   val name = "timestamp"
+}
+
+final case class PgTimestamp(value: Instant) extends PgVal[Instant] {
+  val typ = PgTimestampType
 }

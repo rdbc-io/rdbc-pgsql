@@ -16,8 +16,8 @@
 
 package io.rdbc.pgsql.core.exception
 
+import io.rdbc.pgsql.core.internal.protocol.StatusData
 import io.rdbc.sapi.exceptions.UnauthorizedException
-import io.rdbc.pgsql.core.pgstruct.StatusData
 
 class PgUnauthorizedException(val pgStatusData: StatusData)
     extends UnauthorizedException(pgStatusData.shortInfo)

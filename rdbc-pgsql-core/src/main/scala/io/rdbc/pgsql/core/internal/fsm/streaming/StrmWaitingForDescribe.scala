@@ -19,9 +19,9 @@ package io.rdbc.pgsql.core.internal.fsm.streaming
 import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.exception.PgProtocolViolationException
 import io.rdbc.pgsql.core.internal.fsm.{State, StateAction}
+import io.rdbc.pgsql.core.internal.protocol.messages.backend._
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.PortalName
 import io.rdbc.pgsql.core.internal.{PgMsgHandler, PgRowPublisher, PortalDescData}
-import io.rdbc.pgsql.core.pgstruct.messages.backend._
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.PortalName
 
 import scala.concurrent.{ExecutionContext, Promise}
 

@@ -16,10 +16,14 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.pgstruct.Oid
+import io.rdbc.pgsql.core.Oid
 
-trait PgVarchar extends PgType[String] {
-  val typeOid = Oid(1043)
-  val cls = classOf[String]
+case object PgVarcharType extends PgType[PgVarchar] {
+  val oid = Oid(1043)
+  val valCls = classOf[PgVarchar]
   val name = "varchar"
+}
+
+final case class PgVarchar(value: String) extends PgVal[String] {
+  val typ = PgVarcharType
 }
