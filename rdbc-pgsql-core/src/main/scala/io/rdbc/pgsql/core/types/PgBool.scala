@@ -16,11 +16,14 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.pgstruct.Oid
+import io.rdbc.pgsql.core.Oid
 
-trait PgBool extends PgType[Boolean] {
-  val typeOid = Oid(16)
-  val cls = classOf[Boolean]
+case object PgBoolType extends PgType[PgBool] {
+  val oid = Oid(16)
+  val valCls = classOf[PgBool]
   val name = "bool"
-  override val otherClasses = Vector(classOf[java.lang.Boolean])
+}
+
+final case class PgBool(value: Boolean) extends PgVal[Boolean] {
+  val typ = PgBoolType
 }

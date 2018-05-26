@@ -18,8 +18,8 @@ package io.rdbc.pgsql.core.internal
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import io.rdbc.pgsql.core.pgstruct.{Argument, TxStatus}
 import io.rdbc.pgsql.core.internal.Compat._
+import io.rdbc.pgsql.core.internal.protocol.{Argument, TxStatus}
 import io.rdbc.util.Logging
 import io.rdbc.util.Preconditions._
 import org.reactivestreams.{Subscriber, Subscription}

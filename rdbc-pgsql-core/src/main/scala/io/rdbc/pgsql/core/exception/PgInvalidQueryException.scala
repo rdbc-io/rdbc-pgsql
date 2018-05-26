@@ -16,8 +16,8 @@
 
 package io.rdbc.pgsql.core.exception
 
+import io.rdbc.pgsql.core.internal.protocol.StatusData
 import io.rdbc.sapi.exceptions.InvalidQueryException
-import io.rdbc.pgsql.core.pgstruct.StatusData
 
 class PgInvalidQueryException(val pgStatusData: StatusData)
   extends InvalidQueryException(pgStatusData.shortInfo, pgStatusData.position)

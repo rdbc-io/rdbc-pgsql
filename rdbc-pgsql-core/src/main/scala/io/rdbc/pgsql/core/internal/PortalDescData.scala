@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.internal
 
-import io.rdbc.pgsql.core.pgstruct.messages.backend.{RowDescription, StatusMessage}
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.{RowDescription, StatusMessage}
 
 import scala.concurrent.Promise
 

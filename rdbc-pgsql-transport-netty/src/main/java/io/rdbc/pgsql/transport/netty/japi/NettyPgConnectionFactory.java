@@ -24,17 +24,13 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.rdbc.jadapter.ConnectionFactoryAdapter;
 import io.rdbc.japi.ConnectionFactory;
-import io.rdbc.japi.TypeConvertersProvider;
 import io.rdbc.pgsql.core.auth.Authenticator;
-import io.rdbc.pgsql.core.codec.DecoderFactory;
-import io.rdbc.pgsql.core.codec.EncoderFactory;
-import io.rdbc.pgsql.core.codec.scodec.ScodecDecoderFactory;
-import io.rdbc.pgsql.core.codec.scodec.ScodecEncoderFactory;
-import io.rdbc.pgsql.core.config.japi.PgTypesProviders;
+import io.rdbc.pgsql.core.internal.protocol.codec.MessageDecoderFactory;
+import io.rdbc.pgsql.core.internal.protocol.codec.MessageEncoderFactory;
+import io.rdbc.pgsql.core.internal.protocol.codec.sco.ScodecMessageDecoderFactory;
+import io.rdbc.pgsql.core.internal.protocol.codec.sco.ScodecMessageEncoderFactory;
 import io.rdbc.pgsql.core.config.japi.StmtCacheConfig;
-import io.rdbc.pgsql.core.types.PgTypesProvider;
 import io.rdbc.pgsql.transport.netty.sapi.NioChannelFactory;
-import io.rdbc.typeconv.StandardTypeConvertersProvider;
 import org.immutables.value.Value.Immutable;
 import org.immutables.value.Value.Style;
 import org.immutables.value.Value.Style.ImplementationVisibility;
@@ -56,7 +52,8 @@ public class NettyPgConnectionFactory
         implements ConnectionFactory {
 
     protected NettyPgConnectionFactory(io.rdbc.sapi.ConnectionFactory underlying, ExecutionContext ec) {
-        super(underlying, PartialFunction$.MODULE$.empty(), ec); //TODO exceptionConverter
+        //TODO register exceptionConverter to convert to Java exceptions
+        super(underlying, PartialFunction$.MODULE$.empty(), ec);
     }
 
     public static NettyPgConnectionFactory create(Config config) {
@@ -66,70 +63,57 @@ public class NettyPgConnectionFactory
     @Immutable
     @Style(visibility = ImplementationVisibility.PACKAGE, typeImmutable = "ImmutableNettyPgConnFactoryConfig")
     public interface Config {
-        String host();
+        String getHost();
 
-        int port();
+        int getPort();
 
-        Authenticator authenticator();
+        Authenticator getAuthenticator();
 
         @Default
-        default ChannelFactory<? extends Channel> channelFactory() {
+        default ChannelFactory<? extends Channel> getChannelFactory() {
             return new NioChannelFactory();
         }
 
         @Default
-        default EventLoopGroup eventLoopGroup() {
+        default EventLoopGroup getEventLoopGroup() {
             return new NioEventLoopGroup();
         }
 
         @Default
-        default List<ChannelOptionValue<?>> channelOptions() {
+        default List<ChannelOptionValue<?>> getChannelOptions() {
             return Collections.singletonList(
                     ChannelOptionValue.of(ChannelOption.SO_KEEPALIVE, true)
             );
         }
 
-        Optional<String> dbName();
+        Optional<String> getDbName();
 
         @Default
-        default int subscriberBufferCapacity() {
+        default int getSubscriberBufferCapacity() {
             return 100;
         }
 
         @Default
-        default int subscriberMinDemandRequestSize() {
+        default int getSubscriberMinDemandRequestSize() {
             return 10;
         }
 
         @Default
-        default StmtCacheConfig cacheConfig() {
+        default StmtCacheConfig getCacheConfig() {
             return StmtCacheConfig.builder().enabled(true).capacity(100).build();
         }
 
         @Default
-        default List<PgTypesProvider> pgTypesProviders() {
-            return Collections.singletonList(PgTypesProviders.scodec());
-        }
-
-        @Default
-        default DecoderFactory msgDecoderFactory() {
-            return new ScodecDecoderFactory();
-        }
-
-        @Default
-        default EncoderFactory msgEncoderFactory() {
-            return new ScodecEncoderFactory();
-        }
-
-        @Default
-        default Duration writeTimeout() {
+        default Duration getWriteTimeout() {
             return Duration.of(10L, ChronoUnit.SECONDS);
         }
 
         @Default
-        default ExecutionContext executionContext() {
+        default ExecutionContext getExecutionContext() {
             return ExecutionContext$.MODULE$.global();
         }
+
+        //TODO allow configuring type mappings, converters and codecs in Java API
 
         static Builder builder() {
             return ImmutableNettyPgConnFactoryConfig.builder();
@@ -151,12 +135,6 @@ public class NettyPgConnectionFactory
             Builder subscriberMinDemandRequestSize(int subscriberMinDemandRequestSize);
 
             Builder cacheConfig(StmtCacheConfig config);
-
-            Builder pgTypesProviders(Iterable<? extends PgTypesProvider> typeConvertersProviders);
-
-            Builder msgDecoderFactory(DecoderFactory decoderFactory);
-
-            Builder msgEncoderFactory(EncoderFactory encoderFactory);
 
             Builder writeTimeout(Duration timeout);
 

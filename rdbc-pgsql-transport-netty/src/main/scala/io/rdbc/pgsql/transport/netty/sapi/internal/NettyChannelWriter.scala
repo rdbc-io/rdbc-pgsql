@@ -19,7 +19,7 @@ package io.rdbc.pgsql.transport.netty.sapi.internal
 import io.netty.channel.Channel
 import io.rdbc.pgsql.core.ChannelWriter
 import io.rdbc.pgsql.core.exception.PgChannelException
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.PgFrontendMessage
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.PgFrontendMessage
 import io.rdbc.util.Logging
 
 import scala.concurrent.{ExecutionContext, Future}

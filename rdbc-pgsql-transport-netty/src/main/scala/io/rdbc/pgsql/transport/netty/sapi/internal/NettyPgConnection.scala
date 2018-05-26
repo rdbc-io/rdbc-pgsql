@@ -20,7 +20,7 @@ import java.nio.charset.Charset
 
 import io.netty.channel.{ChannelHandlerContext, SimpleChannelInboundHandler}
 import io.rdbc.pgsql.core._
-import io.rdbc.pgsql.core.pgstruct.messages.backend._
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.PgBackendMessage
 import io.rdbc.util.scheduler.TaskScheduler
 
 import scala.concurrent.ExecutionContext
@@ -32,14 +32,19 @@ private[netty] class NettyPgConnection(id: ConnId,
                                        encoder: PgMsgEncoderHandler,
                                        ec: ExecutionContext,
                                        scheduler: TaskScheduler,
-                                       requestCanceler: RequestCanceler)
+                                       requestCanceler: RequestCanceler,
+                                       stmtArgsConverter: StmtArgsConverter,
+                                       colValueToObjConverter: ColValueToObjConverter
+                                      )
   extends AbstractPgConnection(
     id = id,
     config = config,
     out = out,
     ec = ec,
     scheduler = scheduler,
-    requestCanceler = requestCanceler) {
+    requestCanceler = requestCanceler,
+    stmtArgsConverter = stmtArgsConverter,
+    colValueToObjConverter = colValueToObjConverter) {
 
   val handler = new SimpleChannelInboundHandler[PgBackendMessage] {
     def channelRead0(ctx: ChannelHandlerContext, msg: PgBackendMessage): Unit = {

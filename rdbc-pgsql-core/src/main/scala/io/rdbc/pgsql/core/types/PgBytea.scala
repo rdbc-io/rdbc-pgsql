@@ -16,10 +16,15 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.pgstruct.Oid
+import _root_.scodec.bits.ByteVector
+import io.rdbc.pgsql.core.Oid
 
-trait PgBytea extends PgType[Array[Byte]] {
-  val typeOid = Oid(17)
-  val cls = classOf[Array[Byte]]
+case object PgByteaType extends PgType[PgBytea] {
+  val oid = Oid(17)
+  val valCls = classOf[PgBytea]
   val name = "bytea"
+}
+
+final case class PgBytea(value: ByteVector) extends PgVal[ByteVector] {
+  val typ = PgByteaType
 }

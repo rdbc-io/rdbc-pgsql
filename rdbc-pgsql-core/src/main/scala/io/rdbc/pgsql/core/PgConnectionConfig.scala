@@ -17,11 +17,7 @@
 package io.rdbc.pgsql.core
 
 import io.rdbc.pgsql.core.config.sapi.StmtCacheConfig
-import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.sapi.TypeConverterRegistry
 
-final case class PgConnectionConfig(pgTypes: PgTypeRegistry,
-                                    typeConverters: TypeConverterRegistry,
-                                    subscriberBufferCapacity: Int,
+final case class PgConnectionConfig(subscriberBufferCapacity: Int,
                                     subscriberMinDemandRequestSize: Int,
                                     stmtCacheConfig: StmtCacheConfig)

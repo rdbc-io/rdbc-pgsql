@@ -18,10 +18,14 @@ package io.rdbc.pgsql.core.types
 
 import java.time.LocalDate
 
-import io.rdbc.pgsql.core.pgstruct.Oid
+import io.rdbc.pgsql.core.Oid
 
-trait PgDate extends PgType[LocalDate] {
-  val typeOid = Oid(1082)
-  val cls = classOf[LocalDate]
+case object PgDateType extends PgType[PgDate] {
+  val oid = Oid(1082)
+  val valCls = classOf[PgDate]
   val name = "date"
+}
+
+final case class PgDate(value: LocalDate) extends PgVal[LocalDate] {
+  val typ = PgDateType
 }

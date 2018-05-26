@@ -17,8 +17,8 @@
 package io.rdbc.pgsql.core.internal.fsm
 
 import io.rdbc.pgsql.core.internal.PgMsgHandler
-import io.rdbc.pgsql.core.pgstruct.TxStatus
-import io.rdbc.pgsql.core.pgstruct.messages.backend._
+import io.rdbc.pgsql.core.internal.protocol.TxStatus
+import io.rdbc.pgsql.core.internal.protocol.messages.backend._
 
 import scala.concurrent.Promise
 

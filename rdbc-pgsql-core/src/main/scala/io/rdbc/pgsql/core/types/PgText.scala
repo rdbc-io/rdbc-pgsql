@@ -16,10 +16,14 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.pgstruct.Oid
+import io.rdbc.pgsql.core.Oid
 
-trait PgText extends PgType[String] {
-  val typeOid = Oid(25)
-  val cls = classOf[String]
+case object PgTextType extends PgType[PgText] {
+  val oid = Oid(25)
+  val valCls = classOf[PgText]
   val name = "text"
+}
+
+final case class PgText(value: String) extends PgVal[String] {
+  val typ = PgTextType
 }

@@ -17,13 +17,13 @@
 package io.rdbc.pgsql.core.internal
 
 import io.rdbc._
-import io.rdbc.sapi.exceptions.MixedParamTypesException
 import io.rdbc.pgsql.core.internal.PgNativeStatement.Params
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.NativeSql
+import io.rdbc.sapi.exceptions.MixedParamTypesException
 import io.rdbc.util.Logging
 
-import scala.util.{Failure, Success, Try}
 import scala.util.matching.Regex
+import scala.util.{Failure, Success, Try}
 
 private[core] object PgNativeStatement extends Logging {
 

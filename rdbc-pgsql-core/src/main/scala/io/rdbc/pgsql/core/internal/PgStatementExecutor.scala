@@ -16,8 +16,9 @@
 
 package io.rdbc.pgsql.core.internal
 
-import io.rdbc.pgsql.core.pgstruct.Argument
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.NativeSql
+import io.rdbc.pgsql.core.SessionParams
+import io.rdbc.pgsql.core.internal.protocol.Argument
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.NativeSql
 import io.rdbc.sapi.{RowPublisher, Timeout}
 import org.reactivestreams.Publisher
 
@@ -35,4 +36,6 @@ private[core] trait PgStatementExecutor {
   def subscribeToStatementArgsStream[A](nativeStatement: PgNativeStatement,
                                         args: Publisher[A],
                                         argsConverter: A => Try[Vector[Argument]]): Future[Unit]
+
+  private[core] def sessionParams: SessionParams
 }

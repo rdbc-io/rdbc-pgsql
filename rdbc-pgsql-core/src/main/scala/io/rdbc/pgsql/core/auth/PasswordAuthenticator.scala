@@ -17,8 +17,8 @@
 package io.rdbc.pgsql.core.auth
 
 import io.rdbc.pgsql.core.auth.AuthState.AuthComplete
-import io.rdbc.pgsql.core.pgstruct.messages.backend.auth._
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.PasswordMessage
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.auth._
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.PasswordMessage
 
 import scala.collection.immutable
 

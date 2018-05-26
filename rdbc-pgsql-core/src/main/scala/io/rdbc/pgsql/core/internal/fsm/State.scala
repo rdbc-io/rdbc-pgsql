@@ -16,15 +16,15 @@
 
 package io.rdbc.pgsql.core.internal.fsm
 
-import io.rdbc.sapi.exceptions.ConnectionClosedException
 import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgStatusDataException}
 import io.rdbc.pgsql.core.internal.fsm.streaming._
+import io.rdbc.pgsql.core.internal.protocol.TxStatus
+import io.rdbc.pgsql.core.internal.protocol.messages.backend._
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.{Bind, Parse, PortalName}
 import io.rdbc.pgsql.core.internal.{PgMsgHandler, PgRowPublisher, PortalDescData}
-import io.rdbc.pgsql.core.pgstruct.TxStatus
-import io.rdbc.pgsql.core.pgstruct.messages.backend._
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.{Bind, Parse, PortalName}
+import io.rdbc.sapi.exceptions.ConnectionClosedException
 import io.rdbc.util.Logging
 
 import scala.concurrent.{ExecutionContext, Future, Promise}

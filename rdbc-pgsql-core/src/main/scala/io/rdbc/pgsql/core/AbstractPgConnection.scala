@@ -29,9 +29,10 @@ import io.rdbc.pgsql.core.internal.cache.LruStmtCache
 import io.rdbc.pgsql.core.internal.fsm.StateAction.{Fatal, Goto, Stay}
 import io.rdbc.pgsql.core.internal.fsm._
 import io.rdbc.pgsql.core.internal.fsm.streaming.{StrmBeginningTx, StrmWaitingForDescribe}
-import io.rdbc.pgsql.core.pgstruct.messages.backend.{SessionParamKey, _}
-import io.rdbc.pgsql.core.pgstruct.messages.frontend._
-import io.rdbc.pgsql.core.pgstruct.{Argument, ReturnColFormats, TxStatus}
+import io.rdbc.pgsql.core.internal.protocol.messages.backend._
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend._
+import io.rdbc.pgsql.core.internal.protocol.{Argument, ReturnColFormats, TxStatus}
 import io.rdbc.sapi._
 import io.rdbc.util.Logging
 import io.rdbc.util.Preconditions._
@@ -48,7 +49,9 @@ abstract class AbstractPgConnection(val id: ConnId,
                                     implicit private[this] val out: ChannelWriter,
                                     implicit protected val ec: ExecutionContext,
                                     scheduler: TaskScheduler,
-                                    requestCanceler: RequestCanceler)
+                                    requestCanceler: RequestCanceler,
+                                    stmtArgsConverter: StmtArgsConverter,
+                                    colValueToObjConverter: ColValueToObjConverter)
   extends Connection
     with ConnectionPartialImpl
     with WriteFailureHandler
@@ -58,16 +61,16 @@ abstract class AbstractPgConnection(val id: ConnId,
     with Logging {
 
   private[this] val fsmManager = new PgSessionFsmManager(id, this)
-  @volatile private[this] var sessionParams = SessionParams.default
+  @volatile private[this] var _sessionParams = SessionParams.default
   @volatile private[this] var maybeBackendKeyData = Option.empty[BackendKeyData]
   private[this] val stmtCounter = new AtomicInteger(0)
-
-  private[this] def argConverter = new StmtArgConverter(config.pgTypes, sessionParams)
 
   @volatile private[this] var maybeStmtCache = config.stmtCacheConfig match {
     case Disabled => None
     case Enabled(capacity) => Some(LruStmtCache.empty(capacity))
   }
+
+  override def sessionParams: SessionParams = _sessionParams
 
   override def watchForIdle: Future[Unit] = fsmManager.readyFuture
 
@@ -86,7 +89,7 @@ abstract class AbstractPgConnection(val id: ConnId,
         new PgStatement(
           stmtExecutor = this,
           nativeStmt = nativeStmt,
-          argConverter = argConverter
+          argConverter = stmtArgsConverter
         )
       }
     }
@@ -148,8 +151,6 @@ abstract class AbstractPgConnection(val id: ConnId,
 
   protected def handleClientCharsetChange(charset: Charset): Unit
 
-  protected def handleServerCharsetChange(charset: Charset): Unit
-
   protected final def handleBackendMessage(msg: PgBackendMessage): Unit = traced {
     checkNotNull(msg)
     logger.trace(s"Handling backend message $msg")
@@ -197,9 +198,8 @@ abstract class AbstractPgConnection(val id: ConnId,
       val publisher = new PgRowPublisher(
         preparePortal = preparePortalFun,
         portalName = parseAndBind.bind.portal,
-        pgTypes = config.pgTypes,
-        typeConverters = config.typeConverters,
-        sessionParams = sessionParams,
+        colValConverter = colValueToObjConverter,
+        sessionParams = _sessionParams,
         maybeTimeoutHandler = newTimeoutHandler(reqId, timeout),
         fatalErrorNotifier = handleFatalError
       )(reqId, out, ec)
@@ -316,7 +316,7 @@ abstract class AbstractPgConnection(val id: ConnId,
     }
 
     def newBind(maybeStmtName: Option[StmtName]): Bind = {
-      Bind(portal = None, maybeStmtName, params, ReturnColFormats.AllBinary)
+      frontend.Bind(portal = None, maybeStmtName, params, ReturnColFormats.AllBinary)
     }
 
     determineStmtStatus(nativeSql) match {
@@ -327,7 +327,7 @@ abstract class AbstractPgConnection(val id: ConnId,
   }
 
   private def shouldCache(nativeSql: NativeSql): Boolean = {
-    //for now, all statements are cached if cache is enabled
+    //for now, all statements are cached if cache is isEnabled
     true
   }
 
@@ -365,7 +365,7 @@ abstract class AbstractPgConnection(val id: ConnId,
     fsmManager.ifReadyF { (_, txStatus) =>
       logger.debug(s"Subscribing to arguments stream for statement '$nativeStatement'")
       fsmManager.triggerTransition(State.waitingForNextBatch)
-      val subscriber = new StatementArgsSubscriber(
+      val subscriber = new StatementArgsSubscriber[A](
         nativeStmt = nativeStatement,
         bufferCapacity = config.subscriberBufferCapacity,
         minDemandRequest = config.subscriberMinDemandRequestSize,
@@ -384,7 +384,7 @@ abstract class AbstractPgConnection(val id: ConnId,
     val execute = Execute(optionalPortalName = None, optionalFetchSize = None)
     val parseVec = {
       if (first) {
-        Vector(Parse(None, nativeStmt.sql, batch.head.map(_.dataTypeOid))) //TODO guard against an empty batch?
+        Vector(frontend.Parse(None, nativeStmt.sql, batch.head.map(_.dataTypeOid))) //TODO guard against an empty batch?
       } else Vector.empty
     }
 
@@ -435,36 +435,20 @@ abstract class AbstractPgConnection(val id: ConnId,
     }
   }
 
-  private def handleCharsetChange(pgCharsetName: String)(consumer: Charset => Unit): Unit = traced {
-    PgCharset.toJavaCharset(pgCharsetName).fold(
-      ex => handleFatalError(ex.getMessage, ex),
-      charset => consumer(charset)
-    )
-  }
-
   private def handleParamStatusChange(p: ParameterStatus): Unit = traced {
     p match {
       case ParameterStatus(SessionParamKey("client_encoding"), SessionParamVal(pgCharsetName)) =>
-        handleCharsetChange(pgCharsetName) {
-          charset =>
+        PgCharset.toJavaCharset(pgCharsetName).fold(
+          ex => handleFatalError(ex.getMessage, ex),
+          charset => {
             handleClientCharsetChange(charset)
-            sessionParams = sessionParams.copy(clientCharset = charset)
-        }
-
-      case ParameterStatus(SessionParamKey("server_encoding"), SessionParamVal(pgCharsetName)) =>
-        handleCharsetChange(pgCharsetName) {
-          charset =>
-            handleServerCharsetChange(charset)
-            sessionParams = sessionParams.copy(serverCharset = charset)
-        }
+            _sessionParams = _sessionParams.copy(clientCharset = charset)
+          }
+        )
 
       case _ => ()
     }
-    logger.debug(s"Session parameter '${
-      p.key.value
-    }' is now set to '${
-      p.value.value
-    }'")
+    logger.debug(s"Session parameter '${p.key.value}' is now set to '${p.value.value}'")
   }
 
   private def nextStmtName(): StmtName = traced {

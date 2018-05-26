@@ -18,7 +18,7 @@ package io.rdbc.pgsql.core.internal.fsm
 
 import io.rdbc.pgsql.core.exception.PgProtocolViolationException
 import io.rdbc.pgsql.core.internal.PgMsgHandler
-import io.rdbc.pgsql.core.pgstruct.messages.backend.{BackendKeyData, ReadyForQuery}
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.{BackendKeyData, ReadyForQuery}
 
 import scala.concurrent.Promise
 

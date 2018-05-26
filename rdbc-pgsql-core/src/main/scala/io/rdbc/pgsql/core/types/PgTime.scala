@@ -18,10 +18,14 @@ package io.rdbc.pgsql.core.types
 
 import java.time.LocalTime
 
-import io.rdbc.pgsql.core.pgstruct.Oid
+import io.rdbc.pgsql.core.Oid
 
-trait PgTime extends PgType[LocalTime] {
-  val typeOid = Oid(1083)
-  val cls = classOf[LocalTime]
+case object PgTimeType extends PgType[PgTime] {
+  val oid = Oid(1083)
+  val valCls = classOf[PgTime]
   val name = "time"
+}
+
+final case class PgTime(value: LocalTime) extends PgVal[LocalTime] {
+  val typ = PgTimeType
 }

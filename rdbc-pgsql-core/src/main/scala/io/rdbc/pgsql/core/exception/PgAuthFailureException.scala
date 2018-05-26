@@ -16,8 +16,8 @@
 
 package io.rdbc.pgsql.core.exception
 
+import io.rdbc.pgsql.core.internal.protocol.StatusData
 import io.rdbc.sapi.exceptions.AuthFailureException
-import io.rdbc.pgsql.core.pgstruct.StatusData
 
 class PgAuthFailureException(val pgStatusData: StatusData)
     extends AuthFailureException(pgStatusData.shortInfo)

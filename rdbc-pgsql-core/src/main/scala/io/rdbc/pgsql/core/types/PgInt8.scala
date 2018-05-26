@@ -16,11 +16,14 @@
 
 package io.rdbc.pgsql.core.types
 
-import io.rdbc.pgsql.core.pgstruct.Oid
+import io.rdbc.pgsql.core.Oid
 
-trait PgInt8 extends PgType[Long] {
-  val typeOid = Oid(20)
-  val cls = classOf[Long]
+case object PgInt8Type extends PgType[PgInt8] {
+  val oid = Oid(20)
+  val valCls = classOf[PgInt8]
   val name = "int8"
-  override val otherClasses = Vector(classOf[java.lang.Long])
+}
+
+final case class PgInt8(value: Long) extends PgVal[Long] {
+  val typ = PgInt8Type
 }

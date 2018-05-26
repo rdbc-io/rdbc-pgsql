@@ -22,15 +22,15 @@ import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.MessageToByteEncoder
 import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.codec.{Encoder, EncoderFactory}
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.PgFrontendMessage
+import io.rdbc.pgsql.core.internal.protocol.codec.{MessageEncoder, MessageEncoderFactory}
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.PgFrontendMessage
 import io.rdbc.util.Logging
 
-private[netty] class PgMsgEncoderHandler(encoderFactory: EncoderFactory)
+private[netty] class PgMsgEncoderHandler(encoderFactory: MessageEncoderFactory)
   extends MessageToByteEncoder[PgFrontendMessage]
     with Logging {
 
-  @volatile private[this] var encoder: Encoder = {
+  @volatile private[this] var encoder: MessageEncoder = {
     encoderFactory.encoder(SessionParams.default.clientCharset)
   }
 

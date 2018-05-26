@@ -16,7 +16,7 @@
 
 package io.rdbc.pgsql.core.internal.fsm
 
-import io.rdbc.pgsql.core.pgstruct.TxStatus
+import io.rdbc.pgsql.core.internal.protocol.TxStatus
 
 private[core]
 final case class Idle private[fsm](txStatus: TxStatus) extends EmptyState

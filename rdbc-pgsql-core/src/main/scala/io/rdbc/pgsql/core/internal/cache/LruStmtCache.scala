@@ -17,7 +17,7 @@
 package io.rdbc.pgsql.core.internal.cache
 
 import io.rdbc.pgsql.core.internal.cache.LruStmtCache.StmtWithIdx
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.{NativeSql, StmtName}
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.{NativeSql, StmtName}
 
 import scala.collection.immutable.SortedMap
 

@@ -17,40 +17,29 @@
 package io.rdbc.pgsql.core.internal
 
 import _root_.scodec.bits.ByteVector
-import io.rdbc.sapi.exceptions.MissingColumnException
 import io.rdbc.implbase.RowPartialImpl
-import io.rdbc.pgsql.core.SessionParams
-import io.rdbc.pgsql.core.exception.{PgDriverInternalErrorException, PgUnsupportedType}
-import io.rdbc.pgsql.core.pgstruct.messages.backend.RowDescription
-import io.rdbc.pgsql.core.pgstruct.messages.frontend.ColName
-import io.rdbc.pgsql.core.pgstruct.{ColFormat, ColValue, DataType}
-import io.rdbc.pgsql.core.types.PgTypeRegistry
-import io.rdbc.sapi.{Row, TypeConverterRegistry}
+import io.rdbc.pgsql.core.{ColValueToObjConverter, SessionParams}
+import io.rdbc.pgsql.core.exception.PgDriverInternalErrorException
+import io.rdbc.pgsql.core.internal.protocol.messages.backend.RowDescription
+import io.rdbc.pgsql.core.internal.protocol.messages.frontend.ColName
+import io.rdbc.pgsql.core.internal.protocol.{ColFormat, ColValue, DataType}
+import io.rdbc.sapi.Row
+import io.rdbc.sapi.exceptions.MissingColumnException
 import io.rdbc.util.Logging
 import io.rdbc.util.Preconditions._
 
-import scala.util.Failure
+import scala.reflect.ClassTag
 
 private[core] class PgRow(rowDesc: RowDescription,
                           cols: IndexedSeq[ColValue],
                           nameMapping: Map[ColName, Int],
-                          protected val typeConverters: TypeConverterRegistry,
-                          pgTypes: PgTypeRegistry,
+                          colValConverter: ColValueToObjConverter,
                           implicit private[this] val sessionParams: SessionParams)
   extends Row
     with RowPartialImpl
     with Logging {
 
-  protected def any(name: String): Option[Any] = traced {
-    checkNotNull(name)
-    checkNonEmptyString(name)
-    nameMapping.get(ColName(name)) match {
-      case Some(idx) => any(idx)
-      case None => throw new MissingColumnException(name)
-    }
-  }
-
-  protected def any(idx: Int): Option[Any] = traced {
+  override def colOpt[A: ClassTag](idx: Int): Option[A] = {
     checkNotNull(idx)
     check(idx, idx >= 0, "has to be >= 0")
     val colVal = cols(idx)
@@ -59,21 +48,32 @@ private[core] class PgRow(rowDesc: RowDescription,
       case ColValue.NotNull(rawFieldVal) =>
         val colDesc = rowDesc.colDescs(idx)
         colDesc.format match {
-          case ColFormat.Binary => Some(binaryToObj(colDesc.dataType, rawFieldVal))
+          case ColFormat.Binary =>
+            val targetType = implicitly[ClassTag[A]].runtimeClass.asInstanceOf[Class[A]]
+            Some(binaryToObj(colDesc.dataType, rawFieldVal, targetType))
+
           case ColFormat.Textual =>
-              throw new PgDriverInternalErrorException(
-                s"Value '$colVal' of column '$colDesc' is in textual format, which is unsupported"
-              )
+            throw new PgDriverInternalErrorException(
+              s"Value '$colVal' of column '$colDesc' is in textual format, which is unsupported"
+            )
         }
     }
   }
 
-  private def binaryToObj(pgType: DataType, binaryVal: ByteVector): Any = traced {
+  override def colOpt[A: ClassTag](name: String): Option[A] = {
+    checkNotNull(name)
+    checkNonEmptyString(name)
+    nameMapping.get(ColName(name)) match {
+      case Some(idx) => colOpt(idx)
+      case None => throw new MissingColumnException(name)
+    }
+  }
+
+  private def binaryToObj[T](pgType: DataType,
+                             binaryVal: ByteVector,
+                             targetType: Class[T]): T = {
     throwOnFailure {
-      pgTypes.typeByOid(pgType.oid) match {
-        case None => Failure(new PgUnsupportedType(pgType))
-        case Some(t) => t.toObj(binaryVal)
-      }
+      colValConverter.colValToObj(pgType.oid, binaryVal, targetType)
     }
   }
 }

@@ -18,10 +18,14 @@ package io.rdbc.pgsql.core.types
 
 import java.util.UUID
 
-import io.rdbc.pgsql.core.pgstruct.Oid
+import io.rdbc.pgsql.core.Oid
 
-trait PgUuid extends PgType[UUID] {
-  val typeOid = Oid(2950)
-  val cls = classOf[UUID]
+case object PgUuidType extends PgType[PgUuid] {
+  val oid = Oid(2950)
+  val valCls = classOf[PgUuid]
   val name = "uuid"
+}
+
+final case class PgUuid(value: UUID) extends PgVal[UUID] {
+  val typ = PgUuidType
 }
