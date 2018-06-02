@@ -13,9 +13,5 @@
  ! See the License for the specific language governing permissions and
  ! limitations under the License. 
  -->
-!!! warning
-    rdbc-pgsql project and this documentation is still a work in progress.
-    It's not ready yet for production use.
 
-Java guide is not ready yet.
-
+Java API is ready but not yet documented.

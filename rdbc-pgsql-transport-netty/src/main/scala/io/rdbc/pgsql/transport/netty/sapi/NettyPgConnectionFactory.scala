@@ -37,7 +37,7 @@ import io.rdbc.pgsql.core.internal.protocol.messages.backend.BackendKeyData
 import io.rdbc.pgsql.core.internal.protocol.messages.frontend.{CancelRequest, Terminate}
 import io.rdbc.pgsql.core.typeconv._
 import io.rdbc.pgsql.core.types._
-import io.rdbc.pgsql.core.{StmtArgsConverter, _}
+import io.rdbc.pgsql.core._
 import io.rdbc.pgsql.transport.netty.sapi.internal._
 import io.rdbc.pgsql.transport.netty.sapi.internal.Compat._
 import io.rdbc.sapi.Timeout
@@ -150,8 +150,8 @@ class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnectionFacto
       stmtCacheConfig = pgConfig.stmtCacheConfig
     )
 
-    val typeConv = TypeConverter.fromPartials(pgConfig.typeConverters)
-    val typeCodec = AnyPgValCodec.fromCodecs(pgConfig.typeCodecs)
+    val typeConv = TypeConverter.fromPartials(BuiltInTypeConverters ++ pgConfig.typeConverters)
+    val typeCodec = AnyPgValCodec.fromCodecs(BuiltInCodecs ++ pgConfig.typeCodecs)
 
     new NettyPgConnection(
       id = ConnId(ch.id().asShortText()),
@@ -163,7 +163,7 @@ class NettyPgConnectionFactory protected(val nettyConfig: NettyPgConnectionFacto
       scheduler = scheduler,
       requestCanceler = abortRequest,
       stmtArgsConverter = {
-        val typeMapping = TypeMappingRegistry.fromMappings(pgConfig.typeMappings)
+        val typeMapping = TypeMappingRegistry.fromMappings(BuiltInTypeMappings ++ pgConfig.typeMappings)
         new StmtArgsConverter(AnyArgToPgArgConverter.of(
           typeConverter = typeConv,
           typeMapping = typeMapping,

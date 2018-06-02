@@ -13,9 +13,6 @@
  ! See the License for the specific language governing permissions and
  ! limitations under the License. 
  -->
-!!! warning
-    rdbc-pgsql project and this documentation is still a work in progress.
-    It's not ready yet for production use.
 
 The table below lists SQL state codes and exceptions that map to them. Every
 driver exception class extends some rdbc exception type. You can extract

@@ -18,8 +18,8 @@ package io.rdbc.pgsql.core.config.sapi
 
 import io.rdbc.pgsql.core.auth.Authenticator
 import io.rdbc.pgsql.core.config.sapi.PgConnFactoryConfig.Defaults
-import io.rdbc.pgsql.core.typeconv.{BuiltInTypeConverters, BuiltInTypeMappings, PartialTypeConverter, TypeMapping}
-import io.rdbc.pgsql.core.types.{BuiltInCodecs, PgType, PgVal, PgValCodec}
+import io.rdbc.pgsql.core.typeconv.{PartialTypeConverter, TypeMapping}
+import io.rdbc.pgsql.core.types.{PgType, PgVal, PgValCodec}
 import io.rdbc.sapi.Timeout
 
 import scala.concurrent.ExecutionContext
@@ -32,9 +32,9 @@ object PgConnFactoryConfig {
     val subscriberMinDemandRequestSize: Int = 10
     val stmtCacheConfig: StmtCacheConfig = StmtCacheConfig.Enabled(capacity = 100)
     val writeTimeout: Timeout = Timeout(10.seconds)
-    val typeConverters: Vector[PartialTypeConverter[_]] = BuiltInTypeConverters
-    val typeMappings: Vector[TypeMapping[_, _ <: PgType[_ <: PgVal[_]]]] = BuiltInTypeMappings
-    val typeCodecs: Vector[PgValCodec[_ <: PgVal[_]]] = BuiltInCodecs
+    val typeConverters: Vector[PartialTypeConverter[_]] = Vector.empty
+    val typeMappings: Vector[TypeMapping[_, _ <: PgType[_ <: PgVal[_]]]] = Vector.empty
+    val typeCodecs: Vector[PgValCodec[_ <: PgVal[_]]] = Vector.empty
     val ec: ExecutionContext = ExecutionContext.global
   }
 }
@@ -48,7 +48,7 @@ final case class PgConnFactoryConfig
  subscriberMinDemandRequestSize: Int = Defaults.subscriberMinDemandRequestSize,
  stmtCacheConfig: StmtCacheConfig = Defaults.stmtCacheConfig,
  writeTimeout: Timeout = Defaults.writeTimeout,
- typeConverters: Vector[PartialTypeConverter[_]],
- typeMappings: Vector[TypeMapping[_, _ <: PgType[_ <: PgVal[_]]]],
- typeCodecs: Vector[PgValCodec[_ <: PgVal[_]]],
+ typeConverters: Vector[PartialTypeConverter[_]] = Defaults.typeConverters,
+ typeMappings: Vector[TypeMapping[_, _ <: PgType[_ <: PgVal[_]]]] = Defaults.typeMappings,
+ typeCodecs: Vector[PgValCodec[_ <: PgVal[_]]] = Defaults.typeCodecs,
  ec: ExecutionContext = Defaults.ec)
