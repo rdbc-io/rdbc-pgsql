@@ -13,9 +13,6 @@
  ! See the License for the specific language governing permissions and
  ! limitations under the License. 
  -->
-!!! warning
-    rdbc-pgsql project and this documentation is still a work in progress.
-    It's not ready yet for production use.
 
 As rdbc documentation [mentions](http://docs.api.rdbc.io/scala/connection/#connecting-to-a-database),
 to use the API you need to construct a driver specific [`ConnectionFactory`]() 
@@ -160,42 +157,40 @@ options non-specific to any transport library.
 
 #### Other
 
--    **typeConvertersProviders**
+-    **typeConverters**
      
-     Providers providing converters that can do conversions between Scala types
-     that represent database values and any other types. This option
-     may be useful if you want to use Scala types not supported by default by rdbc.
-     By default, conversions listed [here]() are provided.
+     Column values and statement arguments have some nominal Scala types that
+     directly correspond to PostgreSQL types. Converters specified here will 
+     convert between the nominal type and the type specified by the client. 
+     For example, `int4` column is nominally represented by `PgInt4` class but 
+     because there is a converter that can convert between `PgInt4` and `Int`
+     whenever a `PgInt4` is expected client can supply an `Int`.
      
-     Default value: `:::scala Vector(new StandardTypeConvertersProvider)`.
+     Converters specified here supplement built-in converters.
+     
+     Default value: `:::scala Vector.empty`.
 
 ---
 
--    **pgTypesProviders**
+-    **typeMappings**
      
-     Providers providing definitions of PostgreSQL types and means to serialize
-     and deserialize them. By default, types listed [here]() are supported
-     and [scodec]() library is used for serialization and deserialization.
+     Statement arguments have some nominal types that directly correspond
+     to PostgreSQL types. If non-nominal type is used as a statement argument
+     there has to be a mapping between this type and a nominal type. For instance,
+     `String` maps to `PgText` type.
      
-     Default value: `:::scala Vector(new ScodecPgTypesProvider)`.
+     Type mappings specified there supplement built-in mappings.     
      
+     Default value: `:::scala Vector.empty`.
 ---
 
--    **msgDecoderFactory**
+-    **typeCodecs**
      
-     A factory creating PostgreSQL protocol message decoder. By default,
-     [scodec]() library is used to decode messages.
+     Codecs for PostgreSQL types not supported by default by the driver. 
      
-     Default value: `:::scala new ScodecDecoderFactory`.
+     Codecs specified here supplement built-in codecs.
      
----
-
--    **msgEncoderFactory**
-     
-     A factory creating PostgreSQL protocol message encoder. By default,
-     [scodec]() library is used to encode messages.
-     
-     Default value: `:::scala new ScodecEncoderFactory`.
+     Default value: `:::scala Vector.empty`.
      
 ---
 
