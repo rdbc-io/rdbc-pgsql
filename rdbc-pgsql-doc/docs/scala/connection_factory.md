@@ -179,7 +179,7 @@ options non-specific to any transport library.
      there has to be a mapping between this type and a nominal type. For instance,
      `String` maps to `PgText` type.
      
-     Type mappings specified there supplement built-in mappings.     
+     Type mappings specified there supplement built-in mappings.
      
      Default value: `:::scala Vector.empty`.
 ---

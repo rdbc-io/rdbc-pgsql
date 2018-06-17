@@ -12,6 +12,7 @@ pages:
       - Exceptions: scala/exceptions.md
     - Java API user guide: java/java.md
     - Developer guide: developer.md
+    - Privacy policy: privacy.md
 theme:
   name: material
   language: en
@@ -42,3 +43,6 @@ markdown_extensions:
 
 extra_css:
   - 'css/extra.css'
+
+extra_javascript:
+  - 'javascripts/extra.js'
