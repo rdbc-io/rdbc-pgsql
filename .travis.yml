@@ -2,112 +2,17 @@ language: scala
 dist: trusty
 sudo: false
 
-before_install:
-  - wget https://raw.githubusercontent.com/sormuras/bach/master/install-jdk.sh
+jdk:
+- oraclejdk8
+- openjdk9
+- openjdk10
+- openjdk11
+- openjdk-ea
 
-matrix:
-  include:
-# scala 2.11, PG 10
-    - env: JDK='Oracle JDK 8' PG_VER=V10
-      jdk: oraclejdk8
-      scala: 2.11.12
-    - env: JDK='OpenJDK 8' PG_VER=V10
-      jdk: openjdk8
-      scala: 2.11.12
-    - env: JDK='Oracle JDK 9' PG_VER=V10
-      jdk: oraclejdk9
-      scala: 2.11.12
-    - env: JDK='OpenJDK 9' PG_VER=V10
-      install: . ./install-jdk.sh -F 9
-      scala: 2.11.12
-    - env: JDK='Oracle JDK 10' PG_VER=V10
-      install: . ./install-jdk.sh -F 10 -L BCL
-      scala: 2.11.12
-    - env: JDK='OpenJDK 10' PG_VER=V10
-      install: . ./install-jdk.sh -F 10 -L GPL
-      scala: 2.11.12
-    - env: JDK='Oracle JDK 11' PG_VER=V10
-      install: . ./install-jdk.sh -F 11 -L BCL
-      scala: 2.11.12
-    - env: JDK='OpenJDK 11' PG_VER=V10
-      install: . ./install-jdk.sh -F 11 -L GPL
-      scala: 2.11.12
-# scala 2.12, PG 10
-    - env: JDK='Oracle JDK 8' PG_VER=V10
-      jdk: oraclejdk8
-      scala: 2.12.6
-    - env: JDK='OpenJDK 8' PG_VER=V10
-      jdk: openjdk8
-      scala: 2.12.6
-    - env: JDK='Oracle JDK 9' PG_VER=V10
-      jdk: oraclejdk9
-      scala: 2.12.6
-    - env: JDK='OpenJDK 9' PG_VER=V10
-      install: . ./install-jdk.sh -F 9
-      scala: 2.12.6
-    - env: JDK='Oracle JDK 10' PG_VER=V10
-      install: . ./install-jdk.sh -F 10 -L BCL
-      scala: 2.12.6
-    - env: JDK='OpenJDK 10' PG_VER=V10
-      install: . ./install-jdk.sh -F 10 -L GPL
-      scala: 2.12.6
-    - env: JDK='Oracle JDK 11' PG_VER=V10
-      install: . ./install-jdk.sh -F 11 -L BCL
-      scala: 2.12.6
-    - env: JDK='OpenJDK 11' PG_VER=V10
-      install: . ./install-jdk.sh -F 11 -L GPL
-      scala: 2.12.6
-# scala 2.11, PG 9.6
-    - env: JDK='Oracle JDK 8' PG_VER=V9_6
-      jdk: oraclejdk8
-      scala: 2.11.12
-    - env: JDK='OpenJDK 8' PG_VER=V9_6
-      jdk: openjdk8
-      scala: 2.11.12
-    - env: JDK='Oracle JDK 9' PG_VER=V9_6
-      jdk: oraclejdk9
-      scala: 2.11.12
-    - env: JDK='OpenJDK 9' PG_VER=V9_6
-      install: . ./install-jdk.sh -F 9
-      scala: 2.11.12
-    - env: JDK='Oracle JDK 10' PG_VER=V9_6
-      install: . ./install-jdk.sh -F 10 -L BCL
-      scala: 2.11.12
-    - env: JDK='OpenJDK 10' PG_VER=V9_6
-      install: . ./install-jdk.sh -F 10 -L GPL
-      scala: 2.11.12
-    - env: JDK='Oracle JDK 11' PG_VER=V9_6
-      install: . ./install-jdk.sh -F 11 -L BCL
-      scala: 2.11.12
-    - env: JDK='OpenJDK 11' PG_VER=V9_6
-      install: . ./install-jdk.sh -F 11 -L GPL
-      scala: 2.11.12
-# scala 2.12, PG 9.6
-    - env: JDK='Oracle JDK 8' PG_VER=V9_6
-      jdk: oraclejdk8
-      scala: 2.12.6
-    - env: JDK='OpenJDK 8' PG_VER=V9_6
-      jdk: openjdk8
-      scala: 2.12.6
-    - env: JDK='Oracle JDK 9' PG_VER=V9_6
-      jdk: oraclejdk9
-      scala: 2.12.6
-    - env: JDK='OpenJDK 9' PG_VER=V9_6
-      install: . ./install-jdk.sh -F 9
-      scala: 2.12.6
-    - env: JDK='Oracle JDK 10' PG_VER=V9_6
-      install: . ./install-jdk.sh -F 10 -L BCL
-      scala: 2.12.6
-    - env: JDK='OpenJDK 10' PG_VER=V9_6
-      install: . ./install-jdk.sh -F 10 -L GPL
-      scala: 2.12.6
-    - env: JDK='Oracle JDK 11' PG_VER=V9_6
-      install: . ./install-jdk.sh -F 11 -L BCL
-      scala: 2.12.6
-    - env: JDK='OpenJDK 11' PG_VER=V9_6
-      install: . ./install-jdk.sh -F 11 -L GPL
-      scala: 2.12.6
-      
+scala:
+- 2.11.12
+- 2.12.7
+
 script: sbt ++$TRAVIS_SCALA_VERSION clean scalastyle test:scalastyle coverage test coverageReport
 after_success: bash <(curl -s https://codecov.io/bash)
 cache:
@@ -121,3 +26,6 @@ before_cache:
 env:
   global:
     - DEFAULT_TIMEOUT_MILLIS=300 #Reactive Streams testkit timeout for async ops
+  matrix:
+  - PG_VER=V9_6
+  - PG_VER=V10
